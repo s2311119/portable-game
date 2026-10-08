@@ -731,11 +731,15 @@ public:
     id = recid;
 
     // デフォルト値
+    name = "？？？";
+    tpCost = 0;
+    power = 0;
+
     type = EffectType::DAMAGE;
     scope = TargetScope::SINGLE_ENEMY;
+    dependence = StatDependence::ATK;
     category = Category::PHYSICAL;
-    if (dependence == StatDependence::SEN) category = Category::MELODY;
-    if (type == EffectType::HEAL || type == EffectType::BUFF) category = Category::OTHER;
+
     switch (id) {
       // --- 主人公 (ID 0-19) ---
       case 0: name = "プチノイズ"; tpCost = 5; power = 10; dependence = StatDependence::SEN; break; // 魔法っぽいのでSEN
@@ -1299,6 +1303,25 @@ public:
     // はぐれ系 (125 ノイズストーム, 126 ロイヤルチャージ) は魔法っぽい？
     if (id == 125 || id == 126) {
         dependence = StatDependence::SEN;
+    }
+    // スキル設定がすべて確定した後にカテゴリを決定
+    bool isOffensive =
+        type == EffectType::DAMAGE ||
+        type == EffectType::MULTI_HIT_DAMAGE ||
+        (type == EffectType::SPECIAL &&
+        power > 0 &&
+        (scope == TargetScope::SINGLE_ENEMY ||
+          scope == TargetScope::ALL_ENEMIES ||
+          scope == TargetScope::RANDOM_ENEMY));
+
+    if (!isOffensive) {
+        category = Category::OTHER;
+    }
+    else if (dependence == StatDependence::SEN) {
+        category = Category::MELODY;
+    }
+    else {
+        category = Category::PHYSICAL;
     }
   }
 };
