@@ -6864,11 +6864,11 @@ public:
         }
 
         // --- ターゲット解決 ---
-        // (単体対象の場合のみ、挑発やかばうを考慮してターゲットを変える)
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
-            currentSkill.scope == Skill::TargetScope::SINGLE_ALLY) 
-        {
-          currentTarget = resolveTarget(currentTarget, currentSkill);
+        // 敵単体を狙う行動だけ、挑発・ステルス・かばうを考慮する。
+        // 味方への回復・バフ・治療などには干渉させない。
+        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY) {
+          currentTarget =
+              resolveTarget(currentTarget, currentSkill);
         }
 
         // --- 実行ロジック ---
@@ -6888,14 +6888,26 @@ public:
 
           if (targetCanReceiveSkill) {                
             // 1. 反射判定
+            // このブロックでは敵単体への攻撃だけを反射対象にする。
+            // 全体攻撃・ランダム攻撃への反射対応は別途共通化する。
             bool isReflected = false;
-            if (currentSkill.type != Skill::EffectType::HEAL) {
-              if (currentTarget->reflectAllTurns > 0) isReflected = true;
-              else if (currentTarget->reflectPhysicalTurns > 0 && currentSkill.category == Skill::Category::PHYSICAL) {
-                isReflected = true; currentTarget->reflectPhysicalTurns--;
+
+            if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY) {
+
+              if (currentTarget->reflectAllTurns > 0) {
+                isReflected = true;
               }
-              else if (currentTarget->reflectMagicTurns > 0 && currentSkill.category == Skill::Category::MELODY) {
-                isReflected = true; currentTarget->reflectMagicTurns--;
+              else if (currentTarget->reflectPhysicalTurns > 0 &&
+                      currentSkill.category == Skill::Category::PHYSICAL)
+              {
+                isReflected = true;
+                currentTarget->reflectPhysicalTurns--;
+              }
+              else if (currentTarget->reflectMagicTurns > 0 &&
+                      currentSkill.category == Skill::Category::MELODY)
+              {
+                isReflected = true;
+                currentTarget->reflectMagicTurns--;
               }
             }
 
@@ -6910,8 +6922,10 @@ public:
             
             // 3. カウンター判定
             // 条件: 反射されていない & ターゲットが生きてる & カウンター持ち & 物理攻撃 & ★自分への攻撃ではない
-            if (!isReflected && currentTarget->getHp() > 0 && 
-                currentTarget->counterTurns > 0 && 
+            if (!isReflected &&
+                currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
+                currentTarget->getHp() > 0 &&
+                currentTarget->counterTurns > 0 &&
                 currentSkill.category == Skill::Category::PHYSICAL &&
                 currentTarget != currentActor)
             {
@@ -7922,7 +7936,7 @@ private:
             }
           }
         }
-        
+
         // その他 (未実装)
         else {
           lastActionMessage = "しかし何も起こらなかった。";
