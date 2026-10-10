@@ -5803,7 +5803,11 @@ public:
     }
     activeEnemies.clear();
     activeEnemies.reserve(4);
-    if (floor % 10 == 0 && !map.isTown){
+    if (floor >= 10 &&
+        floor <= 50 &&
+        floor % 10 == 0 &&
+        !map.isTown)
+    {
       isBossBattleMode = true;
       int bossId = 0;
       if (floor == 10) bossId = 80;
@@ -8947,73 +8951,156 @@ void loop() {
         currentEvent = EVENT_NONE; // イベントタイプをリセット
         break; // EVENT_TREASURE_BOX 終了
       }
+
       case EVENT_STAIR_UP: {
-        map.currentFloor++;
-        int width = 0, height = 0;
-        Map::MapType nextType = Map::MapType::TYPE_DUNGEON;
-        if (map.currentFloor % 10 == 0){
-          int bossIndex = (map.currentFloor / 10) - 1;
-          // ボスを倒しているかチェック
-          width = height = 5;
-          if (ctx->bossDefeated[bossIndex]) {
-            nextType = Map::MapType::TYPE_TOWN; // 倒してれば集落
-            map.isTown = true;
-            music.switchTrack(0, sd);  // 集落BGM
-          } else {
-            map.isTown = false;
-            nextType = Map::MapType::TYPE_BOSS_ROOM; // まだならボス部屋
-            music.switchTrack(1, sd); // ボス部屋BGM (ダンジョンと同じか、無音で緊張感を出す)
-          }
-        }else {
-          // 通常階
-          map.isTown = false;
-          width = height = 20;
-          nextType = Map::MapType::TYPE_DUNGEON;
-          music.switchTrack(1, sd); // ダンジョンBGM
+        // 50Fを最終階とする
+        if (map.currentFloor >= 50) {
+          state = STATE_GAME;
+          currentEvent = EVENT_NONE;
+          break;
         }
-        ctx->graphic->setFloor(map.currentFloor);
-        ctx->map->regenerate(width, height, nextType);
-        ctx->hero->reset(*ctx->map);
-        state = STATE_GAME;
-        currentEvent = EVENT_NONE;
-        break;
-      }
-      case EVENT_STAIR_DOWN: {
-        if (map.currentFloor > 1) {
-          int width = 0, height = 0;
-          map.currentFloor--;
-          Map::MapType nextType = Map::MapType::TYPE_DUNGEON;
-          if (map.currentFloor == 1) {
-            nextType = Map::MapType::TYPE_TOWN;
-            music.switchTrack(0, sd);
-          }else if (map.currentFloor % 10 == 0) {
+
+        map.currentFloor++;
+
+        int width = 0;
+        int height = 0;
+
+        Map::MapType nextType =
+            Map::MapType::TYPE_DUNGEON;
+
+        // 10F / 20F / 30F / 40F / 50F
+        if (map.currentFloor % 10 == 0) {
+
+          int bossIndex =
+              (map.currentFloor / 10) - 1;
+
+          // bossDefeated[] の範囲内だけ参照する
+          if (bossIndex >= 0 &&
+              bossIndex < 5)
+          {
             width = height = 5;
-            int bossIndex = (map.currentFloor / 10) - 1;
+
             if (ctx->bossDefeated[bossIndex]) {
+              // 撃破済みなら集落
               nextType = Map::MapType::TYPE_TOWN;
-              music.switchTrack(0, sd);
               map.isTown = true;
-            }else {
-              // (ありえないが) ボス未撃破ならボス部屋
+              music.switchTrack(0, sd);
+            }
+            else {
+              // 未撃破ならボス部屋
               nextType = Map::MapType::TYPE_BOSS_ROOM;
+              map.isTown = false;
               music.switchTrack(1, sd);
             }
-          }else {
+          }
+          else {
+            // 想定外の10の倍数階
             width = height = 20;
-            // 通常階
-            map.isTown = false;
             nextType = Map::MapType::TYPE_DUNGEON;
+            map.isTown = false;
             music.switchTrack(1, sd);
           }
-          // 3. マップ生成
-          ctx->graphic->setFloor(map.currentFloor);
-          ctx->map->regenerate(width, height, nextType);
-          ctx->hero->reset(*ctx->map);
         }
+        else {
+          // 通常階
+          width = height = 20;
+          nextType = Map::MapType::TYPE_DUNGEON;
+          map.isTown = false;
+          music.switchTrack(1, sd);
+        }
+
+        ctx->graphic->setFloor(map.currentFloor);
+
+        ctx->map->regenerate(
+            width,
+            height,
+            nextType
+        );
+
+        ctx->hero->reset(*ctx->map);
+
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
         break;
       }
+
+      case EVENT_STAIR_DOWN: {
+        if (map.currentFloor > 1) {
+
+          map.currentFloor--;
+
+          int width = 0;
+          int height = 0;
+
+          Map::MapType nextType =
+              Map::MapType::TYPE_DUNGEON;
+
+          // 1Fは集落
+          if (map.currentFloor == 1) {
+
+            nextType = Map::MapType::TYPE_TOWN;
+            map.isTown = true;
+            music.switchTrack(0, sd);
+          }
+
+          // 10F / 20F / 30F / 40F / 50F
+          else if (map.currentFloor % 10 == 0) {
+
+            int bossIndex =
+                (map.currentFloor / 10) - 1;
+
+            // bossDefeated[] の範囲内だけ参照
+            if (bossIndex >= 0 &&
+                bossIndex < 5)
+            {
+              width = height = 5;
+
+              if (ctx->bossDefeated[bossIndex]) {
+                // 撃破済みなら集落
+                nextType = Map::MapType::TYPE_TOWN;
+                map.isTown = true;
+                music.switchTrack(0, sd);
+              }
+              else {
+                // 未撃破ならボス部屋
+                nextType = Map::MapType::TYPE_BOSS_ROOM;
+                map.isTown = false;
+                music.switchTrack(1, sd);
+              }
+            }
+            else {
+              // 想定外の10の倍数階
+              width = height = 20;
+              nextType = Map::MapType::TYPE_DUNGEON;
+              map.isTown = false;
+              music.switchTrack(1, sd);
+            }
+          }
+
+          // 通常階
+          else {
+            width = height = 20;
+            nextType = Map::MapType::TYPE_DUNGEON;
+            map.isTown = false;
+            music.switchTrack(1, sd);
+          }
+
+          ctx->graphic->setFloor(map.currentFloor);
+
+          ctx->map->regenerate(
+              width,
+              height,
+              nextType
+          );
+
+          ctx->hero->reset(*ctx->map);
+        }
+
+        state = STATE_GAME;
+        currentEvent = EVENT_NONE;
+        break;
+      }
+
       case EVENT_AUTOMATON: {
         // TODO: 「壊れたオートマタがある。調律しますか？」の
         // メッセージウィンドウを本当は出すべき
