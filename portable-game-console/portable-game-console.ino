@@ -129,7 +129,7 @@ public:
     TYPE_TOWN,
     TYPE_BOSS_ROOM
   };
-  MapType currentType;
+
   // ★★★ 追加：部屋の矩形情報を保存する構造体 ★★★
   struct Room {
     int x, y, w, h;
@@ -192,6 +192,10 @@ public:
     return currentType == TYPE_TOWN;
   }
 
+  bool isBossRoom() const {
+    return currentType == TYPE_BOSS_ROOM;
+  }
+
   void regenerate(int max_w, int max_h, MapType type){
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
@@ -208,6 +212,7 @@ public:
     placeObjects();
   }
 private:
+  MapType currentType;
   void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
       MAP_WIDTH = 8;
@@ -9647,7 +9652,7 @@ void loop() {
     if (moved && !menu.active) {
       // 5. イベントが発生しなかった場合のみ、エンカウントをチェック
       if (!eventOccurred && !map.isTown()) {
-        if (map.currentType != Map::MapType::TYPE_BOSS_ROOM &&
+        if (!map.isBossRoom() &&
             encounter.checkEncounter()) {
           vib.trigger(300);
           state = STATE_BATTLE;
