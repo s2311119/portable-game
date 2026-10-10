@@ -9738,9 +9738,15 @@ void loop() {
           itemId = 2; // 銅の歯車
         }
         else if (r < 90) { // レア素材
-          if (floor <= 20) itemId = 1; // 鉄くず(進化素材)
-          else if (floor <= 30) itemId = 10 + random(0, 2); // 銀/金の歯車
-          else itemId = 13; // 謎のパーツ
+          if (floor <= 20) {
+            itemId = 1; // 鉄くず
+          }
+          else if (floor <= 30) {
+            itemId = 3 + random(0, 2); // 銀の歯車 / 金の歯車
+          }
+          else {
+            itemId = 5; // 謎のパーツ
+          }
         }
         else if (r < 93) { // 巻物 (3%)
           int minSkill = 1, maxSkill = 5;
