@@ -6002,8 +6002,6 @@ public:
           pendingSkillIndex = -1;
           currentTarget = nullptr;
 
-          turnCount++;
-
           currentBattleState = STATE_ACTOR_SELECT;
         }
         break;
@@ -6575,6 +6573,10 @@ public:
       case STATE_EXECUTE_NEXT_ACTION: {
         // 全ての予約行動を実行し終えた
         if (currentPlannedActionIndex >= plannedActions.size()) {
+          // 今のターンの全行動が終了したので、
+          // 次のターン番号へ進める
+          turnCount++;
+
           battlePhase = BattlePhase::PLANNING;
           currentBattleState = STATE_TURN_START;
           break;
