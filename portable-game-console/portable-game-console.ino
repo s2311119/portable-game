@@ -3520,25 +3520,24 @@ const int Status::skillLearningRuleCount = sizeof(Status::skillLearningTable) / 
 class Automaton {
 public:
   Status* status;
-  const char* name;
-  int who; // 仲間の種類 (5体のうちのどれか、またはその進化形)
 
   /**
    * @brief 仲間（オートマタ）を生成
    * @param level 初期レベル
-   * @param w 仲間の種類ID (who)
+   * @param w 仲間の種類ID
    */
   Automaton(int level, int w) {
-    who = w;
-    status = new Status(level, who);
-    
-    name = status->getname();
+    status = new Status(level, w);
   }
-  const char* getname(){
-    name = status->getname();
-    return name;
+
+  const char* getname() {
+    return status->getname();
   }
-  // (デストラクタ：Statusも削除)
+
+  int getWho() {
+    return status->getWho();
+  }
+
   ~Automaton() {
     delete status;
     status = nullptr;
@@ -4986,11 +4985,9 @@ public:
     party.members.clear();
     int memberCount = file.readStringUntil('\n').toInt();
     for(int i=0; i<memberCount; i++) {
-       Automaton* ally = new Automaton(1, 0); 
-       ally->status->loadFrom(file);
-       ally->who = ally->status->getWho(); 
-       ally->name = ally->status->getname();
-       party.members.push_back(ally);
+      Automaton* ally = new Automaton(1, 0);
+      ally->status->loadFrom(file);
+      party.members.push_back(ally);
     }
 
     // 5. 預かり所復元
@@ -4998,11 +4995,9 @@ public:
     party.storage.clear();
     int storageCount = file.readStringUntil('\n').toInt();
     for(int i=0; i<storageCount; i++) {
-       Automaton* ally = new Automaton(1, 0); 
-       ally->status->loadFrom(file);
-       ally->who = ally->status->getWho();
-       ally->name = ally->status->getname();
-       party.storage.push_back(ally);
+      Automaton* ally = new Automaton(1, 0);
+      ally->status->loadFrom(file);
+      party.storage.push_back(ally);
     }
 
     for (int i = 0; i < 5; i++) {
@@ -5308,7 +5303,11 @@ public:
               for(int i = startIdx; i < endIdx; i++) {
                   g->lineSprite.setCursor(30, 60 + (i - startIdx) * 25 - drawY);
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
-                  g->lineSprite.printf("%s Lv%d", party.storage[i]->name, party.storage[i]->status->getLevel());
+                  g->lineSprite.printf(
+                      "%s Lv%d",
+                      party.storage[i]->status->getname(),
+                      party.storage[i]->status->getLevel()
+                  );
               }
           }
           else if (storageMode == 2) {
@@ -5318,7 +5317,11 @@ public:
               for(int i=0; i<count; i++) {
                   g->lineSprite.setCursor(30, 60 + i*25 - drawY);
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
-                  g->lineSprite.printf("%s Lv%d", party.members[i]->name, party.members[i]->status->getLevel());
+                  g->lineSprite.printf(
+                      "%s Lv%d",
+                      party.members[i]->status->getname(),
+                      party.members[i]->status->getLevel()
+                  );
               }
           }
       } else if (currentMenuState == STATE_SAVE_RESULT) {
@@ -7467,7 +7470,12 @@ public:
             if (ally->status->getHp() > 0) {
               int allyRes = ally->status->gainXP(lastGainedXP);
               if (allyRes >= 1) resultMessages.push_back(String(ally->status->getname()) + "はLv" + String(ally->status->getLevel()) + "になった!");
-              if (allyRes == 2) resultMessages.push_back(String(ally->name) + "は進化した!");
+              if (allyRes == 2) {
+                resultMessages.push_back(
+                    String(ally->status->getname()) +
+                    "は進化した!"
+                );
+              }
             }
           }
           
