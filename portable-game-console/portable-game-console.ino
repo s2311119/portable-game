@@ -5593,6 +5593,21 @@ public:
     FLEE
   };
 
+  enum class ActionPriority {
+    NORMAL = 0,
+    FIRST_STRIKE = 1
+  };
+
+  struct BattleAction {
+    Status* actor = nullptr;          // 行動するキャラ
+    ActionType type = ActionType::NONE;
+    int skillIndex = -1;             // SKILLの場合のみ使用
+    Status* target = nullptr;         // 単体対象。全体技などではnullptr可
+
+    ActionPriority priority = ActionPriority::NORMAL;
+    int speedSnapshot = 0;           // 行動決定時点のSPD
+  };
+
   enum class MessageFlow {
     ACTION_COMPLETE, // 実際の行動が終わった
     CONTINUE_TURN,   // 毒・回復等の表示後、まだ行動する
@@ -5622,6 +5637,8 @@ public:
   std::vector<Status*> actorList; // 戦闘参加者 (Speed順)
   int currentActorIndex = 0;        // 現在行動中のキャラのインデックス
   Status* currentActor = nullptr; // 現在行動中のキャラのStatus
+  // 1ターン分の行動予定
+  std::vector<BattleAction> plannedActions;
   int lastDamage = 0;             // 直前のダメージ計算結果
   String lastActionMessage = "";
   int lastGainedXP = 0;
@@ -5633,9 +5650,53 @@ public:
   uint16_t* activeImages[8];
   std::vector<String> resultMessages;
   int resultMessageIndex = 0;
+
+  BattleAction createBattleAction(
+      Status* actor,
+      ActionType type,
+      int skillIndex = -1,
+      Status* target = nullptr)
+  {
+    BattleAction action;
+
+    action.actor = actor;
+    action.type = type;
+    action.skillIndex = skillIndex;
+    action.target = target;
+
+    if (actor != nullptr) {
+      action.speedSnapshot = actor->getSpeed();
+    }
+
+    // 先制技判定
+    if (type == ActionType::SKILL && actor != nullptr) {
+      std::vector<Skill>& skills = actor->getLearnedSkills();
+
+      if (skillIndex >= 0 &&
+          skillIndex < static_cast<int>(skills.size()))
+      {
+        int skillId = skills[skillIndex].id;
+
+        // 必ず先制
+        if (skillId == 38 ||   // ソニックブレイド
+            skillId == 84 ||   // マッハブレイド
+            skillId == 121)    // ソニックダガー
+        {
+          action.priority = ActionPriority::FIRST_STRIKE;
+        }
+      }
+    }
+
+    return action;
+  }
+
   Battle() {
-    activeEnemies.reserve(4); // 敵は最大4体まで
-    for(int i=0; i<8; i++) activeImages[i] = nullptr;
+    activeEnemies.reserve(4);
+    plannedActions.reserve(8);
+
+    for(int i=0; i<8; i++) {
+      activeImages[i] = nullptr;
+    }
   }
 
   void start(MUSIC &music, Sd &sd, Caractor& hero, Party& party, int floor, ImageManager &imgMgr, Map& map) {
@@ -5659,6 +5720,7 @@ public:
     lastActionMessage = "";
     enemyTargetIndex = 0;
     allyTargetIndex = 0;
+    plannedActions.clear();
 
     // 参加メンバーへの参照を保存
     heroRef = &hero;
