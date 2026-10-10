@@ -5557,7 +5557,8 @@ public:
     STATE_ENEMY_AI,         // 7. 敵のAI実行
     STATE_ACTION_CALC,      // 8. 行動実行（計算）
     STATE_ACTION_MSG,       // 9. 行動結果のメッセージ
-    STATE_CHECK_BATTLE_RESULT, // 10. 結果判定
+    STATE_CHECK_BATTLE_RESULT, // 10. 勝敗だけ確認
+    STATE_END_ACTOR_TURN,      // 11. 現在の行動者のターン終了処理
     STATE_SHOW_XP_GAIN,     // 12. XP獲得表示
     STATE_BATTLE_END,       // 15. 戦闘終了
     STATE_CHECK_STATUS,      // 16. Yボタンステータス
@@ -6553,7 +6554,7 @@ public:
             else if (!currentTarget->isPlayer() && lastPopup.value > 0) vibration.trigger(30);
         }
 
-        currentBattleState = STATE_ACTION_MSG; 
+        currentBattleState = STATE_ACTION_MSG;
         break;
       }
       
@@ -6672,15 +6673,28 @@ public:
         // -------------------------
         // 4. まだ戦闘継続
         // -------------------------
+        currentBattleState = STATE_END_ACTOR_TURN;
+        break;
+      }
 
-        // 実際に行動を完了した場合だけ2回行動を許可する。
-        // 麻痺・死亡など END_TURN の場合は再行動させない。
+      case STATE_END_ACTOR_TURN: {
+        // -------------------------
+        // 1. 2回行動
+        // -------------------------
+        // 実際に行動を完了していて、
+        // かつ本人がまだ生きている場合のみ再行動する
         if (messageFlow == MessageFlow::ACTION_COMPLETE &&
             currentActor != nullptr &&
             currentActor->getHp() > 0 &&
             currentActor->isDoubleAction)
         {
           currentActor->isDoubleAction = false;
+
+          // 前の行動情報をクリア
+          pendingActionType = ActionType::NONE;
+          pendingSkillIndex = -1;
+          currentTarget = nullptr;
+          messageFlow = MessageFlow::ACTION_COMPLETE;
 
           if (currentActor->isPlayer()) {
             message = String(currentActor->getname()) + " の再行動！";
@@ -6693,11 +6707,22 @@ public:
           break;
         }
 
-        // 通常の行動終了
+        // -------------------------
+        // 2. この行動者のターン終了
+        // -------------------------
         if (currentActor != nullptr) {
           currentActor->UpdateTurn();
         }
 
+        // 次の行動に古い情報を持ち越さない
+        pendingActionType = ActionType::NONE;
+        pendingSkillIndex = -1;
+        currentTarget = nullptr;
+        messageFlow = MessageFlow::ACTION_COMPLETE;
+
+        // -------------------------
+        // 3. 次の行動者へ
+        // -------------------------
         currentActorIndex++;
         currentBattleState = STATE_ACTOR_SELECT;
 
