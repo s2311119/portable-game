@@ -103,7 +103,6 @@ public:
 
 class Map {
 public:
-  int currentFloor = 1;
   // マップの寸法（コンストラクタで決定）  
   static const int TILE_SIZE = 32;
   static const int TILE_GRASS = 0;
@@ -251,6 +250,7 @@ private:
   ObjectPos stairDownPos = {-1, -1};
   ObjectPos playerStartPos;
   int automatonWhoId = -1;
+  int currentFloor = 1;
 
   void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
@@ -4993,7 +4993,7 @@ public:
     // -------------------------------------------------
     // 1. 現在のマップ状態
     // -------------------------------------------------
-    file.println(map.currentFloor);
+    file.println(map.getFloor());
     file.println((int)map.getType());
 
     file.println(map.getMAP_WIDTH());
@@ -5343,12 +5343,12 @@ public:
           loadedType;
 
       // ボス階ではbossFlagsを優先
-      if (map.currentFloor >= 10 &&
-          map.currentFloor <= 50 &&
-          map.currentFloor % 10 == 0)
+      if (map.getFloor() >= 10 &&
+          map.getFloor() <= 50 &&
+          map.getFloor() % 10 == 0)
       {
         int bossIndex =
-            (map.currentFloor / 10) - 1;
+            (map.getFloor() / 10) - 1;
 
         if (bossIndex >= 0 &&
             bossIndex < 5)
@@ -7921,7 +7921,7 @@ public:
           std::vector<Status*>().swap(actorList);
           if (actualBossDefeated) {
             // 撃破フラグを立てる
-            int bossIndex = (map.currentFloor / 10) - 1;
+            int bossIndex = (map.getFloor() / 10) - 1;
             if (bossIndex >= 0 && bossIndex < 5) {
               bossFlags[bossIndex] = true;
             }
@@ -8745,7 +8745,7 @@ void applyFloorMapConfig(GameContext* ctx)
 {
   FloorMapConfig config =
       getFloorMapConfig(
-          ctx->map->currentFloor,
+          ctx->map->getFloor(),
           ctx->bossDefeated
       );
 
@@ -8755,7 +8755,7 @@ void applyFloorMapConfig(GameContext* ctx)
   );
 
   ctx->graphic->setFloor(
-      ctx->map->currentFloor
+      ctx->map->getFloor()
   );
 
   ctx->map->regenerate(
@@ -9351,11 +9351,11 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           shopItemList.push_back(100); // リペアキット
           shopItemList.push_back(103); // エネルギー缶
           shopItemList.push_back(104); // 万能オイル
-          if (map.currentFloor >= 10) shopItemList.push_back(101); // リペアキット中
+          if (map.getFloor() >= 10) shopItemList.push_back(101); // リペアキット中
 
           // 2. 階層に応じた装備品 (Tier計算)
           // 1-10F: Tier 0, 11-20F: Tier 1, ...
-          int tier = (map.currentFloor - 1) / 10;
+          int tier = (map.getFloor() - 1) / 10;
           if (tier > 4) tier = 4; // 最大Tier 4 (5段階目)
 
           // 武器: 300 + tier
@@ -9627,7 +9627,7 @@ void setup() {
   ctx->battle = new Battle();
 
   // Graphicクラスへ階層通知
-  ctx->graphic->setFloor(ctx->map->currentFloor);
+  ctx->graphic->setFloor(ctx->map->getFloor());
 
   // 初回描画 (ここもGraphicクラスに任せるので安全)
   int camX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
@@ -9656,7 +9656,7 @@ void loop() {
     ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
     ctx->hero->reset(*ctx->map);
 
-    ctx->graphic->setFloor(ctx->map->currentFloor);
+    ctx->graphic->setFloor(ctx->map->getFloor());
 
     int cameraX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
     int cameraY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
@@ -9708,7 +9708,7 @@ void loop() {
             encounter.checkEncounter()) {
           vib.trigger(300);
           state = STATE_BATTLE;
-          ctx->battle->start(music, sd, hero, party, map.currentFloor, imgmgr, map);
+          ctx->battle->start(music, sd, hero, party, map.getFloor(), imgmgr, map);
         }
       }
     }
@@ -9765,7 +9765,7 @@ void loop() {
         map.setTile(heroTileX, heroTileY, Map::TILE_BOX_OPEN);
           
         // 2. 中身の抽選
-        int floor = map.currentFloor;
+        int floor = map.getFloor();
         int itemId = 0;
         int r = random(100);
 
@@ -9921,12 +9921,12 @@ void loop() {
       case EVENT_BOSS_BATTLE: {
 
         int bossIndex =
-            (map.currentFloor / 10) - 1;
+            (map.getFloor() / 10) - 1;
 
         // 撃破済みボスのタイルが何らかの理由で残っていた場合
-        if (map.currentFloor >= 10 &&
-            map.currentFloor <= 50 &&
-            map.currentFloor % 10 == 0 &&
+        if (map.getFloor() >= 10 &&
+            map.getFloor() <= 50 &&
+            map.getFloor() % 10 == 0 &&
             bossIndex >= 0 &&
             bossIndex < 5 &&
             ctx->bossDefeated[bossIndex])
@@ -9956,7 +9956,7 @@ void loop() {
             sd,
             hero,
             party,
-            map.currentFloor,
+            map.getFloor(),
             imgmgr,
             map
         );
