@@ -3162,28 +3162,58 @@ public:
   }
 
   void loadFrom(FsFile& file) {
-    // 読み込み (改行まで読んで数値に変換)
-    // ParseInt的な機能がない場合があるので、Stringで読んで変換が確実
+    // -------------------------
+    // 保存値を読み込む
+    // -------------------------
     who = file.readStringUntil('\n').toInt();
     Level = file.readStringUntil('\n').toInt();
     currentXP = file.readStringUntil('\n').toInt();
-    HP = file.readStringUntil('\n').toInt();
-    TP = file.readStringUntil('\n').toInt();
+
+    // HP / TP は再計算で上書きされるので、一旦退避する
+    int savedHP = file.readStringUntil('\n').toInt();
+    int savedTP = file.readStringUntil('\n').toInt();
+
     equipWeaponId = file.readStringUntil('\n').toInt();
     equipArmorId = file.readStringUntil('\n').toInt();
     equipAccId = file.readStringUntil('\n').toInt();
-    // 名前や最大HPなどを再計算
+
+    // -------------------------
+    // レベル・種類に応じた基礎値を再構築
+    // -------------------------
     updateName();
+
+    // ロードしたLevelに合わせて次の必要XPも更新
+    nextLevelXP = calculateNextXP(Level);
+
     recalculateStats();
 
-    // スキル復元
+    // -------------------------
+    // 保存時の現在HP / TPを復元
+    // -------------------------
+    HP = savedHP;
+    TP = savedTP;
+
+    // 壊れた/古いセーブデータ対策
+    if (HP < 0) HP = 0;
+    if (HP > MaxHP) HP = MaxHP;
+
+    if (TP < 0) TP = 0;
+    if (TP > MaxTP) TP = MaxTP;
+
+    // -------------------------
+    // 習得済みスキル復元
+    // -------------------------
     learnedSkills.clear();
+
     int skillCount = file.readStringUntil('\n').toInt();
+
     for (int i = 0; i < skillCount; i++) {
       int skillId = file.readStringUntil('\n').toInt();
       learnedSkills.push_back(Skill(skillId));
     }
-    // ★★★ 追加: 覚え漏れがないか再チェックして補完する ★★★
+
+    // レベル上は覚えているはずなのに、
+    // 古いセーブに存在しないスキルがあれば補完
     checkLevelUpSkills(0, Level);
   }
 
