@@ -7607,9 +7607,7 @@ private:
         {
           int hits = 1;
           if (skill.id == 23 || skill.id == 74 || skill.id == 76) hits = 2; 
-          if (skill.id == 36) hits = 3; 
-          if (skill.id == 123) hits = random(2, 5);
-          if (skill.id == 127) hits = random(1, 8);
+          if (skill.id == 36) hits = 3;
 
           for(int i=0; i<hits; i++) {
             isCrit = false; // 毎回リセット
