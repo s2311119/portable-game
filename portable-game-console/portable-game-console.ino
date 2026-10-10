@@ -6643,6 +6643,43 @@ public:
 
           currentSkill = skills[pendingSkillIndex];
 
+          // --- 実行時ターゲット再確認 ---
+
+          // 単体の敵対象技で、予約していた相手がすでに倒れていた場合
+          if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
+              (currentTarget == nullptr || currentTarget->getHp() <= 0))
+          {
+            // 使用者から見た「敵」の生存者を取得
+            std::vector<Status*> candidates =
+                currentActor->isPlayer()
+                    ? getAliveEnemies()
+                    : getAliveAllies();
+
+            if (candidates.empty()) {
+              message += "\n対象がいない！";
+              messageFlow = MessageFlow::END_TURN;
+              currentBattleState = STATE_ACTION_MSG;
+              break;
+            }
+
+            // 生存している敵からランダムで新しい対象を選ぶ
+            currentTarget =
+                candidates[random((int)candidates.size())];
+
+            message += "\n対象を変更した！";
+          }
+
+          // 単体蘇生の対象が、実行前に別の蘇生で既に復活していた場合
+          if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
+              currentSkill.type == Skill::EffectType::REVIVE &&
+              (currentTarget == nullptr || currentTarget->getHp() > 0))
+          {
+            message += "\n対象はすでに復活している！";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
           // TP消費をここに集約
           if (!currentActor->useTP(currentSkill.tpCost)) {
             message = String(currentActor->getname()) + " はTPが足りない！";
@@ -6659,43 +6696,6 @@ public:
         }
         else {
           message = "行動指定エラー";
-          messageFlow = MessageFlow::END_TURN;
-          currentBattleState = STATE_ACTION_MSG;
-          break;
-        }
-
-        // --- 実行時ターゲット再確認 ---
-
-        // 単体の敵対象技で、予約していた相手がすでに倒れていた場合
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
-            (currentTarget == nullptr || currentTarget->getHp() <= 0))
-        {
-          // 使用者から見た「敵」の生存者を取得
-          std::vector<Status*> candidates =
-              currentActor->isPlayer()
-                  ? getAliveEnemies()
-                  : getAliveAllies();
-
-          if (candidates.empty()) {
-            message += "\n対象がいない！";
-            messageFlow = MessageFlow::END_TURN;
-            currentBattleState = STATE_ACTION_MSG;
-            break;
-          }
-
-          // 生存している敵からランダムで新しい対象を選ぶ
-          currentTarget =
-              candidates[random((int)candidates.size())];
-
-          message += "\n対象を変更した！";
-        }
-
-        // 単体蘇生の対象が、実行前に別の蘇生で既に復活していた場合
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
-            currentSkill.type == Skill::EffectType::REVIVE &&
-            (currentTarget == nullptr || currentTarget->getHp() > 0))
-        {
-          message += "\n対象はすでに復活している！";
           messageFlow = MessageFlow::END_TURN;
           currentBattleState = STATE_ACTION_MSG;
           break;
