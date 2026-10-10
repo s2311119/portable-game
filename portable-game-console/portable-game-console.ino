@@ -8869,13 +8869,6 @@ void core1_main() {
     ctx->sd->performPendingSwitch(*ctx->music);
     ctx->sd->refile(*ctx->music);
 
-    // ISRが止まっていてrefill完了したら再開
-    if (ctx->music->paused &&
-        !ctx->music->needs_refill)
-    {
-      ctx->music->paused = false;
-    }
-
     tight_loop_contents();
   }
 }
