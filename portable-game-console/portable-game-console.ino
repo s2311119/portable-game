@@ -4079,6 +4079,7 @@ public:
   // 前フレームのヒーロー矩形（画面座標）
   int prevHeroScreenX = -1;
   int prevHeroScreenY = -1;
+  Caractor::Direction prevHeroDirection = Caractor::DIR_DOWN;
   
   // 強制再描画フラグ
   int startTileX = -1; 
@@ -4245,11 +4246,13 @@ public:
         lineSprite.pushSprite(0, drawY);
     }
 
-    // 前回の位置を更新
+    // 前回の位置・向きを更新
     int hx = hero.X - cameraX;
     int hy = hero.Y - cameraY;
+
     prevHeroScreenX = hx;
     prevHeroScreenY = hy;
+    prevHeroDirection = hero.direction;
     
     // 再描画完了フラグ
     startTileX = 0; // -1 以外なら何でもOK
@@ -4312,8 +4315,13 @@ public:
     int heroScreenX = hero.X - cameraX;
     int heroScreenY = hero.Y - cameraY;
 
-    // ヒーローが動いていなければ何もしない
-    if (prevHeroScreenX == heroScreenX && prevHeroScreenY == heroScreenY) return;
+    // 位置も向きも変わっていなければ何もしない
+    if (prevHeroScreenX == heroScreenX &&
+        prevHeroScreenY == heroScreenY &&
+        prevHeroDirection == hero.direction)
+    {
+      return;
+    }
 
     // ★ ヒーローの「移動前」と「移動後」の領域だけを復元・描画する
     // 1. 古い場所を背景で塗りつぶす (LCD直接)
@@ -4326,6 +4334,7 @@ public:
     lcd.pushImage(heroScreenX, heroScreenY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)heroBmp, H_TRANSPARENT);
     prevHeroScreenX = heroScreenX;
     prevHeroScreenY = heroScreenY;
+    prevHeroDirection = hero.direction;
   }
 
   // 外部から強制再描画を要求するときに呼ぶ
