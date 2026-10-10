@@ -2805,36 +2805,87 @@ public:
   }
 
   int gainXP(int amount) {
-    if (Level >= 99) return 0;
+    if (Level >= 99) {
+      return 0;
+    }
 
     currentXP += amount;
-    bool leveledUp = false;
-    int oldLevel = Level;
 
-    while (currentXP >= nextLevelXP && Level < 99) {
-      currentXP -= nextLevelXP; 
+    bool leveledUp = false;
+    bool evolvedDuringGain = false;
+
+    // 一度に複数レベル上がる場合でも、
+    // 1レベルずつ処理して、その都度進化判定を行う。
+    while (currentXP >= nextLevelXP &&
+          Level < 99)
+    {
+      int previousLevel = Level;
+
+      currentXP -= nextLevelXP;
       Level++;
-      nextLevelXP = calculateNextXP(Level);
+
+      nextLevelXP =
+          calculateNextXP(Level);
+
       leveledUp = true;
+
+      // -------------------------------------------------
+      // このレベルで発生する自動進化を処理
+      // -------------------------------------------------
+      bool evolvedAtThisLevel = false;
+
+      while (true) {
+        bool evolutionFound = false;
+
+        for (int i = 0;
+            i < evolutionRuleCount;
+            i++)
+        {
+          const EvolutionRule& rule =
+              evolutionTable[i];
+
+          if (rule.before_who_id == this->who &&
+              rule.trigger_type == TRIGGER_LEVEL &&
+              this->Level >= rule.trigger_value)
+          {
+            evolve(rule.after_who_id);
+
+            evolvedDuringGain = true;
+            evolvedAtThisLevel = true;
+            evolutionFound = true;
+
+            // who が変わったので、
+            // 新しい who でも進化条件があるか再確認する
+            break;
+          }
+        }
+
+        if (!evolutionFound) {
+          break;
+        }
+      }
+
+      // evolve() 内ではステータス再計算と
+      // スキル習得処理が行われるので、
+      // 進化しなかった場合だけここで処理する。
+      if (!evolvedAtThisLevel) {
+        recalculateStats();
+
+        checkLevelUpSkills(
+            previousLevel,
+            Level
+        );
+      }
+    }
+
+    if (evolvedDuringGain) {
+      return 2; // レベルアップ中に進化した
     }
 
     if (leveledUp) {
-      // ★ クラス内部なので、そのまま 'evolutionTable' を参照できる
-      for (int i = 0; i < evolutionRuleCount; i++) {
-        const EvolutionRule& rule = evolutionTable[i]; 
-
-        if (rule.before_who_id == this->who &&
-            rule.trigger_type == TRIGGER_LEVEL && // ★ 内部なので 'Status::' は不要
-            this->Level >= rule.trigger_value) 
-        {
-          evolve(rule.after_who_id); 
-          return 2; // 「進化した」
-        }
-      }
-      recalculateStats();
-      checkLevelUpSkills(oldLevel, Level);
-      return 1; // 「レベルアップのみ」
+      return 1; // レベルアップのみ
     }
+
     return 0; // 変化なし
   }
 
