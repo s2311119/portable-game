@@ -8808,7 +8808,6 @@ bool audio_timer_callback(struct repeating_timer *t) {
 // core1 のエントリポイント（オーディオ専用）
 // -------------------------
 void core1_main() {
-  ctx->sd->init(*ctx->music);
 
   // -------------------------------------------------
   // 音声専用タイマーをcore1上に作成
