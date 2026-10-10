@@ -106,7 +106,7 @@ class Map {
 public:
   int MAP_WIDTH;
   int MAP_HEIGHT;
-  int automatonWhoId;
+  int automatonWhoId = -1;
   int currentFloor = 1;
   // マップの寸法（コンストラクタで決定）  
   static const int TILE_SIZE = 32;
