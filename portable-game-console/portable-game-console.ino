@@ -1117,9 +1117,9 @@ public:
         name = "ソニックダガー"; tpCost = 0; power = 120; 
         type = EffectType::DAMAGE; scope = TargetScope::SINGLE_ENEMY; 
         break; // (必ず先制攻撃)
-      case 122: 
-        name = "かく乱"; tpCost = 0; power = 0; 
-        type = EffectType::DEBUFF; scope = TargetScope::SINGLE_ENEMY; 
+      case 122:
+        name = "かく乱"; tpCost = 0; power = 90;
+        type = EffectType::SPECIAL; scope = TargetScope::SINGLE_ENEMY;
         break; // (攻撃 + 確率で混乱)
       case 123: 
         name = "ファントムラッシュ"; tpCost = 0; power = 130; 
@@ -8467,9 +8467,10 @@ private:
         // 4. 攻撃 + 状態異常 (ポイズン、ヴォイドショック、ディザスターなど)
         // (ID: 105, 45, 110, 114)
         else if (skill.id == 105 ||
-         skill.id == 45 ||
-         skill.id == 110 ||
-         skill.id == 114)
+          skill.id == 45 ||
+          skill.id == 110 ||
+          skill.id == 114 ||
+          skill.id == 122)
         {
           // まず攻撃の命中・ダメージ判定
           value =
@@ -8505,6 +8506,10 @@ private:
             }
             else if (skill.id == 114 && success) {
               lastActionMessage = "厄災を与えた!";
+              music.playSE(7);
+            }
+            else if (skill.id == 122 && success) {
+              lastActionMessage = "敵をかく乱した!";
               music.playSE(7);
             }
           }
