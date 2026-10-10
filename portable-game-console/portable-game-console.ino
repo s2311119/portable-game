@@ -8865,7 +8865,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
 
           // 2. 階層に応じた装備品 (Tier計算)
           // 1-10F: Tier 0, 11-20F: Tier 1, ...
-          int tier = (map.currentFloor) / 10; 
+          int tier = (map.currentFloor - 1) / 10;
           if (tier > 4) tier = 4; // 最大Tier 4 (5段階目)
 
           // 武器: 300 + tier
