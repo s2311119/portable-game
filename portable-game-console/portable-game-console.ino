@@ -198,6 +198,32 @@ public:
     automatonWhoId = whoId;
   }
 
+  int getFloor() const {
+    return currentFloor;
+  }
+
+  void restoreFloor(int floor) {
+    currentFloor = floor;
+  }
+
+  bool advanceFloor() {
+    if (currentFloor >= 50) {
+      return false;
+    }
+
+    currentFloor++;
+    return true;
+  }
+
+  bool retreatFloor() {
+    if (currentFloor <= 1) {
+      return false;
+    }
+
+    currentFloor--;
+    return true;
+  }
+
   void regenerate(int max_w, int max_h, MapType type){
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
@@ -5092,8 +5118,9 @@ public:
       // -------------------------------------------------
       // PGSAVE2
       // -------------------------------------------------
-      map.currentFloor =
-          file.readStringUntil('\n').toInt();
+      map.restoreFloor(
+          file.readStringUntil('\n').toInt()
+      );
 
       int typeVal =
           file.readStringUntil('\n').toInt();
@@ -5195,8 +5222,9 @@ public:
       // 従来どおり階層とMapTypeだけ読み、
       // 最後にマップを再生成する。
       // -------------------------------------------------
-      map.currentFloor =
-          firstLine.toInt();
+      map.restoreFloor(
+          firstLine.toInt()
+      );
 
       int typeVal =
           file.readStringUntil('\n').toInt();
@@ -9572,7 +9600,6 @@ void setup() {
     if (ctx->inventory) delete ctx->inventory;
     if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
     ctx->map = new Map(20, 20, Map::TYPE_TOWN);
-    ctx->map->currentFloor = 1;
     
     ctx->hero = new Caractor(*ctx->map, 1, 38);
 
@@ -9811,16 +9838,9 @@ void loop() {
       }
 
       case EVENT_STAIR_UP: {
-        // 50Fを最終階とする
-        if (map.currentFloor >= 50) {
-          state = STATE_GAME;
-          currentEvent = EVENT_NONE;
-          break;
+        if (map.advanceFloor()) {
+          applyFloorMapConfig(ctx);
         }
-
-        map.currentFloor++;
-
-        applyFloorMapConfig(ctx);
 
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
@@ -9828,9 +9848,7 @@ void loop() {
       }
 
       case EVENT_STAIR_DOWN: {
-        if (map.currentFloor > 1) {
-          map.currentFloor--;
-
+        if (map.retreatFloor()) {
           applyFloorMapConfig(ctx);
         }
 
