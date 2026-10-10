@@ -3319,8 +3319,8 @@ public:
         if (poisonDmg < 1) poisonDmg = 1;
       }
 
-      takedamage(poisonDmg);
-      value = poisonDmg;
+      value =
+        takedamage(poisonDmg);
     }
     return value;
   }
@@ -6225,12 +6225,19 @@ private:
 
       music.playSE(3);
 
-      int counterDamage = defender->getAttack();
-      attacker->takedamage(
+      int counterDamage =
+          defender->getAttack();
+
+      counterDamage =
+          attacker->takedamage(
+              counterDamage,
+              Skill::Category::PHYSICAL
+          );
+
+      attacker->addPopup(
           counterDamage,
-          Skill::Category::PHYSICAL
+          false
       );
-      attacker->addPopup(counterDamage, false);
     }
 
     return defender->getHp() <= 0;
@@ -8359,7 +8366,8 @@ private:
   void ExecuteSkill(Skill& skill, Status* user, Status* target, MUSIC& music) {
     if (target == nullptr) return;
 
-    int value = 0; 
+    int value = 0;
+    int actualDamage = 0;
     bool isCrit = false;
     switch (skill.type) {
       
@@ -8378,9 +8386,11 @@ private:
             else music.playSE(7); // センス単体
           }
         }
-        target->takedamage(value, skill.category);
-        target->addPopup(value, isCrit); // ★ 結果をポップアップへ
-        lastDamage += value; 
+        actualDamage =
+            target->takedamage(value, skill.category);
+
+        target->addPopup(actualDamage, isCrit);
+        lastDamage += actualDamage;
         break;
 
       case Skill::EffectType::HEAL:
@@ -8408,9 +8418,11 @@ private:
               if (skill.category == Skill::Category::PHYSICAL) music.playSE(5); 
               else music.playSE(7);
             }
-            target->takedamage(value, skill.category);
-            target->addPopup(value, isCrit); // ★ 結果をポップアップへ
-            lastDamage += value; 
+            actualDamage =
+                target->takedamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+            lastDamage += actualDamage;
           }
         }
         break;
@@ -8452,16 +8464,29 @@ private:
           if (random(0, 100) < chance) {
             music.playSE(4);
             int dmg = target->getHp();
-            target->takedamage(dmg, skill.category);
-            target->addPopup(dmg, true); // 赤字
-            lastActionMessage = "急所を突いた! 即死!";
+
+            actualDamage =
+                target->takedamage(dmg, skill.category);
+
+            target->addPopup(actualDamage, true);
+
+            if (target->getHp() <= 0) {
+              lastActionMessage = "急所を突いた! 即死!";
+            }
+            else {
+              // バリア、アダマン・ボディ、ラストスタンドなどで
+              // 即死を防がれた場合
+              lastActionMessage = "急所を突いた!";
+            }
           } else {
             // 失敗時は通常ダメージの半分
             music.playSE(5);
             value = user->caclulateSkillDamage(target, skill, isCrit) / 2;
             if(value<1) value=1;
-            target->takedamage(value, skill.category);
-            target->addPopup(value, isCrit);
+            actualDamage =
+                target->takedamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
             lastActionMessage = "急所を外した...";
           }
         }
@@ -8470,11 +8495,21 @@ private:
         else if (skill.id == 44 || skill.id == 111) {
           if (skill.id == 44) { // HP吸収
             music.playSE(5);
-            value = user->caclulateSkillDamage(target, skill, isCrit);
-            target->takedamage(value, skill.category);
-            target->addPopup(value, isCrit);
-            user->ReceiveHeal(value); // 自分回復
-            user->addPopup(-value, false);
+            value =
+                user->caclulateSkillDamage(
+                    target,
+                    skill,
+                    isCrit
+                );
+
+            actualDamage =
+                target->takedamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+
+            // 実際に与えたダメージ分だけ吸収
+            user->ReceiveHeal(actualDamage);
+            user->addPopup(-actualDamage, false);
             lastActionMessage = "体力を奪い取った!";
           } else { // TP吸収
             music.playSE(7);
@@ -8501,8 +8536,10 @@ private:
                   isCrit
               );
 
-          target->takedamage(value, skill.category);
-          target->addPopup(value, isCrit);
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
 
           // ダメージ計算結果が0なら攻撃自体が失敗したので、
           // 追加の状態異常も発生させない
@@ -8556,8 +8593,10 @@ private:
                   isCrit
               );
 
-          target->takedamage(value, skill.category);
-          target->addPopup(value, isCrit);
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
 
           if (value <= 0) {
             lastActionMessage = "ミス！";
@@ -8585,8 +8624,10 @@ private:
                   isCrit
               );
 
-          target->takedamage(value, skill.category);
-          target->addPopup(value, isCrit);
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
 
           if (value <= 0) {
             lastActionMessage = "ミス！";
@@ -8608,8 +8649,10 @@ private:
                   isCrit
               );
 
-          target->takedamage(value, skill.category);
-          target->addPopup(value, isCrit);
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
 
           if (value <= 0) {
             lastActionMessage = "ミス！";
