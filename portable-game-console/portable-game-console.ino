@@ -150,55 +150,7 @@ public:
   {
     // 初期化リスト (:) ではなく、ここで代入する
     currentType = type;
-    if (type == TYPE_TOWN) {
-      // 集落: 床5x5 + 周囲の壁2 = 7x7
-      MAP_WIDTH = 8;
-      MAP_HEIGHT = 8;
-    } 
-    else if (type == TYPE_BOSS_ROOM) {
-      // ボス部屋: 床7x7 + 周囲の壁2 = 9x9
-      MAP_WIDTH = 9;
-      MAP_HEIGHT = 9;
-    }
-    else {
-      // ダンジョンは最低15マスとし、
-      // 指定された最大サイズ以下の奇数サイズにする
-      const int MIN_DUNGEON_SIZE = 15;
-
-      int safeMaxW =
-          (max_w < MIN_DUNGEON_SIZE)
-              ? MIN_DUNGEON_SIZE
-              : max_w;
-
-      int safeMaxH =
-          (max_h < MIN_DUNGEON_SIZE)
-              ? MIN_DUNGEON_SIZE
-              : max_h;
-
-      // 最大値も奇数にそろえる
-      int maxOddW =
-          (safeMaxW % 2 == 0)
-              ? safeMaxW - 1
-              : safeMaxW;
-
-      int maxOddH =
-          (safeMaxH % 2 == 0)
-              ? safeMaxH - 1
-              : safeMaxH;
-
-      // 15, 17, 19, ... の中から抽選
-      MAP_WIDTH =
-          random(
-              (MIN_DUNGEON_SIZE - 1) / 2,
-              (maxOddW - 1) / 2 + 1
-          ) * 2 + 1;
-
-      MAP_HEIGHT =
-          random(
-              (MIN_DUNGEON_SIZE - 1) / 2,
-              (maxOddH - 1) / 2 + 1
-          ) * 2 + 1;
-    }
+    setMapDimensions(max_w, max_h, type);
     mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
     generateMazeAndRooms(type);
     placeObjects();
@@ -213,56 +165,9 @@ public:
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
     
-    isTown = false;
-    if (type == TYPE_TOWN) {
-      // 集落: 床5x5 + 周囲の壁2 = 7x7
-      MAP_WIDTH = 8;
-      MAP_HEIGHT = 8;
-      isTown = true;
-    } 
-    else if (type == TYPE_BOSS_ROOM) {
-      // ボス部屋: 床7x7 + 周囲の壁2 = 9x9
-      MAP_WIDTH = 9;
-      MAP_HEIGHT = 9;
-    }
+    isTown = (type == TYPE_TOWN);
 
-    else {
-      // ダンジョンは最低15マスとし、
-      // 指定された最大サイズ以下の奇数サイズにする
-      const int MIN_DUNGEON_SIZE = 15;
-
-      int safeMaxW =
-          (max_w < MIN_DUNGEON_SIZE)
-              ? MIN_DUNGEON_SIZE
-              : max_w;
-
-      int safeMaxH =
-          (max_h < MIN_DUNGEON_SIZE)
-              ? MIN_DUNGEON_SIZE
-              : max_h;
-
-      int maxOddW =
-          (safeMaxW % 2 == 0)
-              ? safeMaxW - 1
-              : safeMaxW;
-
-      int maxOddH =
-          (safeMaxH % 2 == 0)
-              ? safeMaxH - 1
-              : safeMaxH;
-
-      MAP_WIDTH =
-          random(
-              (MIN_DUNGEON_SIZE - 1) / 2,
-              (maxOddW - 1) / 2 + 1
-          ) * 2 + 1;
-
-      MAP_HEIGHT =
-          random(
-              (MIN_DUNGEON_SIZE - 1) / 2,
-              (maxOddH - 1) / 2 + 1
-          ) * 2 + 1;
-    }
+    setMapDimensions(max_w, max_h, type);
 
     mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
     if (type == TYPE_BOSS_ROOM) {
@@ -302,8 +207,51 @@ public:
     placeObjects();
   }
 private:
-  //int MAP_WIDTH;
-  //int MAP_HEIGHT;
+  void setMapDimensions(int max_w, int max_h, MapType type) {
+    if (type == TYPE_TOWN) {
+      MAP_WIDTH = 8;
+      MAP_HEIGHT = 8;
+    }
+    else if (type == TYPE_BOSS_ROOM) {
+      MAP_WIDTH = 9;
+      MAP_HEIGHT = 9;
+    }
+    else {
+      const int MIN_DUNGEON_SIZE = 15;
+
+      int safeMaxW =
+          (max_w < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_w;
+
+      int safeMaxH =
+          (max_h < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_h;
+
+      int maxOddW =
+          (safeMaxW % 2 == 0)
+              ? safeMaxW - 1
+              : safeMaxW;
+
+      int maxOddH =
+          (safeMaxH % 2 == 0)
+              ? safeMaxH - 1
+              : safeMaxH;
+
+      MAP_WIDTH =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddW - 1) / 2 + 1
+          ) * 2 + 1;
+
+      MAP_HEIGHT =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddH - 1) / 2 + 1
+          ) * 2 + 1;
+    }
+  }
   std::vector<int> pathX, pathY;
   std::vector<int> dirs;
   std::vector<Room> placedRooms;
