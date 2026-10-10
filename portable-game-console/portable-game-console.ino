@@ -2626,7 +2626,8 @@ public:
       return false; // デバフを適用せずに終了
     }
     const int DEFAULT_DEBUFF_TURNS = 3;
-    int baseChance = 100; // デフォルトは100%
+    int baseChance = 100;
+    bool sureHit = false;
     // --- 成功率の設定 ---
     switch (skillId) {
       // 毒系
@@ -2652,14 +2653,14 @@ public:
       case 112: baseChance = 80; break; // エリア・ブレイク
       case 118: baseChance = 70; break; // ワールド・ダウン
       // 必中系
-      case 101: baseChance = 999; break; // ディスペル(必中)
-      case 117: baseChance = 999; break; // バニッシュ(必中)
+      case 101: sureHit = true; break; // ディスペル
+      case 117: sureHit = true; break; // バニッシュ
       // 特殊
       case 114: baseChance = 40; break; // ディザスター(全体異常)
       default: baseChance = 100; break;
     }
-    if (!checkDebuffHit(baseChance, user)) {
-      return false; // ミス！
+    if (!sureHit && !checkDebuffHit(baseChance, user)) {
+      return false;
     }
     switch (skillId) {
       // --- 主人公 ---
