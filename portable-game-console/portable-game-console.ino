@@ -164,10 +164,43 @@ public:
       MAP_HEIGHT = 9;
     }
     else {
-      // ダンジョン: ランダム (奇数になるように調整)
-      // ※ max_w/h が渡されていますが、最低サイズを下回らないように注意
-      MAP_WIDTH = random(15, max_w / 2) * 2 + 1;
-      MAP_HEIGHT = random(15, max_h / 2) * 2 + 1;
+      // ダンジョンは最低15マスとし、
+      // 指定された最大サイズ以下の奇数サイズにする
+      const int MIN_DUNGEON_SIZE = 15;
+
+      int safeMaxW =
+          (max_w < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_w;
+
+      int safeMaxH =
+          (max_h < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_h;
+
+      // 最大値も奇数にそろえる
+      int maxOddW =
+          (safeMaxW % 2 == 0)
+              ? safeMaxW - 1
+              : safeMaxW;
+
+      int maxOddH =
+          (safeMaxH % 2 == 0)
+              ? safeMaxH - 1
+              : safeMaxH;
+
+      // 15, 17, 19, ... の中から抽選
+      MAP_WIDTH =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddW - 1) / 2 + 1
+          ) * 2 + 1;
+
+      MAP_HEIGHT =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddH - 1) / 2 + 1
+          ) * 2 + 1;
     }
     mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
     generateMazeAndRooms(type);
@@ -195,12 +228,45 @@ public:
       MAP_WIDTH = 9;
       MAP_HEIGHT = 9;
     }
+
     else {
-      // ダンジョン: ランダム (奇数になるように調整)
-      // ※ max_w/h が渡されていますが、最低サイズを下回らないように注意
-      MAP_WIDTH = random(15, max_w / 2) * 2 + 1;
-      MAP_HEIGHT = random(15, max_h / 2) * 2 + 1;
+      // ダンジョンは最低15マスとし、
+      // 指定された最大サイズ以下の奇数サイズにする
+      const int MIN_DUNGEON_SIZE = 15;
+
+      int safeMaxW =
+          (max_w < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_w;
+
+      int safeMaxH =
+          (max_h < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_h;
+
+      int maxOddW =
+          (safeMaxW % 2 == 0)
+              ? safeMaxW - 1
+              : safeMaxW;
+
+      int maxOddH =
+          (safeMaxH % 2 == 0)
+              ? safeMaxH - 1
+              : safeMaxH;
+
+      MAP_WIDTH =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddW - 1) / 2 + 1
+          ) * 2 + 1;
+
+      MAP_HEIGHT =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddH - 1) / 2 + 1
+          ) * 2 + 1;
     }
+    
     mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
     if (type == TYPE_BOSS_ROOM) {
       // --- ボス部屋の描画 ---
