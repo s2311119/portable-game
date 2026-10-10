@@ -266,7 +266,7 @@ public:
               (maxOddH - 1) / 2 + 1
           ) * 2 + 1;
     }
-    
+
     mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
     if (type == TYPE_BOSS_ROOM) {
       // --- ボス部屋の描画 ---
@@ -4203,6 +4203,26 @@ public:
               lineSprite.pushImage(drawX, drawY_local, Map::TILE_SIZE, Map::TILE_SIZE, bmp, H_TRANSPARENT);
             }
           }
+        }
+        // マップが画面幅より小さい場合だけ、
+        // 右側のマップ外領域を黒で消す。
+        // ラインスプライト全体はクリアしない。
+        int mapRight =
+            map.getMAP_WIDTH() * Map::TILE_SIZE
+            - cameraX;
+
+        if (mapRight < SCREEN_WIDTH) {
+          if (mapRight < 0) {
+            mapRight = 0;
+          }
+
+          lineSprite.fillRect(
+              mapRight,
+              0,
+              SCREEN_WIDTH - mapRight,
+              BLOCK_HEIGHT,
+              TFT_BLACK
+          );
         }
 
         // 4. この帯にヒーローが居るか？ (重なり判定)
