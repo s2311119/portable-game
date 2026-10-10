@@ -5557,8 +5557,7 @@ public:
     STATE_ENEMY_AI,         // 7. 敵のAI実行
     STATE_ACTION_CALC,      // 8. 行動実行（計算）
     STATE_ACTION_MSG,       // 9. 行動結果のメッセージ
-    STATE_CHECK_VICTORY,    // 10. 勝利判定
-    STATE_CHECK_DEFEAT,     // 11. 敗北判定
+    STATE_CHECK_BATTLE_RESULT, // 10. 結果判定
     STATE_SHOW_XP_GAIN,     // 12. XP獲得表示
     STATE_BATTLE_END,       // 15. 戦闘終了
     STATE_CHECK_STATUS,      // 16. Yボタンステータス
@@ -6290,7 +6289,7 @@ public:
       case STATE_ACTION_CALC: {
         lastDamage = 0;
         lastActionMessage = "";
-        
+
         messageFlow = MessageFlow::ACTION_COMPLETE;
         // ★★★ 修正A: フリーズ防止 (ポインタチェックを追加) ★★★
         if (heroRef && heroRef->status) heroRef->status->clearPopups();
@@ -6555,9 +6554,11 @@ public:
       case STATE_ACTION_MSG:
         if (aPressed) {
           hero.status->clearPopups();
+
           for (auto m : party.members) {
             m->status->clearPopups();
           }
+
           for (auto e : activeEnemies) {
             e->status->clearPopups();
           }
@@ -6571,94 +6572,130 @@ public:
               currentBattleState = STATE_ENEMY_AI;
             }
           }
-
-          else if (messageFlow == MessageFlow::END_TURN) {
-            // 死亡・麻痺など。
-            // このキャラの行動は終了。
-            if (currentActor->isPlayer()) {
-              currentBattleState = STATE_CHECK_DEFEAT;
-            } else {
-              currentBattleState = STATE_CHECK_VICTORY;
-            }
-          }
-
-          else { // ACTION_COMPLETE
-            if (currentActor->isDoubleAction) {
-              currentActor->isDoubleAction = false;
-
-              if (currentActor->isPlayer()) {
-                currentBattleState = STATE_COMMAND_SELECT;
-                message =
-                  String(currentActor->getname()) +
-                  " の再行動！";
-              } else {
-                currentBattleState = STATE_ENEMY_AI;
-              }
-            }
-            else {
-              if (currentActor->isPlayer()) {
-                currentBattleState = STATE_CHECK_VICTORY;
-              } else {
-                currentBattleState = STATE_CHECK_DEFEAT;
-              }
-            }
+          else {
+            // ACTION_COMPLETE / END_TURN のどちらでも
+            // まず戦闘が終わったか確認する。
+            currentBattleState = STATE_CHECK_BATTLE_RESULT;
           }
         }
         break;
       // 10. 勝利判定 (旧 8)
-      case STATE_CHECK_VICTORY:
-        {
-          bool allEnemiesDefeated = true;
-          for (auto enemy : activeEnemies) {
-            if (enemy->status->getHp() > 0) {
-              allEnemiesDefeated = false;
-              break;
-            }
-          }
-          
-          if (allEnemiesDefeated) {
-            message = "敵を倒した！";
-            battleEndReason = BattleEndReason::VICTORY;
-            if(aPressed) currentBattleState = STATE_SHOW_XP_GAIN; // XP獲得へ
-          } else {
-            currentActor->UpdateTurn();
-            currentActorIndex++;
-            currentBattleState = STATE_ACTOR_SELECT;
+      case STATE_CHECK_BATTLE_RESULT: {
+        // -------------------------
+        // 1. 敵側が全滅しているか
+        // -------------------------
+        bool allEnemiesDefeated = true;
+
+        for (auto enemy : activeEnemies) {
+          if (enemy && enemy->status && enemy->status->getHp() > 0) {
+            allEnemiesDefeated = false;
+            break;
           }
         }
-        break;
 
-      // 11. 敗北判定 (旧 9)
-      case STATE_CHECK_DEFEAT: 
-      {
-        // ★★★ 修正: 全滅判定に変更 ★★★
+        // -------------------------
+        // 2. プレイヤー側が全滅しているか
+        // -------------------------
         bool anyoneAlive = false;
 
-        // 主人公は生きているか？
-        if (hero.status->getHp() > 0) anyoneAlive = true;
+        if (hero.status->getHp() > 0) {
+          anyoneAlive = true;
+        }
 
-        // 仲間は生きているか？
         if (!anyoneAlive) {
           for (auto m : party.members) {
-            if (m->status->getHp() > 0) {
+            if (m && m->status && m->status->getHp() > 0) {
               anyoneAlive = true;
               break;
             }
           }
         }
 
+        // -------------------------
+        // 3. 勝敗判定
+        // -------------------------
+
+        // 両陣営が同時に全滅した場合。
+        // 今回は既存挙動をなるべく維持する。
+        if (allEnemiesDefeated && !anyoneAlive) {
+          if (currentActor && currentActor->isPlayer()) {
+            message = "敵を倒した！";
+            battleEndReason = BattleEndReason::VICTORY;
+
+            if (aPressed) {
+              currentBattleState = STATE_SHOW_XP_GAIN;
+            }
+          }
+          else {
+            message = "全滅した…";
+            battleEndReason = BattleEndReason::DEFEAT;
+
+            if (aPressed) {
+              currentBattleState = STATE_BATTLE_END;
+            }
+          }
+
+          break;
+        }
+
+        // 敵全滅
+        if (allEnemiesDefeated) {
+          message = "敵を倒した！";
+          battleEndReason = BattleEndReason::VICTORY;
+
+          if (aPressed) {
+            currentBattleState = STATE_SHOW_XP_GAIN;
+          }
+
+          break;
+        }
+
+        // 味方全滅
         if (!anyoneAlive) {
-          // 全員死んだら敗北確定
           message = "全滅した…";
           battleEndReason = BattleEndReason::DEFEAT;
-          if(aPressed) currentBattleState = STATE_BATTLE_END;
-        } else {
-          currentActor->UpdateTurn();
-          currentActorIndex++; 
-          currentBattleState = STATE_ACTOR_SELECT;
+
+          if (aPressed) {
+            currentBattleState = STATE_BATTLE_END;
+          }
+
+          break;
         }
+
+        // -------------------------
+        // 4. まだ戦闘継続
+        // -------------------------
+
+        // 実際に行動を完了した場合だけ2回行動を許可する。
+        // 麻痺・死亡など END_TURN の場合は再行動させない。
+        if (messageFlow == MessageFlow::ACTION_COMPLETE &&
+            currentActor != nullptr &&
+            currentActor->getHp() > 0 &&
+            currentActor->isDoubleAction)
+        {
+          currentActor->isDoubleAction = false;
+
+          if (currentActor->isPlayer()) {
+            message = String(currentActor->getname()) + " の再行動！";
+            currentBattleState = STATE_COMMAND_SELECT;
+          }
+          else {
+            currentBattleState = STATE_ENEMY_AI;
+          }
+
+          break;
+        }
+
+        // 通常の行動終了
+        if (currentActor != nullptr) {
+          currentActor->UpdateTurn();
+        }
+
+        currentActorIndex++;
+        currentBattleState = STATE_ACTOR_SELECT;
+
+        break;
       }
-      break;
 
       // 12. XP獲得 (旧 10)
       case STATE_SHOW_XP_GAIN:
