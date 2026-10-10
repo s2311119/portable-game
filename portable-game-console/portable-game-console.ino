@@ -182,12 +182,7 @@ public:
   void regenerate(int max_w, int max_h, MapType type){
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
-    /*MAP_WIDTH = (type != TYPE_MAZE && type != TYPE_DUNGEON) ? random(4, max_w / 2) * 2 + 1 : random(15, max_w / 2) * 2 + 1;
-    MAP_HEIGHT = (type != TYPE_MAZE && type != TYPE_DUNGEON) ? random(4, max_h / 2) * 2 + 1 : random(15, max_h / 2) * 2 + 1;
-    if(type == TYPE_TOWN){
-      MAP_WIDTH = random(5, max_w / 2) * 2 + 1;
-      MAP_HEIGHT = random(5, max_h / 2) * 2 + 1;
-    }*/
+    
     isTown = false;
     if (type == TYPE_TOWN) {
       // 集落: 床5x5 + 周囲の壁2 = 7x7
@@ -498,204 +493,6 @@ public:
   };
   // main.ino (Skill クラスのコンストラクタ 322行目あたり)
 
-  /*Skill(int recid) {
-    id = recid;
-    
-    switch (id) {
-      case 0: name = "プチノイズ"; tpCost = 5; power = 10; break;
-      // (ID 1-19 は主人公(巻物)用、または他の仲間用に予約)
-
-      // --- ストライカー (who=39) ---
-      case 20: name = "ハードヒット"; tpCost = 8; power = 20; break;
-      case 21: name = "パワーチャージ"; tpCost = 10; power = 0; break; // (ATK 1.5倍バフなど)
-
-      // --- ギア・ソルジャー (who=40) ---
-      case 22: name = "スラッシュ"; tpCost = 15; power = 40; break;
-      case 23: name = "ダブルヒット"; tpCost = 18; power = 30; break; // (30ダメージ x 2回)
-
-      // --- ギア・ナイト (who=41) ---
-      case 24: name = "アーマーブレイク"; tpCost = 20; power = 50; break; // (防御無視 or 防御ダウン)
-      case 25: name = "ソードダンス"; tpCost = 22; power = 0; break; // (ATK/SPD バフ)
-
-      // --- ヴァンガード (who=42) ---
-      case 26: name = "シールドバッシュ"; tpCost = 25; power = 70; break;
-      case 27: name = "かばう"; tpCost = 15; power = 0; break; // (仲間を守る)
-
-      // --- スワッシュバックラー (who=45) ---
-      case 28: name = "ファントムエッジ"; tpCost = 24; power = 65; break; // (クリティカル率 高)
-      case 29: name = "トリックステップ"; tpCost = 18; power = 0; break; // (SPD/LCK バフ)
-      
-      // --- オーバーロード (who=43) ---
-      case 30: name = "ギガブレイク"; tpCost = 40; power = 150; break;
-      case 31: name = "王者の波動"; tpCost = 50; power = 0; break; // (味方全体 ATK/DEF バフ)
-      case 32: name = "キングス・シールド"; tpCost = 30; power = 0; break; // (物理・旋律反射)
-      case 33: name = "デッドエンド"; tpCost = 60; power = 250; break;
-
-      // --- デストロイヤー (who=44) ---
-      case 34: name = "バーサーク"; tpCost = 30; power = 0; break; // (ATK 2倍 / DEF 0.5倍)
-      case 35: name = "カラミティ・エンド"; tpCost = 50; power = 200; break; // (HPが低いほど高威力)
-      case 36: name = "トリプルスラッシュ"; tpCost = 45; power = 80; break; // (80ダメージ x 3回)
-      case 37: name = "デモリッシュ"; tpCost = 55; power = 220; break;
-
-      // --- ゼロ・ブレード (who=46) ---
-      case 38: name = "ソニックブレイド"; tpCost = 40; power = 100; break; // (必ず先制)
-      case 39: name = "ミラーズエッジ"; tpCost = 35; power = 0; break; // (回避率 2倍バフ)
-      case 40: name = "刹那"; tpCost = 50; power = 200; break; // (高クリティカル率)
-      case 41: name = "無空"; tpCost = 65; power = 300; break; // (TP消費が激しい)
-
-      // --- ヴォイド・ストーカー (who=47) ---
-      case 42: name = "アサシネイト"; tpCost = 40; power = 100; break; // (確率で即死)
-      case 43: name = "ダーククローク"; tpCost = 30; power = 0; break; // (姿を消す / 狙われない)
-      case 44: name = "ペインサイクル"; tpCost = 55; power = 150; break; // (与ダメージ分 HP 回復)
-      case 45: name = "ヴォイド・ショック"; tpCost = 45; power = 120; break; // (高確率で状態異常)
-
-      // --- ガーディアン (who=1) ---
-      case 46: name = "プロテクト"; tpCost = 8; power = 0; break; // (味方単体 DEF 1.5倍)
-      case 47: name = "シールドバッシュ"; tpCost = 10; power = 20; break; // (威力20 + 確率でスタン)
-
-      // --- フォートレス (who=6) ---
-      case 48: name = "ウォール"; tpCost = 15; power = 0; break; // (味方全体 DEF 1.2倍)
-      case 49: name = "挑発"; tpCost = 12; power = 0; break; // (敵の攻撃を自分に集める)
-
-      // --- キャッスル・ウォール (who=11) ---
-      case 50: name = "リフレクト"; tpCost = 20; power = 0; break; // (物理攻撃を一度だけ反射)
-      case 51: name = "ガーディアン魂"; tpCost = 25; power = 0; break; // (DEF 2倍、SPD 0.5倍)
-
-      // --- バスティオン (who=17) ---
-      case 52: name = "鉄壁"; tpCost = 30; power = 0; break; // (3ターン DEF 2.5倍)
-      case 53: name = "カウンター"; tpCost = 25; power = 100; break; // (受けたダメージを反撃)
-
-      // --- イージス (who=18) ---
-      case 54: name = "リペア"; tpCost = 15; power = 50; break; // (味方単体 回復)
-      case 55: name = "フォースフィールド"; tpCost = 25; power = 0; break; // (味方単体 ダメージ無効 1回)
-
-      // --- アダマンタイト (who=26) ---
-      case 56: name = "アダマン・ボディ"; tpCost = 40; power = 0; break; // (物理ダメージを 1 に)
-      case 57: name = "自己修復"; tpCost = 20; power = 0; break; // (HPリジェネ(大))
-      case 58: name = "ラストスタンド"; tpCost = 50; power = 0; break; // (HP1で耐える)
-      case 59: name = "ギガンティック・ウォール"; tpCost = 60; power = 0; break; // (味方全体 DEF 2倍)
-
-      // --- インヴィンシブル (who=27) ---
-      case 60: name = "超回復"; tpCost = 40; power = 500; break; // (HP大回復)
-      case 61: name = "オートリバイブ"; tpCost = 60; power = 0; break; // (自動蘇生 1回)
-      case 62: name = "最大HP上昇"; tpCost = 30; power = 0; break; // (戦闘中 MaxHP 1.5倍)
-      case 63: name = "無敵"; tpCost = 70; power = 0; break; // (1ターン ダメージ 0)
-
-      // --- ディヴァイン・シールド (who=28) ---
-      case 64: name = "全体バリア"; tpCost = 45; power = 0; break; // (味方全体 ダメージ無効 1回)
-      case 65: name = "旋律反射"; tpCost = 35; power = 0; break; // (旋律(魔法)反射)
-      case 66: name = "キュア・オール"; tpCost = 30; power = 0; break; // (味方全体 状態異常回復)
-      case 67: name = "ホーリーウォール"; tpCost = 60; power = 0; break; // (味方全体 属性耐性UP)
-      
-      // --- リジェネレーター (who=29) ---
-      case 68: name = "全体リペア"; tpCost = 30; power = 100; break; // (味方全体 回復)
-      case 69: name = "リザレクション"; tpCost = 50; power = 0; break; // (味方単体 蘇生)
-      case 70: name = "TPリジェネ"; tpCost = 0; power = 0; break; // (自身のTPを徐々に回復)
-      case 71: name = "フル・キュア"; tpCost = 70; power = 9999; break; // (味方全体 HP全回復)
-
-      // --- クリッパー (who=41) ---
-      case 72: name = "カッティング"; tpCost = 7; power = 18; break;
-      case 73: name = "クイックステップ"; tpCost = 10; power = 0; break; // (自身 SPD バフ)
-
-      // --- ブレード・ダンサー (who=46) ---
-      case 74: name = "ツインエッジ"; tpCost = 15; power = 35; break; // (35ダメージ x 2回)
-      case 75: name = "エアリアルダンス"; tpCost = 18; power = 0; break; // (自身 AGI バフ)
-
-      // --- サイクロン・ダンサー (who=51) ---
-      case 76: name = "スパイラルエッジ"; tpCost = 28; power = 70; break; // (70ダメージ x 2回)
-      case 77: name = "エアステップ"; tpCost = 22; power = 0; break; // (味方単体 SPD/AGI バフ)
-
-      // --- テンペスト (who=58) ---
-      case 78: name = "ゲイルストライク"; tpCost = 35; power = 140; break; // (風属性)
-      case 79: name = "ラピッドムーブ"; tpCost = 30; power = 0; break; // (味方全体 SPD バフ)
-
-      // --- シルフィード (who=69) ---
-      case 80: name = "インビジブルエッジ"; tpCost = 40; power = 160; break; // (回避無視)
-      case 81: name = "ウインドウォール"; tpCost = 38; power = 0; break; // (味方全体 回避率UP)
-      case 82: name = "ストームブリンガー"; tpCost = 50; power = 130; break; // (全体 風属性攻撃)
-      case 83: name = "精霊の舞"; tpCost = 45; power = 0; break; // (自身のTP徐々に回復)
-
-      // --- アクセラレーター (who=70) ---
-      case 84: name = "マッハブレイド"; tpCost = 42; power = 150; break; // (必ず先制)
-      case 85: name = "オーバークロック"; tpCost = 55; power = 0; break; // (自身 2回行動)
-      case 86: name = "リミットブレイク"; tpCost = 40; power = 0; break; // (自身のATK/SPD 最大まで上昇)
-      case 87: name = "タービュランス"; tpCost = 60; power = 140; break; // (全体 風属性 + SPDダウン)
-
-      // --- メンダー (who=42) ---
-      case 88: name = "リペア"; tpCost = 8; power = 50; break; // (単体 HP回復)
-      case 89: name = "キュア"; tpCost = 10; power = 0; break; // (単体 状態異常回復)
-
-      // --- (第1進化: who=47) ---
-      case 90: name = "リペア・プラス"; tpCost = 16; power = 150; break; // (単体 HP回復(中))
-      case 91: name = "リフレッシュ"; tpCost = 15; power = 0; break; // (単体 弱体解除)
-
-      // --- (第2進化: who=52) ---
-      case 92: name = "エリア・リペア"; tpCost = 25; power = 100; break; // (全体 HP回復(小))
-      case 93: name = "リザレクション"; tpCost = 30; power = 0; break; // (単体 蘇生(HP中))
-
-      // --- (第3進化: who=59) ---
-      case 94: name = "フル・リペア"; tpCost = 30; power = 500; break; // (単体 HP回復(大))
-      case 95: name = "オートリペア"; tpCost = 28; power = 0; break; // (単体 HP自動回復)
-
-      // --- (最終進化A: who=71) ---
-      case 96: name = "エリア・リペア・プラス"; tpCost = 45; power = 250; break; // (全体 HP回復(中))
-      case 97: name = "リジェネフィールド"; tpCost = 50; power = 0; break; // (全体 HP自動回復)
-      case 98: name = "アセンション"; tpCost = 60; power = 0; break; // (全体 蘇生(HP全快))
-      case 99: name = "ホーリー・ウォール"; tpCost = 40; power = 0; break; // (全体 状態異常無効 1回)
-
-      // --- (最終進化B: who=72) ---
-      case 100: name = "TPチャージ"; tpCost = 10; power = 30; break; // (単体 TP回復)
-      case 101: name = "ディスペル"; tpCost = 35; power = 0; break; // (敵単体 強化解除)
-      case 102: name = "TPリジェネ"; tpCost = 40; power = 0; break; // (自身 TP自動回復)
-      case 103: name = "オラクルフィールド"; tpCost = 55; power = 0; break; // (全体 TP徐々に回復)
-
-      // --- ジャマー (who=43) ---
-      case 104: name = "スロウ"; tpCost = 10; power = 0; break; // (敵単体 SPD ダウン)
-      case 105: name = "ポイズン"; tpCost = 12; power = 20; break; // (ダメージ + 確率で毒)
-
-      // --- (第1進化: who=48) ---
-      case 106: name = "パワーダウン"; tpCost = 15; power = 0; break; // (敵単体 ATK ダウン)
-      case 107: name = "ガードダウン"; tpCost = 15; power = 0; break; // (敵単体 DEF ダウン)
-
-      // --- (第2進化: who=53) ---
-      case 108: name = "エリア・スロウ"; tpCost = 25; power = 0; break; // (敵全体 SPD ダウン)
-      case 109: name = "サイレンス"; tpCost = 20; power = 0; break; // (敵単体 確率で沈黙)
-
-      // --- (第3進化: who=60) ---
-      case 110: name = "デッドリーポイズン"; tpCost = 30; power = 50; break; // (ダメージ + 確率で猛毒)
-      case 111: name = "TPドレイン"; tpCost = 5; power = 30; break; // (敵単体 TP吸収)
-
-      // --- (最終進化A: who=73) ---
-      case 112: name = "エリア・ブレイク"; tpCost = 45; power = 0; break; // (敵全体 ATK/DEF ダウン)
-      case 113: name = "カオスフィールド"; tpCost = 50; power = 0; break; // (敵全体 確率で混乱)
-      case 114: name = "ディザスター"; tpCost = 60; power = 150; break; // (無属性 + 全状態異常付与)
-      case 115: name = "ペイン・イーター"; tpCost = 40; power = 100; break; // (状態異常の敵に特効)
-
-      // --- (最終進化B: who=74) ---
-      case 116: name = "ロックダウン"; tpCost = 40; power = 0; break; // (敵単体 確率で行動不能)
-      case 117: name = "バニッシュ"; tpCost = 55; power = 0; break; // (敵単体 強化全解除)
-      case 118: name = "ワールド・ダウン"; tpCost = 65; power = 0; break; // (敵全体 全能力ダウン)
-      case 119: name = "エナジー・バーン"; tpCost = 50; power = 130; break; // (敵のTPが多いほど高威力)
-
-      // --- はぐれノイズ (仲間用) (who=75) ---
-      case 120: name = "ノイズヒット"; tpCost = 0; power = 40; break; // (シンプルな攻撃)
-      case 121: name = "ソニックダガー"; tpCost = 0; power = 60; break; // (必ず先制攻撃)
-      case 122: name = "かく乱"; tpCost = 25; power = 0; break; // (攻撃 + 確率で混乱)
-      case 123: name = "ファントムラッシュ"; tpCost = 0; power = 40; break; // (40ダメージ x 2-4回ランダム攻撃)
-
-      // --- はぐれキング (仲間用) (who=76) ---
-      case 124: name = "キングスピア"; tpCost = 0; power = 130; break; // (防御無視攻撃)
-      case 125: name = "ノイズストーム"; tpCost = 0; power = 100; break; // (敵全体攻撃)
-      case 126: name = "ロイヤルチャージ"; tpCost = 0; power = 200; break; // (高威力だが次のターン行動不可)
-      case 127: name = "ラッキーセブン"; tpCost = 0; power = 77; break; // (77ダメージ x 1-7回ランダム攻撃)
-
-      default:
-        name = "？？？";
-        tpCost = 0;
-        power = 0;
-        break;
-    }
-  }*/
   enum class EffectType {
     NONE,             // 効果なし
     DAMAGE,           // 物理・属性ダメージ (powerを参照)
@@ -731,11 +528,15 @@ public:
     id = recid;
 
     // デフォルト値
+    name = "？？？";
+    tpCost = 0;
+    power = 0;
+
     type = EffectType::DAMAGE;
     scope = TargetScope::SINGLE_ENEMY;
+    dependence = StatDependence::ATK;
     category = Category::PHYSICAL;
-    if (dependence == StatDependence::SEN) category = Category::MELODY;
-    if (type == EffectType::HEAL || type == EffectType::BUFF) category = Category::OTHER;
+
     switch (id) {
       // --- 主人公 (ID 0-19) ---
       case 0: name = "プチノイズ"; tpCost = 5; power = 10; dependence = StatDependence::SEN; break; // 魔法っぽいのでSEN
@@ -1300,6 +1101,25 @@ public:
     if (id == 125 || id == 126) {
         dependence = StatDependence::SEN;
     }
+    // スキル設定がすべて確定した後にカテゴリを決定
+    bool isOffensive =
+        type == EffectType::DAMAGE ||
+        type == EffectType::MULTI_HIT_DAMAGE ||
+        (type == EffectType::SPECIAL &&
+        power > 0 &&
+        (scope == TargetScope::SINGLE_ENEMY ||
+          scope == TargetScope::ALL_ENEMIES ||
+          scope == TargetScope::RANDOM_ENEMY));
+
+    if (!isOffensive) {
+        category = Category::OTHER;
+    }
+    else if (dependence == StatDependence::SEN) {
+        category = Category::MELODY;
+    }
+    else {
+        category = Category::PHYSICAL;
+    }
   }
 };
 
@@ -1529,6 +1349,7 @@ public:
   int equipAccId = -1;    // アクセ
   // --- 状態異常 ---
   int poisonTurns = 0;
+  int poisonLevel = 0;   // 0: なし, 1: 毒, 2: 猛毒
   int paralyzedTurns = 0;
   int silencedTurns = 0;
   int confusedTurns = 0;
@@ -2598,6 +2419,7 @@ public:
   void CureStatus(bool cureDebuffs) {
     // 状態異常フラグをリセット
       poisonTurns = 0;
+      poisonLevel = 0;
       paralyzedTurns = 0;
       silencedTurns = 0;
       confusedTurns = 0;
@@ -2885,7 +2707,11 @@ public:
         spdDebuffRate = 0.7; spdDebuffTurns = DEFAULT_DEBUFF_TURNS;
         break;
       case 105: // ポイズン (毒)
-        poisonTurns = DEFAULT_DEBUFF_TURNS;
+        // 猛毒中なら通常毒で上書きしない
+        if (poisonLevel < 2) {
+            poisonLevel = 1;
+            poisonTurns = DEFAULT_DEBUFF_TURNS;
+        }
         break;
       case 106: // パワーダウン (敵単体 ATK 0.7倍)
         atkDebuffRate = 0.7; atkDebuffTurns = DEFAULT_DEBUFF_TURNS;
@@ -2900,7 +2726,8 @@ public:
         silencedTurns = DEFAULT_DEBUFF_TURNS;
         break;
       case 110: // デッドリーポイズン (猛毒)
-        poisonTurns = DEFAULT_DEBUFF_TURNS; // (isDeadlyPoisoned = true; の方が望ましい)
+        poisonLevel = 2;
+        poisonTurns = DEFAULT_DEBUFF_TURNS;
         break;
       case 112: // エリア・ブレイク (敵全体 ATK/DEF 0.7倍)
         atkDebuffRate = 0.7; atkDebuffTurns = DEFAULT_DEBUFF_TURNS;
@@ -2910,7 +2737,10 @@ public:
         confusedTurns = DEFAULT_DEBUFF_TURNS;
         break;
       case 114: // ディザスター (全状態異常)
-        poisonTurns = DEFAULT_DEBUFF_TURNS;
+        if (poisonLevel < 2) {
+            poisonLevel = 1;
+            poisonTurns = DEFAULT_DEBUFF_TURNS;
+        }
         paralyzedTurns = DEFAULT_DEBUFF_TURNS;
         silencedTurns = DEFAULT_DEBUFF_TURNS;
         confusedTurns = DEFAULT_DEBUFF_TURNS;
@@ -2972,27 +2802,6 @@ public:
     }
     return false; // TPが足りない
   }
-
-  /*bool gainXP(int amount) {
-    if (Level >= 99) return false; // Lv99なら何もしない
-
-    currentXP += amount;
-    bool leveledUp = false;
-
-    // 複数レベルアップにも対応 (例: XP50もらって2レベルアップ)
-    while (currentXP >= nextLevelXP && Level < 99) {
-      currentXP -= nextLevelXP; // 必要なXPを引く (繰り越し)
-      Level++;
-      nextLevelXP = calculateNextXP(Level);
-      leveledUp = true;
-    }
-
-    if (leveledUp) {
-      recalculateStats(); // ステータスを再計算
-    }
-    
-    return leveledUp;
-  }*/
 
   int gainXP(int amount) {
     if (Level >= 99) return 0;
@@ -3308,17 +3117,21 @@ public:
     }
     // ★ 毒の処理 (isPoisoned -> poisonTurns > 0)
     if (poisonTurns > 0) {
-        int poisonDmg = getMaxHp() * 0.1; // (例: 最大HPの10%ダメージ)
+        // 通常毒: 最大HPの10%
+        // 猛毒:   最大HPの20%
+        int poisonRate = (poisonLevel >= 2) ? 20 : 10;
+        int poisonDmg = getMaxHp() * poisonRate / 100;
+
         if (poisonDmg < 1) poisonDmg = 1;
+
         if (attributeResistTurns > 0) {
-          poisonDmg /= 2;
-          if (poisonDmg < 1) poisonDmg = 1;
+            poisonDmg /= 2;
+            if (poisonDmg < 1) poisonDmg = 1;
         }
+
         takedamage(poisonDmg);
         value = poisonDmg;
     }
-    // (TODO: 猛毒 isDeadlyPoisoned なら更にダメージ)
-
     // --- 2. 状態異常による行動不能判定 ---
     // (麻痺・混乱などは ApplyTurnEffects の責務ではないので Battle 側で処理)
 
@@ -3345,7 +3158,13 @@ public:
     if (lckDebuffTurns > 0) lckDebuffTurns--;
     
     // 状態異常 (ターンで解除されるもの)
-    if (poisonTurns > 0) poisonTurns--;
+    if (poisonTurns > 0) {
+      poisonTurns--;
+
+      if (poisonTurns == 0) {
+        poisonLevel = 0;
+      }
+    }
     if (paralyzedTurns > 0) paralyzedTurns--;
     if (silencedTurns > 0) silencedTurns--;
     if (confusedTurns > 0) confusedTurns--;
@@ -4037,29 +3856,7 @@ public:
       X = Map::TILE_SIZE; Y = Map::TILE_SIZE; oldX = X; oldY = Y;
     }
   }
-  /*void reset(Map& map) {
-    bool positionFound = false;
-    // 最初の草タイル(TILE_GRASS)を探す
-    for (int y = 1; y < map.getMAP_HEIGHT() - 1; y++) {
-      for (int x = 1; x < map.getMAP_WIDTH() - 1; x++) {
-        if (map.mapData[y * map.getMAP_WIDTH() + x] == Map::TILE_GRASS) {
-          // 見つけたら、そこをピクセル座標のスタート地点に
-          X = x * Map::TILE_SIZE;
-          Y = y * Map::TILE_SIZE;
-          oldX = X;
-          oldY = Y;
-          positionFound = true;
-          break;
-        }
-      }
-      if (positionFound) break;
-    }
-    
-    // もし万が一、草タイルが一つも見つからなかった場合の保険
-    if (!positionFound) { 
-      X = Map::TILE_SIZE; Y = Map::TILE_SIZE; oldX = X; oldY = Y;
-    }
-  }*/
+  
   void reset(Map& map) {
     // 以前の検索ループ処理は全て削除してください
 
@@ -4077,187 +3874,6 @@ public:
     }
   }
 };
-
-
-//---旧版---
-/*class Graphic {
-public:
-  static const int SCREEN_WIDTH = 320;
-  static const int SCREEN_HEIGHT = 240;
-  LGFX lcd;
-  LGFX_Sprite screenSprite;
-
-  // カメラはタイル境界に揃える（補間 OFF）
-  int cameraX = 0;
-  int cameraY = 0;
-
-  // 前フレームのヒーロー矩形（画面座標）。-1なら未描画
-  int prevHeroScreenX = -1;
-  int prevHeroScreenY = -1;
-
-  // 現在背景が描かれている start tile（可視領域の左上タイル）
-  int startTileX = -1;
-  int startTileY = -1;
-  int visTileW = 0, visTileH = 0;
-
-  Graphic(): screenSprite(&lcd) {}
-
-  void init(){
-    lcd.init();
-    lcd.setRotation(1);
-    lcd.setColorDepth(16);
-    lcd.setSwapBytes(true);
-
-    screenSprite.setColorDepth(16);
-    screenSprite.createSprite(SCREEN_WIDTH, SCREEN_HEIGHT);
-    screenSprite.setSwapBytes(true);
-
-    lcd.setFont(&fonts::lgfxJapanGothic_12);
-    screenSprite.setFont(&fonts::lgfxJapanGothic_12);
-
-    // 最初は黒で初期化しておく
-    screenSprite.fillScreen(TFT_BLACK);
-    screenSprite.pushSprite(0,0);
-  }
-
-  // tileType からビットマップポインタを返す小ヘルパ
-  inline const uint16_t* tileBitmapFor(int tileType){
-    switch(tileType){
-      case Map::TILE_WALL: return (const uint16_t*)wall;
-      case Map::TILE_STAIR_UP: return (const uint16_t*)stair_up;
-      case Map::TILE_STAIR_DOWN: return (const uint16_t*)stair_down;
-      case Map::TILE_BOX_CLOSE: return (const uint16_t*)box_close;
-      case Map::TILE_BOX_OPEN: return (const uint16_t*)box_open;
-      case Map::TILE_AUTOMATON: return (const uint16_t*)automaton_tile;
-      case Map::TILE_INN: return (const uint16_t*)inn_tile;
-      case Map::TILE_SHOP: return (const uint16_t*)shop_tile;
-      case Map::TILE_STORAGE: return (const uint16_t*)storage_tile;
-      case Map::TILE_GRASS:
-      default: return (const uint16_t*)grass;
-    }
-  }
-
-  // （内部）画面上の指定タイルを screenSprite に描く
-  inline void drawTileToScreenSprite(int tx, int ty, Map &map, int cameraX_local, int cameraY_local){
-    if (tx < 0 || ty < 0 || tx >= map.getMAP_WIDTH() || ty >= map.getMAP_HEIGHT()) return;
-    int screenX = tx * Map::TILE_SIZE - cameraX_local;
-    int screenY = ty * Map::TILE_SIZE - cameraY_local;
-    const uint16_t* bmp = tileBitmapFor(map.mapData[ty * map.getMAP_WIDTH() + tx]);
-    screenSprite.pushImage(screenX, screenY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)bmp);
-  }
-
-  // 可視領域の背景を (screenSprite に) フル描画して LCD に転送する
-  void drawFullBackground(Map &map, int cameraX_in, int cameraY_in){
-    // カメラをタイル境界に揃える
-    int maxCameraX = map.getMAP_WIDTH() * Map::TILE_SIZE - SCREEN_WIDTH;
-    int maxCameraY = map.getMAP_HEIGHT() * Map::TILE_SIZE - SCREEN_HEIGHT;
-    if (maxCameraX < 0) maxCameraX = 0;
-    if (maxCameraY < 0) maxCameraY = 0;
-    int cameraX_clamped = cameraX_in < 0 ? 0 : (cameraX_in > maxCameraX ? maxCameraX : cameraX_in);
-    int cameraY_clamped = cameraY_in < 0 ? 0 : (cameraY_in > maxCameraY ? maxCameraY : cameraY_in);
-    //cameraX_clamped = (cameraX_clamped / Map::TILE_SIZE) * Map::TILE_SIZE;
-    //cameraY_clamped = (cameraY_clamped / Map::TILE_SIZE) * Map::TILE_SIZE;
-
-    cameraX = cameraX_clamped;
-    cameraY = cameraY_clamped;
-
-    // タイル範囲
-    startTileX = cameraX / Map::TILE_SIZE;
-    startTileY = cameraY / Map::TILE_SIZE;
-    int endTileX = (cameraX + SCREEN_WIDTH - 1) / Map::TILE_SIZE;
-    int endTileY = (cameraY + SCREEN_HEIGHT - 1) / Map::TILE_SIZE;
-    if (endTileX >= map.getMAP_WIDTH()) endTileX = map.getMAP_WIDTH() - 1;
-    if (endTileY >= map.getMAP_HEIGHT()) endTileY = map.getMAP_HEIGHT() - 1;
-    visTileW = endTileX - startTileX + 1;
-    visTileH = endTileY - startTileY + 1;
-
-    // screenSprite に書き込む（1回だけ）
-    screenSprite.fillScreen(TFT_BLACK);
-    for (int ty = startTileY; ty <= endTileY; ++ty) {
-      for (int tx = startTileX; tx <= endTileX; ++tx) {
-        drawTileToScreenSprite(tx, ty, map, cameraX, cameraY);
-      }
-    }
-    // 一括転送（これが重いが発生頻度は低い）
-    screenSprite.pushSprite(0, 0);
-
-    // 前ヒーロー座標は無効化（次は hero を LCD に描く）
-    prevHeroScreenX = -1; prevHeroScreenY = -1;
-  }
-
-  // ヒーローの矩形が覆っていたタイル群をLCDへ復元する（prevHeroScreenX/Y が -1 のとき何もしない）
-  void restorePrevHeroArea(Map &map){
-    if (prevHeroScreenX < 0) return;
-    // prevHeroScreen は画面座標（0..SCREEN）
-    int left = prevHeroScreenX;
-    int top  = prevHeroScreenY;
-    int right = prevHeroScreenX + Map::TILE_SIZE - 1;
-    int bottom = prevHeroScreenY + Map::TILE_SIZE - 1;
-
-    // 画面上で重なっているタイル範囲を計算（画面座標 → タイル座標）
-    int tileLeft = (left + cameraX) / Map::TILE_SIZE;
-    int tileTop  = (top  + cameraY) / Map::TILE_SIZE;
-    int tileRight = (right + cameraX) / Map::TILE_SIZE;
-    int tileBottom = (bottom + cameraY) / Map::TILE_SIZE;
-
-    // 各タイルを lcd に直接 pushImage して復元
-    for (int ty = tileTop; ty <= tileBottom; ++ty) {
-      for (int tx = tileLeft; tx <= tileRight; ++tx) {
-        if (tx < 0 || ty < 0 || tx >= map.getMAP_WIDTH() || ty >= map.getMAP_HEIGHT()) continue;
-        int screenX = tx * Map::TILE_SIZE - cameraX;
-        int screenY = ty * Map::TILE_SIZE - cameraY;
-        const uint16_t* bmp = tileBitmapFor(map.mapData[ty * map.getMAP_WIDTH() + tx]);
-        lcd.pushImage(screenX, screenY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)bmp);
-      }
-    }
-  }
-
-  // メイン：ヒーロー位置とカメラを受け取り、必要最小限の描画だけ行う
-  // 呼び出し：毎フレーム（loop内）に呼ぶ。map->変化（再生成）時は drawFullBackground を先に呼ぶ
-  void smartRender(Map &map, const Caractor &hero, int desiredCameraX, int desiredCameraY){
-    // カメラをタイル境界に揃える（desired はピクセル座標）
-    int maxCameraX = map.getMAP_WIDTH() * Map::TILE_SIZE - SCREEN_WIDTH;
-    int maxCameraY = map.getMAP_HEIGHT() * Map::TILE_SIZE - SCREEN_HEIGHT;
-    if (maxCameraX < 0) maxCameraX = 0;
-    if (maxCameraY < 0) maxCameraY = 0;
-    int camX = desiredCameraX < 0 ? 0 : (desiredCameraX > maxCameraX ? maxCameraX : desiredCameraX);
-    int camY = desiredCameraY < 0 ? 0 : (desiredCameraY > maxCameraY ? maxCameraY : desiredCameraY);
-    const int SCROLL_SNAP = 8;
-    // カメラをタイル境界ではなく、SNAP単位に揃える
-    camX = (camX / SCROLL_SNAP) * SCROLL_SNAP;
-    camY = (camY / SCROLL_SNAP) * SCROLL_SNAP;
-
-    // カメラが変わったら背景をフル再描画（この分岐が最重要）
-    if (camX != cameraX || camY != cameraY || startTileX < 0) {
-      drawFullBackground(map, camX, camY);
-    }
-
-    // ヒーローの画面座標（整数）
-    int heroScreenX = hero.X - cameraX;
-    int heroScreenY = hero.Y - cameraY;
-
-    // もし hero が動いたなら、前の領域だけ復元してから新しい hero を描く
-    if (prevHeroScreenX != heroScreenX || prevHeroScreenY != heroScreenY) {
-      // 1) 前ヒーローが描かれていれば、その領域のタイルを復元
-      restorePrevHeroArea(map);
-      // 2) 新しいヒーローをLCDに直接描画（透過あり）
-      lcd.pushImage(heroScreenX, heroScreenY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)hero_dots, H_TRANSPARENT);
-      
-
-      // 3) prev を更新
-      prevHeroScreenX = heroScreenX;
-      prevHeroScreenY = heroScreenY;
-    }
-    // それ以外（位置が同じ）は何もしない
-  }
-
-  // マップが再生成されたときなどに呼ぶ（外部から）
-  void invalidateAndRedraw(Map &map, int desiredCameraX, int desiredCameraY){
-    startTileX = startTileY = -1;
-    prevHeroScreenX = prevHeroScreenY = -1;
-    drawFullBackground(map, desiredCameraX, desiredCameraY);
-  }
-};*/
 
 // -------------------------
 // Graphic クラス (省メモリ・直接描画版)
@@ -4666,37 +4282,6 @@ public:
   }
 };
 
-/*class Menu {
-public:
-  static const int ITEM_COUNT = 4;
-  const char* items[ITEM_COUNT] = {"道具", "魔法", "技", "設定"};
-  int selected = 0;
-  bool active = false;
-
-  void toggle() { active = !active; }
-
-  void update(Controller &ctrl) {
-    if (!active) return;
-    if (ctrl.pressedDebounced(ctrl.BTN_UP))
-      selected = (selected - 1 + ITEM_COUNT) % ITEM_COUNT;
-    if (ctrl.pressedDebounced(ctrl.BTN_DOWN))
-      selected = (selected + 1) % ITEM_COUNT;
-  }
-
-  void draw(LGFX_Sprite &sp) {
-    if (!active) return;
-    int x = 60, y = 40, w = 200, h = 140;
-    sp.fillRect(x, y, w, h, TFT_DARKGREY);
-    sp.drawRect(x, y, w, h, TFT_WHITE);
-    sp.setTextSize(2);
-    for (int i = 0; i < ITEM_COUNT; i++) {
-      uint16_t color = (i == selected) ? TFT_YELLOW : TFT_WHITE;
-      sp.setTextColor(color);
-      sp.setCursor(x + 20, y + 20 + i * 28);
-      sp.print(items[i]);
-    }
-  }
-};*/
 // -------------------------
 // うまくいってるやつ
 // -------------------------
@@ -6177,69 +5762,7 @@ public:
       
       music.switchTrack(2, sd);
     }
-    /*else{
-      // ★★★ GDDに基づいた敵の生成（ここから） ★★★
-      int min_who, max_who;
-      bool rare_36_appears = false; // 36 (はぐれノイズ)
-      bool rare_37_appears = false; // 37 (ノイズ・キング)
-
-      // GDDのエンカウントテーブル
-      if (floor <= 5)       { min_who = 0;  max_who = 6; }
-      else if (floor <= 10) { min_who = 0;  max_who = 9; }
-      else if (floor <= 15) { min_who = 7;  max_who = 13; }
-      else if (floor <= 20) { min_who = 7;  max_who = 16; }
-      else if (floor <= 25) { min_who = 14; max_who = 20; rare_36_appears = true; }
-      else if (floor <= 30) { min_who = 14; max_who = 23; rare_36_appears = true; }
-      else if (floor <= 35) { min_who = 21; max_who = 27; rare_36_appears = true; }
-      else if (floor <= 40) { min_who = 21; max_who = 30; rare_37_appears = true; }
-      else if (floor <= 45) { min_who = 28; max_who = 34; rare_37_appears = true; }
-      else if (floor <= 50) { min_who = 28; max_who = 35; rare_37_appears = true; } // (36が通常枠に入る)
-      else { // 51階以降 (仮)
-        min_who = 28; max_who = 35; rare_37_appears = true;
-      }
-
-      int enemyCount = random(1, 5); // 1～4体の敵が出現
-
-      for (int i = 0; i < enemyCount; i++) {
-        int who = 0;
-        int r = random(100);
-        
-        // レア敵の抽選 (出現率 10% と仮定)
-        if (rare_37_appears && r < 3) {
-          who = 37; // ノイズ・キング
-        } else if (rare_36_appears && r < 5) { // 37が出ない場合、36を抽選
-          who = 36; // はぐれノイズ
-        } else {
-          // 通常エンカウント (min_who から max_who の間)
-          who = random(min_who, max_who + 1);
-        }
-        Enemy* newEnemy = new Enemy(who, floor);
-      
-        // 1. 生成直後にステータスを「完全リセット」する (ゴミデータ対策)
-        if (newEnemy->status) {
-          newEnemy->status->resetBattleStats();
-          // 2. 名前をStatusから確実にコピーする (文字化け対策)
-          newEnemy->name = newEnemy->status->getname();
-        }
-        // 3. リストに追加
-        activeEnemies.push_back(newEnemy);
-      }
-      
-      critical_section_enter_blocking(&sdLock);
-      // 1. 敵画像のロード (スロット 0-3)
-      for (int i = 0; i < 4; i++) {
-        if (i < activeEnemies.size()) {
-          String fname = "/e_" + String(activeEnemies[i]->who) + ".bin";
-          // Managerに読み込んでもらい、そのポインタをもらう
-          activeImages[i] = imgMgr.load(i, fname, sd);
-        } else {
-          activeImages[i] = nullptr; // いない場合は空
-        }
-      }
-      critical_section_exit(&sdLock);
-      music.switchTrack(2, sd);
-    }*/
-
+    
     critical_section_enter_blocking(&sdLock);
     activeImages[4] = imgMgr.load(4, "/a_38.bin", sd);
     for (int i = 0; i < party.members.size(); i++) {
@@ -6587,25 +6110,6 @@ public:
         break;
       }
 
-      // 7. 敵のAI (旧 5)
-      /*case STATE_ENEMY_AI: {
-        String enemyName = currentActor->getname(); // Status に name を持たせる修正が必要かも
-        message = enemyName + " の攻撃!";
-        pendingAction = 0; // 敵は「たたかう」 (TODO: 将来はスキルAI)
-        
-        // ターゲット選択AI (生きている味方からランダム)
-        std::vector<Status*> allies = getAliveAllies();
-        if (allies.empty()) {
-          currentTarget = nullptr; // 攻撃対象がいない
-        } else {
-          int targetIdx = random(0, allies.size());
-          currentTarget = allies[targetIdx];
-        }
-        
-        currentBattleState = STATE_ACTION_CALC; // 計算へ
-        break;
-      }*/
-      // 7. 敵のAI実行
       // 7. 敵のAI実行
       case STATE_ENEMY_AI: {
         String enemyName = currentActor->getname();
@@ -6753,159 +6257,6 @@ public:
         break;
       }
 
-      //8. 行動の実行（計算） (旧 6)
-      // 8. 行動の実行（計算）
-      /*case STATE_ACTION_CALC: {
-        lastDamage = 0;
-        lastActionMessage = "";
-        
-        hero.status->clearPopups();
-        for(auto m : party.members) m->status->clearPopups();
-        for(auto e : activeEnemies) e->status->clearPopups();
-
-        // スキル情報取得
-        Skill currentSkill(0); 
-        if (pendingAction == 0) { 
-            currentSkill.name = "攻撃"; currentSkill.power = 50; 
-            currentSkill.type = Skill::EffectType::DAMAGE;
-            currentSkill.dependence = Skill::StatDependence::ATK;
-            message = String(currentActor->getname()) + " の攻撃！";
-        } else {
-            currentSkill = currentActor->getLearnedSkills()[pendingAction - 100];
-            message = String(currentActor->getname()) + " の " + currentSkill.name + "！";
-        }
-        // 行動不能チェック (ロイヤルチャージ後など)
-        if (currentActor->cantMoveTurns > 0) {
-            message = String(currentActor->getname()) + " は動けない！";
-            currentActor->cantMoveTurns--;
-            currentBattleState = STATE_ACTION_MSG; break; 
-        }
-
-        // --- ターゲット解決 & 反射・カウンター ---
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
-            currentSkill.scope == Skill::TargetScope::SINGLE_ALLY ||
-            currentSkill.scope == Skill::TargetScope::SELF) 
-        {
-            // 1. ターゲット解決
-            Status* original = currentTarget;
-            currentTarget = resolveTarget(currentTarget, currentSkill);
-            // (かばった場合などのメッセージを入れるならここ)
-
-            if (currentTarget != nullptr) {
-                // 2. 反射判定
-                bool isReflected = false;
-                if (currentSkill.type != Skill::EffectType::HEAL) {
-                    if (currentTarget->reflectAllTurns > 0) isReflected = true;
-                    else if (currentTarget->reflectPhysicalTurns > 0 && currentSkill.dependence == Skill::StatDependence::ATK) {
-                        isReflected = true; currentTarget->reflectPhysicalTurns--;
-                    }
-                    else if (currentTarget->reflectMagicTurns > 0 && currentSkill.dependence == Skill::StatDependence::SEN) {
-                        isReflected = true; currentTarget->reflectMagicTurns--;
-                    }
-                }
-
-                if (isReflected) {
-                  music.playSE(7);
-                  message += "\n" + String(currentTarget->getname()) + " は跳ね返した！";
-                  currentTarget = currentActor; // ターゲットを自分に変更
-                }
-
-                // 3. 実行 (回避無視ID:80以外なら回避判定が必要だが、caclulatedamage内でヒット判定している)
-                // ただし、インビジブルエッジ(80)は必中させたい場合
-                // (今のStatus::caclatedamageは必中フラグ引数がないので、簡易的にここでの修正は省略するか、hitRateを100にするロジックを追加)
-                
-                ExecuteSkill(currentSkill, currentActor, currentTarget, music);
-                
-                if (currentTarget->getHp() <= 0) {
-                  if (currentTarget->autoReviveTurns > 0) {
-                    currentTarget->autoReviveTurns = 0; // 消費
-                    currentTarget->Revive(50); // 50%復活
-                    // ポップアップで回復量を表示
-                    currentTarget->addPopup(-currentTarget->getHp(), false);
-                    music.playSE(7);
-                    message += "\n" + String(currentTarget->getname()) + " は自動蘇生した！";
-                  }
-                  else if (!currentTarget->isPlayer()) {
-                    message += "\n" + String(currentTarget->getname()) + " を倒した！";
-                  }
-                }
-
-                // 4. カウンター判定 (反射されてない かつ 物理攻撃)
-                if (!isReflected && currentTarget->getHp() > 0 && currentTarget->counterTurns > 0 &&
-                    currentSkill.type == Skill::EffectType::DAMAGE &&
-                    currentSkill.dependence == Skill::StatDependence::ATK) 
-                {
-                    message += "\n" + String(currentTarget->getname()) + " の反撃！";
-                    music.playSE(3);
-                    bool isCrit=false;
-                    int cntDmg = currentTarget->getAttack(); // 簡易通常攻撃
-                    currentActor->takedamage(cntDmg);
-                    currentActor->addPopup(cntDmg, false);
-                }
-            }
-        }
-        // --- 範囲・ランダム攻撃 (反射・かばう無効) ---
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ENEMIES) {
-            bool anyDefeated = false;
-            for (auto enemy : activeEnemies) {
-                if (enemy->status->getHp() > 0) {
-                    ExecuteSkill(currentSkill, currentActor, enemy->status, music);
-                    if (enemy->status->getHp() <= 0) anyDefeated = true;
-                }
-            }
-            if (anyDefeated) message += "\n敵を一掃した！";
-        } 
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ALLIES) {
-            std::vector<Status*> allies = getAliveAllies();
-            for (auto ally : allies) ExecuteSkill(currentSkill, currentActor, ally, music);
-        } 
-        else if (currentSkill.scope == Skill::TargetScope::RANDOM_ENEMY) {
-             int hits = 1;
-             if (currentSkill.id == 123) hits = random(2, 5);
-             if (currentSkill.id == 127) hits = random(1, 8);
-             std::vector<Status*> livingEnemies;
-             for(auto e : activeEnemies) { if(e->status->getHp() > 0) livingEnemies.push_back(e->status); }
-             if (!livingEnemies.empty()) {
-                 bool anyDefeated = false;
-                 for (int i = 0; i < hits; i++) {
-                     Status* randomTarget = livingEnemies[random(0, livingEnemies.size())];
-                     if(randomTarget->getHp() > 0) {
-                         ExecuteSkill(currentSkill, currentActor, randomTarget, music);
-                         if (randomTarget->getHp() <= 0) anyDefeated = true;
-                     }
-                 }
-                 if (anyDefeated) message += "\n敵を倒した！";
-             }
-        }
-
-        // 特殊メッセージ
-        if (lastActionMessage != "") message += "\n" + lastActionMessage;
-
-        // 行動後フラグ処理
-        if (currentSkill.id == 86) currentActor->limitBreak(); // リミットブレイク
-        if (currentSkill.id == 126) currentActor->cantMoveTurns = 2; // ロイヤルチャージ(次行動不可なので2ターンセットして、次のTURN_STARTで1減り、ACTOR_SELECTでチェック)
-        if (currentSkill.id == 85) currentActor->isDoubleAction = true; // オーバークロック
-
-        if (currentTarget != nullptr && !currentTarget->popupValues.empty()) {
-            auto& lastPopup = currentTarget->popupValues.back();
-            
-            // 1. 主人公か仲間がダメージを受けた時
-            if (currentTarget->isPlayer() && lastPopup.value > 0) {
-                 vibration.trigger(50); // 痛い振動
-            }
-            // 2. 敵に会心の一撃が入った時
-            else if (!currentTarget->isPlayer() && lastPopup.isCritical) {
-                 vibration.trigger(150); // 鋭い振動
-            }
-            // 3. 敵に通常攻撃が当たった時
-            else if (!currentTarget->isPlayer() && lastPopup.value > 0) {
-                 vibration.trigger(30);  // 短い振動
-            }
-        }
-
-        currentBattleState = STATE_ACTION_MSG; 
-        break;
-      }*/
       // 8. 行動の実行（計算）
       case STATE_ACTION_CALC: {
         lastDamage = 0;
@@ -7302,17 +6653,6 @@ public:
             if (map.isTown) music.switchTrack(0, sd); // 集落
             else music.switchTrack(1, sd);            // ダンジョン
           }
-          // 5. 画像メモリのクリーンアップ (ImageManagerを使っている場合は不要だが、念のため)
-          // もしベクタ(enemyImages)を使っているならここで解放必須
-          /*
-          for (auto* img : enemyImages) if(img) delete[] img;
-          enemyImages.clear();
-          std::vector<uint16_t*>().swap(enemyImages);
-          
-          for (auto* img : allyImages) if(img) delete[] img;
-          allyImages.clear();
-          std::vector<uint16_t*>().swap(allyImages);
-          */
         }
         break;
       
@@ -7892,34 +7232,6 @@ struct GameContext {
 };
 
 GameContext* ctx = nullptr;
-
-// タイマー（core1 上で動く）: 62us ~ 16kHz
-/*bool audio_timer_callback(struct repeating_timer *t) {
-  MUSIC* music = ctx->music;
-  if (music->paused) return true;
-  if (music->sampleIndex + 1 < music->playBytes) {
-    uint8_t lo = music->playBuf[music->sampleIndex];
-    uint8_t hi = music->playBuf[music->sampleIndex + 1];
-    int16_t sample = lo | (hi << 8);
-    uint16_t usample = (uint16_t)((int)sample + 32768) >> 7;
-    music->setDAC_ISR(usample);
-    music->sampleIndex += 2;
-  } else {
-    if (music->fillBytes > 0) {
-      noInterrupts();
-      volatile uint8_t* tmp = music->playBuf;
-      music->playBuf = music->fillBuf;
-      music->fillBuf = (uint8_t*)tmp;
-      music->playBytes = music->fillBytes;
-      music->fillBytes = 0;
-      music->sampleIndex = 0;
-      interrupts();
-    } else {
-      music->needs_refill = true;
-    }
-  }
-  return true;
-}*/
 
 // タイマー割り込み関数
 
@@ -8952,39 +8264,6 @@ void loop() {
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
         break;
-        /*
-        // 今が集落なら、ダンジョンの `currentFloor` 階へ
-        if (map.isTown) {
-          map.isTown = false;
-          ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
-          music.switchTrack(1, sd);
-        } 
-        // 今がダンジョンなら
-        else {
-          // 10, 20, 30...階層ならボス戦or集落へ
-          if (map.currentFloor % 10 == 0) {
-            // TODO: ここでボス戦ロジックを入れるなら入れる
-            // ボスを倒したと仮定して、次の休憩所（集落）へ
-            map.isTown = true;
-            map.currentFloor++; // 10Fクリア -> 次は11F
-            ctx->graphic->setFloor(map.currentFloor);
-            ctx->map->regenerate(20, 20, Map::TYPE_TOWN);
-            music.switchTrack(0, sd);
-          } 
-          else {
-            // 通常の階層進行
-            map.currentFloor++;
-            ctx->graphic->setFloor(map.currentFloor);
-            ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
-          }
-        }
-        
-        // (階段演出やプレイヤー位置リセット処理)
-        ctx->hero->reset(*ctx->map);
-        state = STATE_GAME;
-        currentEvent = EVENT_NONE;
-        break;
-        */
       }
       case EVENT_STAIR_DOWN: {
         if (map.currentFloor > 1) {
@@ -9022,40 +8301,6 @@ void loop() {
         currentEvent = EVENT_NONE;
         break;
       }
-        /*
-        // A. 集落から戻る場合 (例: 11F集落 -> 10Fダンジョン)
-        if (map.isTown) {
-          map.isTown = false;
-          map.currentFloor--; // 階層を戻す
-          ctx->graphic->setFloor(map.currentFloor);
-          ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
-          music.switchTrack(1, sd);
-        }
-        // B. ダンジョンから戻る場合
-        else {
-          if (map.currentFloor >= 1) {
-            // 11F, 21F... から戻る場合は、その階層の「集落」に戻る
-            // (11Fダンジョン -> 11F集落)
-            if (map.currentFloor % 10 == 1) {
-              map.isTown = true;
-              // 階層数は減らさない (進行度は維持)
-              ctx->map->regenerate(20, 20, Map::TYPE_TOWN);
-              music.switchTrack(0, sd);
-            }
-            // 通常の階層戻り (例: 12F -> 11F)
-            else {
-              map.currentFloor--;
-              ctx->graphic->setFloor(map.currentFloor);
-              ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
-            }
-          }
-        }
-
-        ctx->hero->reset(*ctx->map);
-        state = STATE_GAME;
-        currentEvent = EVENT_NONE;
-        break;
-        */
       case EVENT_AUTOMATON: {
         // TODO: 「壊れたオートマタがある。調律しますか？」の
         // メッセージウィンドウを本当は出すべき
@@ -9085,24 +8330,6 @@ void loop() {
         currentEvent = EVENT_NONE;
         break;
       }
-      /*
-      case EVENT_INN: {
-         // 全回復
-        hero.status->Revive(100);
-        hero.status->ReceiveHeal(9999);
-        hero.status->ReceiveTP(9999);
-        // 仲間も全回復
-        for(auto m : party.members) {
-          m->status->Revive(100);
-          m->status->ReceiveHeal(9999);
-          m->status->ReceiveTP(9999);
-        }
-        // (TODO: メッセージ表示やお金消費)
-        
-        state = STATE_GAME; // 即復帰
-        currentEvent = EVENT_NONE;
-        break;
-      }*/
       case EVENT_INN: {
         ctx->menu->active = true;
         ctx->menu->currentMenuState = Menu::STATE_INN;
