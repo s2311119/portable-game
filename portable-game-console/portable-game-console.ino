@@ -6110,7 +6110,7 @@ public:
         // 2. スキル選択ロジック
         std::vector<Skill>& skills = currentActor->getLearnedSkills();
         
-        if (!skills.empty()) {
+        if (!skills.empty() && currentActor->getSilencedTurns() <= 0) {
             int who = currentActor->getWho();
             int curTP = currentActor->getTp();
             int curHP = currentActor->getHp();
@@ -6367,42 +6367,79 @@ public:
         }
         // B. 全体・ランダム対象 (反射・カウンターなし)
         else if (currentSkill.scope == Skill::TargetScope::ALL_ENEMIES) {
-            bool anyDefeated = false;
-            for (auto enemy : activeEnemies) {
-                if (enemy && enemy->status && enemy->status->getHp() > 0) {
-                    ExecuteSkill(currentSkill, currentActor, enemy->status, music);
-                    if (enemy->status->getHp() <= 0) anyDefeated = true;
-                }
-            }
-            if (anyDefeated) message += "\n敵を一掃した！";
-        } 
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ALLIES) {
-            for (auto ally : getAliveAllies()) {
-                ExecuteSkill(currentSkill, currentActor, ally, music);
-            }
-        } 
-        else if (currentSkill.scope == Skill::TargetScope::RANDOM_ENEMY) {
-             int hits = 1;
-             if (currentSkill.id == 123) hits = random(2, 5);
-             if (currentSkill.id == 127) hits = random(1, 8);
-             
-             std::vector<Status*> livingEnemies;
-             for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
-             
-             if (!livingEnemies.empty()) {
-                 bool anyDefeated = false;
-                 for (int i = 0; i < hits; i++) {
-                     // 攻撃のたびに生きている敵を再取得 (途中で倒すかもしれないので)
-                     std::vector<Status*> live;
-                     for(auto t : livingEnemies) if(t->getHp() > 0) live.push_back(t);
-                     if(live.empty()) break;
+          bool anyDefeated = false;
 
-                     Status* t = live[random(0, live.size())];
-                     ExecuteSkill(currentSkill, currentActor, t, music);
-                     if (t->getHp() <= 0) anyDefeated = true;
-                 }
-                 if (anyDefeated) message += "\n敵を倒した！";
-             }
+          // 使用者から見た「敵」を取得
+          std::vector<Status*> targets =
+            currentActor->isPlayer() ? getAliveEnemies() : getAliveAllies();
+
+          for (auto target : targets) {
+            ExecuteSkill(currentSkill, currentActor, target, music);
+
+            if (target->getHp() <= 0) {
+              anyDefeated = true;
+            }
+          }
+
+          if (anyDefeated) {
+            if (currentActor->isPlayer()) {
+              message += "\n敵を倒した！";
+            } else {
+              message += "\n味方が倒れた！";
+            }
+          }
+        }
+        else if (currentSkill.scope == Skill::TargetScope::ALL_ALLIES) {
+          // 使用者から見た「味方」を取得
+          std::vector<Status*> targets =
+            currentActor->isPlayer() ? getAliveAllies() : getAliveEnemies();
+
+          for (auto target : targets) {
+            ExecuteSkill(currentSkill, currentActor, target, music);
+          }
+        }
+        else if (currentSkill.scope == Skill::TargetScope::RANDOM_ENEMY) {
+          int hits = 1;
+
+          if (currentSkill.id == 123) hits = random(2, 5);
+          if (currentSkill.id == 127) hits = random(1, 8);
+
+          // 使用者から見た「敵」
+          std::vector<Status*> targets =
+            currentActor->isPlayer() ? getAliveEnemies() : getAliveAllies();
+
+          if (!targets.empty()) {
+            bool anyDefeated = false;
+
+            for (int i = 0; i < hits; i++) {
+              // 前のヒットで倒れている可能性があるので毎回更新
+              std::vector<Status*> live;
+
+              for (auto target : targets) {
+                if (target->getHp() > 0) {
+                  live.push_back(target);
+                }
+              }
+
+              if (live.empty()) break;
+
+              Status* target = live[random(0, live.size())];
+
+              ExecuteSkill(currentSkill, currentActor, target, music);
+
+              if (target->getHp() <= 0) {
+                anyDefeated = true;
+              }
+            }
+
+            if (anyDefeated) {
+              if (currentActor->isPlayer()) {
+                message += "\n敵を倒した！";
+              } else {
+                message += "\n味方が倒れた！";
+              }
+            }
+          }
         }
 
         // 特殊効果メッセージ
@@ -7179,6 +7216,18 @@ private:
       }
     }
     return allies;
+  }
+
+  std::vector<Status*> getAliveEnemies() {
+    std::vector<Status*> enemies;
+
+    for (auto enemy : activeEnemies) {
+      if (enemy && enemy->status && enemy->status->getHp() > 0) {
+        enemies.push_back(enemy->status);
+      }
+    }
+
+    return enemies;
   }
 };
 
