@@ -5915,35 +5915,98 @@ public:
       // ★★★ 0. ターン開始処理 ★★★ (変更なし)
       case STATE_TURN_START:
         message = "ターン " + String(turnCount);
-        if(aPressed){
-          // Speed順にソート
-          std::sort(actorList.begin(), actorList.end(), [](Status* a, Status* b) {
-            return a->getSpeed() > b->getSpeed();
-          });
-          currentActorIndex = 0; 
+
+        if (aPressed) {
+
+          // -------------------------
+          // 新しいターンの行動予約を開始
+          // -------------------------
+          battlePhase = BattlePhase::PLANNING;
+
+          plannedActions.clear();
+          currentPlannedActionIndex = 0;
+
+          currentActorIndex = 0;
+          currentActor = nullptr;
+          currentBattleAction = BattleAction();
+
+          pendingActionType = ActionType::NONE;
+          pendingSkillIndex = -1;
+          currentTarget = nullptr;
+
           turnCount++;
+
           currentBattleState = STATE_ACTOR_SELECT;
         }
-        break; 
+        break;
 
       // ★★★ 1. 行動者を決定する (変更なし)
-      case STATE_ACTOR_SELECT:
+      case STATE_ACTOR_SELECT: {
+        // -------------------------
+        // 全員分の行動予約が完了した
+        // -------------------------
         if (currentActorIndex >= actorList.size()) {
-          currentBattleState = STATE_TURN_START;
+
+          // 先制技を最優先、その中ではSPD順
+          std::stable_sort(
+            plannedActions.begin(),
+            plannedActions.end(),
+            [](const BattleAction& a, const BattleAction& b) {
+
+              if (a.priority != b.priority) {
+                return static_cast<int>(a.priority) >
+                      static_cast<int>(b.priority);
+              }
+
+              return a.speedSnapshot > b.speedSnapshot;
+            }
+          );
+
+          battlePhase = BattlePhase::EXECUTING;
+          currentPlannedActionIndex = 0;
+
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
           break;
         }
-        
-        currentActor = actorList[currentActorIndex]; 
+
+        // -------------------------
+        // 次に行動を決めるキャラ
+        // -------------------------
+        currentActor = actorList[currentActorIndex];
+
+        if (currentActor == nullptr) {
+          currentActorIndex++;
+          currentBattleState = STATE_ACTOR_SELECT;
+          break;
+        }
+
+        // 前ターンの防御を解除
         currentActor->isDefending = false;
+
+        // 死亡中なら行動予約しない
         if (currentActor->getHp() <= 0) {
           currentActorIndex++;
-          currentBattleState = STATE_ACTOR_SELECT; 
+          currentBattleState = STATE_ACTOR_SELECT;
+          break;
+        }
+
+        // 前のキャラの行動内容を残さない
+        pendingActionType = ActionType::NONE;
+        pendingSkillIndex = -1;
+        currentTarget = nullptr;
+
+        // ★ここでは状態異常処理をしない
+        // 実際に行動する直前に PRE_ACTION_EFFECTS を通す
+
+        if (currentActor->isPlayer()) {
+          currentBattleState = STATE_COMMAND_SELECT;
         }
         else {
-          // ★ 遷移先を「継続効果処理」に変更
-          currentBattleState = STATE_PRE_ACTION_EFFECTS;
+          currentBattleState = STATE_ENEMY_AI;
         }
+
         break;
+      }
 
       // 2. 味方のコマンド入力
       case STATE_COMMAND_SELECT: 
@@ -6392,8 +6455,31 @@ public:
             currentTarget
         );
 
-        // 今はまだ即実行する。
-        // 次の段階でここを plannedActions への登録処理に変更する。
+        // -------------------------
+        // 行動予約フェーズ
+        // -------------------------
+        if (battlePhase == BattlePhase::PLANNING) {
+
+          plannedActions.push_back(currentBattleAction);
+
+          // 次のキャラへ
+          currentActorIndex++;
+
+          // 前の行動情報をクリア
+          pendingActionType = ActionType::NONE;
+          pendingSkillIndex = -1;
+          currentTarget = nullptr;
+          currentBattleAction = BattleAction();
+
+          currentBattleState = STATE_ACTOR_SELECT;
+          break;
+        }
+
+        // -------------------------
+        // 実行フェーズ
+        // -------------------------
+        // 混乱などによって実行直前に行動内容が変更された場合は
+        // 新たに予約せず、そのまま実行する。
         currentBattleState = STATE_ACTION_CALC;
 
         break;
@@ -6408,23 +6494,26 @@ public:
           break;
         }
 
-        currentBattleAction = plannedActions[currentPlannedActionIndex];
+        currentBattleAction =
+            plannedActions[currentPlannedActionIndex];
 
         currentActor = currentBattleAction.actor;
 
-        // 行動前に倒されていたキャラはスキップ
-        if (currentActor == nullptr || currentActor->getHp() <= 0) {
+        // 実行前に倒されていたらスキップ
+        if (currentActor == nullptr ||
+            currentActor->getHp() <= 0)
+        {
           currentPlannedActionIndex++;
           currentBattleState = STATE_EXECUTE_NEXT_ACTION;
           break;
         }
 
-        // BattleActionの内容を既存実行系に戻す
+        // 予約していた行動を既存実行系へ戻す
         pendingActionType = currentBattleAction.type;
         pendingSkillIndex = currentBattleAction.skillIndex;
         currentTarget = currentBattleAction.target;
 
-        // 実行直前に状態異常などを処理する
+        // 毒・麻痺・混乱などはここから処理する
         currentBattleState = STATE_PRE_ACTION_EFFECTS;
 
         break;
