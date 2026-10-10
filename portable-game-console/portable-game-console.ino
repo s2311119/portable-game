@@ -8810,18 +8810,53 @@ bool audio_timer_callback(struct repeating_timer *t) {
 void core1_main() {
   ctx->sd->init(*ctx->music);
 
-  static repeating_timer_t timer;
-  add_repeating_timer_us(62, audio_timer_callback, NULL, &timer);
-  int lastTrack = ctx->music->currentTrack;
+  // -------------------------------------------------
+  // 音声専用タイマーをcore1上に作成
+  //
+  // デフォルトalarm poolは使わず、
+  // このcore1上で独自のalarm poolを作ることで、
+  // audio_timer_callbackもcore1側のIRQとして実行する。
+  // -------------------------------------------------
+  static alarm_pool_t* audioAlarmPool =
+      alarm_pool_create_with_unused_hardware_alarm(1);
+
+  static repeating_timer_t audioTimer;
+
+  // 16kHzの理想周期は62.5us。
+  // repeating_timerは整数us指定なので、
+  // 近い63usを使用する。
+  //
+  // 負値にすることで
+  // 「callback終了から63us後」ではなく
+  // 「callback開始から63usごと」に呼ばれる。
+  bool timerStarted =
+      alarm_pool_add_repeating_timer_us(
+          audioAlarmPool,
+          -63,
+          audio_timer_callback,
+          nullptr,
+          &audioTimer
+      );
+
+  // タイマー生成に失敗した場合は、
+  // 不定状態でゲームを続けない。
+  if (!timerStarted) {
+    while (true) {
+      tight_loop_contents();
+    }
+  }
 
   while (true) {
     ctx->sd->performPendingSwitch(*ctx->music);
     ctx->sd->refile(*ctx->music);
-    
+
     // ISRが止まっていてrefill完了したら再開
-    if (ctx->music->paused && !ctx->music->needs_refill) {
+    if (ctx->music->paused &&
+        !ctx->music->needs_refill)
+    {
       ctx->music->paused = false;
     }
+
     tight_loop_contents();
   }
 }
