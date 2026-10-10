@@ -8738,42 +8738,53 @@ bool audio_timer_callback(struct repeating_timer *t) {
   int32_t mixedSample = 0;
 
   // --- 1. BGMの取得 ---
-  if (!music->paused && music->sampleIndex + 1 < music->playBytes) {
-    uint8_t lo = music->playBuf[music->sampleIndex];
-    uint8_t hi = music->playBuf[music->sampleIndex + 1];
-    int16_t bgm = (int16_t)(lo | (hi << 8));
-    bgm = (int16_t)(bgm * music->bgmVolume);
-    mixedSample += bgm;
-    music->sampleIndex += 2;
-  } else {
-    // バッファ切れまたは停止中はBGM音量0
-    // refill要求などはここで行う
-    if (!music->paused &&
-        music->fillBytes > 0 &&
-        music->sampleIndex >= music->playBytes)
-    {
-      noInterrupts();
+  if (!music->paused) {
 
-      // 読み込み済みの裏バッファを再生側へ切り替える
-      volatile uint8_t* tmp = music->playBuf;
-      music->playBuf = music->fillBuf;
-      music->fillBuf = (uint8_t*)tmp;
+    // 現在の再生バッファを使い切っていたら、
+    // 先に裏バッファへ切り替える
+    if (music->sampleIndex + 1 >= music->playBytes) {
 
-      music->playBytes = music->fillBytes;
-      music->fillBytes = 0;
-      music->sampleIndex = 0;
+      if (music->fillBytes > 0) {
 
-      // 今まで再生していたバッファが空いたので、
-      // core1へ次のデータ補充をすぐ要求する
-      music->needs_refill = true;
+        // ここはタイマーISR内なので、
+        // noInterrupts()/interrupts() は不要
+        volatile uint8_t* tmp = music->playBuf;
+        music->playBuf = music->fillBuf;
+        music->fillBuf = (uint8_t*)tmp;
 
-      interrupts();
+        music->playBytes = music->fillBytes;
+        music->fillBytes = 0;
+        music->sampleIndex = 0;
+
+        // 空いた裏バッファの補充をcore1ループへ要求
+        music->needs_refill = true;
+      }
+      else {
+        // 裏バッファの準備が間に合っていない
+        music->needs_refill = true;
+      }
     }
-    else if (!music->paused &&
-            music->fillBytes == 0)
-    {
-      // 裏バッファがまだ準備できていない場合も補充要求を出す
-      music->needs_refill = true;
+
+    // バッファを切り替えた場合も、
+    // 同じタイマー割り込み内でそのまま次の1サンプルを読む。
+    // これによりバッファ境界に無音サンプルを挟まない。
+    if (music->sampleIndex + 1 < music->playBytes) {
+
+      uint8_t lo =
+          music->playBuf[music->sampleIndex];
+
+      uint8_t hi =
+          music->playBuf[music->sampleIndex + 1];
+
+      int16_t bgm =
+          (int16_t)(lo | (hi << 8));
+
+      bgm =
+          (int16_t)(bgm * music->bgmVolume);
+
+      mixedSample += bgm;
+
+      music->sampleIndex += 2;
     }
   }
 
