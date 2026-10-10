@@ -4392,26 +4392,86 @@ public:
   }
 
   // --- 壁判定 ---
-  void check_wall(Caractor &hero, Map & map){
+  void check_wall(Caractor &hero, Map &map) {
     int hitbox_offset = 1;
-    int centerX = hero.X + Map::TILE_SIZE/2;
-    int centerY = hero.Y + Map::TILE_SIZE/2;
-    int left = centerX - hitbox_offset, right = centerX + hitbox_offset;
-    int top = centerY - hitbox_offset, bottom = centerY + hitbox_offset;
-    if (map.mapData[top/Map::TILE_SIZE * map.getMAP_WIDTH() + left/Map::TILE_SIZE] == Map::TILE_WALL ||
-        map.mapData[top/Map::TILE_SIZE * map.getMAP_WIDTH() + right/Map::TILE_SIZE] == Map::TILE_WALL ||
-        map.mapData[bottom/Map::TILE_SIZE * map.getMAP_WIDTH() + left/Map::TILE_SIZE] == Map::TILE_WALL ||
-        map.mapData[bottom/Map::TILE_SIZE * map.getMAP_WIDTH() + right/Map::TILE_SIZE] == Map::TILE_WALL) {
-      hero.X = hero.oldX; hero.Y = hero.oldY; hero.moved = false;
+
+    int centerX =
+        hero.X + Map::TILE_SIZE / 2;
+
+    int centerY =
+        hero.Y + Map::TILE_SIZE / 2;
+
+    int left   = centerX - hitbox_offset;
+    int right  = centerX + hitbox_offset;
+    int top    = centerY - hitbox_offset;
+    int bottom = centerY + hitbox_offset;
+
+    const int mapPixelWidth =
+        map.getMAP_WIDTH() * Map::TILE_SIZE;
+
+    const int mapPixelHeight =
+        map.getMAP_HEIGHT() * Map::TILE_SIZE;
+
+    // マップ外は壁として扱う
+    auto isWallOrOutOfBounds =
+        [&](int px, int py) -> bool
+    {
+      if (px < 0 ||
+          py < 0 ||
+          px >= mapPixelWidth ||
+          py >= mapPixelHeight)
+      {
+        return true;
+      }
+
+      int tileX =
+          px / Map::TILE_SIZE;
+
+      int tileY =
+          py / Map::TILE_SIZE;
+
+      return
+          map.mapData[
+              tileY * map.getMAP_WIDTH() + tileX
+          ] == Map::TILE_WALL;
+    };
+
+    if (isWallOrOutOfBounds(left,  top) ||
+        isWallOrOutOfBounds(right, top) ||
+        isWallOrOutOfBounds(left,  bottom) ||
+        isWallOrOutOfBounds(right, bottom))
+    {
+      hero.X = hero.oldX;
+      hero.Y = hero.oldY;
+      hero.moved = false;
     }
   }
 
   bool check_event(Caractor &hero, Map &map, GameState &state, EventType &currentEvent) {
     // 1. プレイヤーの現在タイル座標を取得
-    int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-    int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
+    int heroTileX =
+        (hero.X + Map::TILE_SIZE / 2) /
+        Map::TILE_SIZE;
+
+    int heroTileY =
+        (hero.Y + Map::TILE_SIZE / 2) /
+        Map::TILE_SIZE;
+
+    // 万一マップ外ならイベント判定をしない
+    if (heroTileX < 0 ||
+        heroTileY < 0 ||
+        heroTileX >= map.getMAP_WIDTH() ||
+        heroTileY >= map.getMAP_HEIGHT())
+    {
+      return false;
+    }
+
     // 2. その場所のタイルタイプを取得
-    uint8_t tileType = map.mapData[heroTileY * map.getMAP_WIDTH() + heroTileX];
+    uint8_t tileType =
+        map.mapData[
+            heroTileY * map.getMAP_WIDTH() +
+            heroTileX
+        ];
 
     // 3. タイルタイプに応じて分岐
     switch (tileType) {
