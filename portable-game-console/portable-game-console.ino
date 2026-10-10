@@ -5536,14 +5536,17 @@ private:
     if (originalTarget == nullptr) return nullptr; // 安全対策
     if (originalTarget->getHp() <= 0) return originalTarget;
     
-    // 自分、全体、ランダム対象の技は対象変更しない
-    if (skill.scope == Skill::TargetScope::SELF || 
-        skill.scope == Skill::TargetScope::ALL_ENEMIES || 
-        skill.scope == Skill::TargetScope::ALL_ALLIES || 
-        skill.scope == Skill::TargetScope::RANDOM_ENEMY ||
-        skill.type == Skill::EffectType::HEAL || 
+    // 自分・全体・味方への補助技は対象変更しない。
+    // RANDOM_ENEMY は各ヒットごとに resolveTarget() を通す。
+    if (skill.scope == Skill::TargetScope::SELF ||
+        skill.scope == Skill::TargetScope::ALL_ENEMIES ||
+        skill.scope == Skill::TargetScope::ALL_ALLIES ||
+        skill.type == Skill::EffectType::HEAL ||
         skill.type == Skill::EffectType::REVIVE ||
-        skill.type == Skill::EffectType::BUFF) return originalTarget;
+        skill.type == Skill::EffectType::BUFF)
+    {
+      return originalTarget;
+    }
     // --- 1. 挑発 (Taunt) ---
     Status* tauntTarget = nullptr;
     if (originalTarget->isPlayer()) { // 敵→味方
@@ -5565,10 +5568,6 @@ private:
          if (!taunters.empty()) tauntTarget = taunters[random(0, taunters.size())];
     }
     if (tauntTarget != nullptr) return tauntTarget;
-    
-    // 挑発者がいればそちらに変更
-    if (tauntTarget != nullptr) return tauntTarget;
-
 
     // --- 2. ステルス (Untargetable) ---
     // 狙われた人がステルス中なら、別の生存者に逸らす
@@ -5604,6 +5603,117 @@ private:
     }
 
     return originalTarget;
+  }
+
+  bool executeHostileSkillOnTarget(
+      Skill& skill,
+      Status* attacker,
+      Status* originalTarget,
+      MUSIC& music,
+      bool allowTargetRedirect)
+  {
+    if (attacker == nullptr ||
+        originalTarget == nullptr ||
+        originalTarget->getHp() <= 0)
+    {
+      return false;
+    }
+
+    // 単体攻撃・ランダム攻撃では
+    // 挑発・ステルス・かばうによる対象変更を行う。
+    // 全体攻撃では行わない。
+    Status* defender = originalTarget;
+
+    if (allowTargetRedirect) {
+      defender = resolveTarget(originalTarget, skill);
+    }
+
+    if (defender == nullptr ||
+        defender->getHp() <= 0)
+    {
+      return false;
+    }
+
+    // 反射は「攻撃」にだけ適用する。
+    // 純粋なデバフなど OTHER カテゴリは反射しない。
+    bool isOffensive =
+        skill.category == Skill::Category::PHYSICAL ||
+        skill.category == Skill::Category::MELODY;
+
+    bool isReflected = false;
+
+    if (isOffensive) {
+      if (defender->reflectAllTurns > 0) {
+        isReflected = true;
+      }
+      else if (defender->reflectPhysicalTurns > 0 &&
+              skill.category == Skill::Category::PHYSICAL)
+      {
+        isReflected = true;
+        defender->reflectPhysicalTurns--;
+      }
+      else if (defender->reflectMagicTurns > 0 &&
+              skill.category == Skill::Category::MELODY)
+      {
+        isReflected = true;
+        defender->reflectMagicTurns--;
+      }
+    }
+
+    if (isReflected) {
+      music.playSE(7);
+
+      message +=
+          "\n" +
+          String(defender->getname()) +
+          " は跳ね返した！";
+
+      // 反射された場合は使用者自身へ実行
+      ExecuteSkill(
+          skill,
+          attacker,
+          attacker,
+          music
+      );
+
+      return false;
+    }
+
+    // カウンター判定のため、攻撃前HPを覚えておく
+    int hpBefore = defender->getHp();
+
+    ExecuteSkill(
+        skill,
+        attacker,
+        defender,
+        music
+    );
+
+    bool tookDamage =
+        defender->getHp() < hpBefore;
+
+    // 実際に物理ダメージを受けたときだけ反撃
+    if (tookDamage &&
+        defender->getHp() > 0 &&
+        defender->counterTurns > 0 &&
+        skill.category == Skill::Category::PHYSICAL &&
+        defender != attacker)
+    {
+      message +=
+          "\n" +
+          String(defender->getname()) +
+          " の反撃！";
+
+      music.playSE(3);
+
+      int counterDamage =
+          defender->getAttack();
+
+      attacker->takedamage(counterDamage);
+      attacker->addPopup(counterDamage, false);
+    }
+
+    return defender->getHp() <= 0;
   }
 
 public:
@@ -6863,92 +6973,73 @@ public:
           break;
         }
 
-        // --- ターゲット解決 ---
-        // 敵単体を狙う行動だけ、挑発・ステルス・かばうを考慮する。
-        // 味方への回復・バフ・治療などには干渉させない。
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY) {
-          currentTarget =
-              resolveTarget(currentTarget, currentSkill);
+        // --- 実行ロジック ---
+        // A. 敵単体
+        if (currentSkill.scope ==
+            Skill::TargetScope::SINGLE_ENEMY)
+        {
+          if (currentTarget != nullptr &&
+              currentTarget->getHp() > 0)
+          {
+            executeHostileSkillOnTarget(
+                currentSkill,
+                currentActor,
+                currentTarget,
+                music,
+                true   // 挑発・ステルス・かばうあり
+            );
+          }
         }
 
-        // --- 実行ロジック ---
-        
-        // A. 単体・自分対象 (反射・カウンター判定あり)
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
-            currentSkill.scope == Skill::TargetScope::SINGLE_ALLY ||
-            currentSkill.scope == Skill::TargetScope::SELF) 
+        // B. 味方単体・自分
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::SINGLE_ALLY ||
+            currentSkill.scope ==
+                Skill::TargetScope::SELF)
         {
-          // ターゲットが存在し、生きているかチェック
           bool targetCanReceiveSkill =
               currentTarget != nullptr &&
               (
                 currentTarget->getHp() > 0 ||
-                currentSkill.type == Skill::EffectType::REVIVE
+                currentSkill.type ==
+                    Skill::EffectType::REVIVE
               );
 
-          if (targetCanReceiveSkill) {                
-            // 1. 反射判定
-            // このブロックでは敵単体への攻撃だけを反射対象にする。
-            // 全体攻撃・ランダム攻撃への反射対応は別途共通化する。
-            bool isReflected = false;
-
-            if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY) {
-
-              if (currentTarget->reflectAllTurns > 0) {
-                isReflected = true;
-              }
-              else if (currentTarget->reflectPhysicalTurns > 0 &&
-                      currentSkill.category == Skill::Category::PHYSICAL)
-              {
-                isReflected = true;
-                currentTarget->reflectPhysicalTurns--;
-              }
-              else if (currentTarget->reflectMagicTurns > 0 &&
-                      currentSkill.category == Skill::Category::MELODY)
-              {
-                isReflected = true;
-                currentTarget->reflectMagicTurns--;
-              }
-            }
-
-            if (isReflected) {
-              music.playSE(7);
-              message += "\n" + String(currentTarget->getname()) + " は跳ね返した！";
-              currentTarget = currentActor; // ターゲットを自分に変更
-            }
-
-            // 2. スキル実行
-            ExecuteSkill(currentSkill, currentActor, currentTarget, music);
-            
-            // 3. カウンター判定
-            // 条件: 反射されていない & ターゲットが生きてる & カウンター持ち & 物理攻撃 & ★自分への攻撃ではない
-            if (!isReflected &&
-                currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
-                currentTarget->getHp() > 0 &&
-                currentTarget->counterTurns > 0 &&
-                currentSkill.category == Skill::Category::PHYSICAL &&
-                currentTarget != currentActor)
-            {
-              message += "\n" + String(currentTarget->getname()) + " の反撃！";
-              music.playSE(3);
-              int cntDmg = currentTarget->getAttack(); 
-              currentActor->takedamage(cntDmg);
-              currentActor->addPopup(cntDmg, false);
-            }
+          if (targetCanReceiveSkill) {
+            ExecuteSkill(
+                currentSkill,
+                currentActor,
+                currentTarget,
+                music
+            );
           }
         }
-        // B. 全体・ランダム対象 (反射・カウンターなし)
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ENEMIES) {
+
+        // C. 敵全体
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::ALL_ENEMIES)
+        {
           bool anyDefeated = false;
 
-          // 使用者から見た「敵」を取得
           std::vector<Status*> targets =
-            currentActor->isPlayer() ? getAliveEnemies() : getAliveAllies();
+              currentActor->isPlayer()
+                  ? getAliveEnemies()
+                  : getAliveAllies();
 
           for (auto target : targets) {
-            ExecuteSkill(currentSkill, currentActor, target, music);
 
-            if (target->getHp() <= 0) {
+            bool defeated =
+                executeHostileSkillOnTarget(
+                    currentSkill,
+                    currentActor,
+                    target,
+                    music,
+                    false  // 全体攻撃なので対象変更なし
+                );
+
+            if (defeated) {
               anyDefeated = true;
             }
           }
@@ -6956,64 +7047,102 @@ public:
           if (anyDefeated) {
             if (currentActor->isPlayer()) {
               message += "\n敵を倒した！";
-            } else {
+            }
+            else {
               message += "\n味方が倒れた！";
             }
           }
         }
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ALLIES) {
+
+        // D. 味方全体
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::ALL_ALLIES)
+        {
           std::vector<Status*> targets;
 
           if (currentActor->isPlayer()) {
 
-            if (currentSkill.type == Skill::EffectType::REVIVE) {
+            if (currentSkill.type ==
+                Skill::EffectType::REVIVE)
+            {
               // 全体蘇生は死亡者も含める
               targets = getAllAllies();
             }
             else {
               targets = getAliveAllies();
             }
-
           }
           else {
-            // 敵側は現状どおり
+            // 敵側
             targets = getAliveEnemies();
           }
 
           for (auto target : targets) {
-            ExecuteSkill(currentSkill, currentActor, target, music);
+            ExecuteSkill(
+                currentSkill,
+                currentActor,
+                target,
+                music
+            );
           }
         }
-        else if (currentSkill.scope == Skill::TargetScope::RANDOM_ENEMY) {
+
+        // E. ランダム敵
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::RANDOM_ENEMY)
+        {
           int hits = 1;
 
-          if (currentSkill.id == 123) hits = random(2, 5);
-          if (currentSkill.id == 127) hits = random(1, 8);
+          if (currentSkill.id == 123) {
+            hits = random(2, 5);
+          }
 
-          // 使用者から見た「敵」
+          if (currentSkill.id == 127) {
+            hits = random(1, 8);
+          }
+
           std::vector<Status*> targets =
-            currentActor->isPlayer() ? getAliveEnemies() : getAliveAllies();
+              currentActor->isPlayer()
+                  ? getAliveEnemies()
+                  : getAliveAllies();
 
           if (!targets.empty()) {
+
             bool anyDefeated = false;
 
             for (int i = 0; i < hits; i++) {
-              // 前のヒットで倒れている可能性があるので毎回更新
+
+              // 前のヒットで倒れている可能性があるので
+              // 毎回生存者だけを作り直す
               std::vector<Status*> live;
 
               for (auto target : targets) {
-                if (target->getHp() > 0) {
+                if (target != nullptr &&
+                    target->getHp() > 0)
+                {
                   live.push_back(target);
                 }
               }
 
-              if (live.empty()) break;
+              if (live.empty()) {
+                break;
+              }
 
-              Status* target = live[random(0, live.size())];
+              Status* target =
+                  live[random(0, live.size())];
 
-              ExecuteSkill(currentSkill, currentActor, target, music);
+              bool defeated =
+                  executeHostileSkillOnTarget(
+                      currentSkill,
+                      currentActor,
+                      target,
+                      music,
+                      true   // 1ヒットごとに対象変更あり
+                  );
 
-              if (target->getHp() <= 0) {
+              if (defeated) {
                 anyDefeated = true;
               }
             }
@@ -7021,7 +7150,8 @@ public:
             if (anyDefeated) {
               if (currentActor->isPlayer()) {
                 message += "\n敵を倒した！";
-              } else {
+              }
+              else {
                 message += "\n味方が倒れた！";
               }
             }
