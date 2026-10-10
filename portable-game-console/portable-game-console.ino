@@ -5980,9 +5980,6 @@ public:
           break;
         }
 
-        // 前ターンの防御を解除
-        currentActor->isDefending = false;
-
         // 死亡中なら行動予約しない
         if (currentActor->getHp() <= 0) {
           currentActorIndex++;
@@ -6499,10 +6496,19 @@ public:
 
         currentActor = currentBattleAction.actor;
 
-        // 実行前に倒されていたらスキップ
-        if (currentActor == nullptr ||
-            currentActor->getHp() <= 0)
-        {
+        // nullptrならスキップ
+        if (currentActor == nullptr) {
+          currentPlannedActionIndex++;
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
+          break;
+        }
+
+        // ★このキャラの実際の行動順が来たので、
+        // 前回の「ぼうぎょ」をここで解除する
+        currentActor->isDefending = false;
+
+        // 行動前に倒されていたキャラはスキップ
+        if (currentActor->getHp() <= 0) {
           currentPlannedActionIndex++;
           currentBattleState = STATE_EXECUTE_NEXT_ACTION;
           break;
@@ -6576,6 +6582,20 @@ public:
 
         // スキル情報取得
         Skill currentSkill(0);
+
+        // 行動予約後に沈黙を受けている可能性があるため、
+        // 実行時にもスキル使用可否を確認する
+        if (pendingActionType == ActionType::SKILL &&
+            currentActor->getSilencedTurns() > 0)
+        {
+          message =
+              String(currentActor->getname()) +
+              " は沈黙していて旋律を使えない！";
+
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
+        }
 
         if (pendingActionType == ActionType::ATTACK) {
           currentSkill = Skill(0);
