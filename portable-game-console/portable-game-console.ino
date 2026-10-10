@@ -7794,29 +7794,44 @@ private:
 
         // 4. 攻撃 + 状態異常 (ポイズン、ヴォイドショック、ディザスターなど)
         // (ID: 105, 45, 110, 114)
-        else if (skill.id == 105 || skill.id == 45 || skill.id == 110 || skill.id == 114) {
-          // まずダメージ
-          value = user->caclulateSkillDamage(target, skill, isCrit);
+        else if (skill.id == 105 ||
+         skill.id == 45 ||
+         skill.id == 110 ||
+         skill.id == 114)
+        {
+          // まず攻撃の命中・ダメージ判定
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
           target->takedamage(value);
           target->addPopup(value, isCrit);
-          
-          // 次にデバフ付与 (AddDebuff内で確率計算などはしていないので必中扱い、またはStatus側で調整)
-          bool success = target->AddDebuff(skill.id, user);
-          
-          if (skill.id == 105 && success){
-            lastActionMessage = "毒を与えた!";
-            music.playSE(7);
+
+          // ダメージ計算結果が0なら攻撃自体が失敗したので、
+          // 追加の状態異常も発生させない
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
           }
-          else if (skill.id == 110 && success){
-            lastActionMessage = "猛毒を与えた!";
-            music.playSE(7);
-          }
-          else if (skill.id == 45 && success){
-            lastActionMessage = "麻痺を与えた!";
-            music.playSE(5);
-          }
-          else{
-            if(success){
+          else {
+            bool success =
+                target->AddDebuff(skill.id, user);
+
+            if (skill.id == 105 && success) {
+              lastActionMessage = "毒を与えた!";
+              music.playSE(7);
+            }
+            else if (skill.id == 110 && success) {
+              lastActionMessage = "猛毒を与えた!";
+              music.playSE(7);
+            }
+            else if (skill.id == 45 && success) {
+              lastActionMessage = "麻痺を与えた!";
+              music.playSE(5);
+            }
+            else if (skill.id == 114 && success) {
               lastActionMessage = "厄災を与えた!";
               music.playSE(7);
             }
@@ -7835,11 +7850,24 @@ private:
         // 6. タービュランス (全体風属性+SPDダウン)
         else if (skill.id == 87) {
           music.playSE(6);
-          value = user->caclulateSkillDamage(target, skill, isCrit);
+
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
           target->takedamage(value);
           target->addPopup(value, isCrit);
-          target->AddDebuff(skill.id, user); // SPDダウン
-          lastActionMessage = "風が切り刻む!";
+
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
+          }
+          else {
+            target->AddDebuff(skill.id, user);
+            lastActionMessage = "風が切り刻む!";
+          }
         }
 
         else if (skill.id == 32) {
@@ -7850,33 +7878,51 @@ private:
         }
 
         else if (skill.id == 24) {
-          // 1. ダメージ処理
-          // ※ Status::caclulateSkillDamage 内で skill.id == 24 の場合 effectiveDef = 0 (防御無視) になります
-          music.playSE(5); // 物理攻撃音
-          value = user->caclulateSkillDamage(target, skill, isCrit);
+          music.playSE(5);
+
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
           target->takedamage(value);
           target->addPopup(value, isCrit);
 
-          // 2. デバフ処理 (防御ダウン)
-          // ※ Status::AddDebuff(24) で防御ダウン処理が行われます
-          if (target->AddDebuff(skill.id, user)) {
-            lastActionMessage = "装甲を破壊した！"; // 成功時メッセージ
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
+          }
+          else {
+            if (target->AddDebuff(skill.id, user)) {
+              lastActionMessage = "装甲を破壊した！";
+            }
           }
         }
 
         else if (skill.id == 47) {
-          // 1. ダメージ処理
-          music.playSE(5); // 打撃音
-          value = user->caclulateSkillDamage(target, skill, isCrit);
+          music.playSE(5);
+
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
           target->takedamage(value);
           target->addPopup(value, isCrit);
 
-          // 2. 状態異常付与 (スタン/麻痺)
-          // ※ Status::AddDebuff(47) で paralyzedTurns = 1 がセットされます
-          if (target->AddDebuff(skill.id, user)) {
-            lastActionMessage = "気絶させた！"; // 成功時メッセージ
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
+          }
+          else {
+            if (target->AddDebuff(skill.id, user)) {
+              lastActionMessage = "気絶させた！";
+            }
           }
         }
+        
         // その他 (未実装)
         else {
           lastActionMessage = "しかし何も起こらなかった。";
