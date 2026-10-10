@@ -4930,50 +4930,70 @@ public:
   }
 
   void refile(MUSIC &music) {
-    // only refill when requested
-    if (!music.needs_refill) return;
-    // --- safety guard ---
-    if (music.paused || refillOffset == 0 && music.sampleIndex == 0 && music.playBytes == MUSIC::BUF_SIZE)
-      return;
-
-    // If we just switched tracks and refillOffset==0 and playBytes>0 and sampleIndex==0,
-    // then we've already prefilled buffers in performPendingSwitch — don't refile immediately.
-    if (refillOffset == 0 && music.sampleIndex == 0 && music.playBytes > 0) {
-      // keep needs_refill false until playback advances a bit
-      // but being defensive: only delay for one buffer consumption threshold
+    // 補充要求がないなら何もしない
+    if (!music.needs_refill) {
       return;
     }
 
-    FsFile& file = music.musicFiles[music.currentTrack];
-    if (!file.isOpen()) return;
+    // 曲切り替え中などはSD読み込みしない
+    if (music.paused) {
+      return;
+    }
+
+    FsFile& file =
+        music.musicFiles[music.currentTrack];
+
+    if (!file.isOpen()) {
+      return;
+    }
 
     critical_section_enter_blocking(&sdLock);
+
+    // 一度に長時間SDを占有しないよう、
+    // 2048 byteずつ裏バッファへ補充する
     const size_t CHUNK = 2048;
-    bool eofReached = false;
 
     if (refillOffset < MUSIC::BUF_SIZE) {
-      size_t toRead = min(CHUNK, MUSIC::BUF_SIZE - refillOffset);
-      size_t n = file.read((void*)(music.fillBuf + refillOffset), toRead);
 
-      if (n == 0 && refillOffset == 0) {
-        memset((void*)(music.fillBuf + refillOffset), 0, MUSIC::BUF_SIZE - refillOffset);
-        eofReached = true;
-      } else if (n == 0) {
-        // loop file
+      size_t remaining =
+          MUSIC::BUF_SIZE - refillOffset;
+
+      size_t toRead =
+          min(CHUNK, remaining);
+
+      size_t n =
+          file.read(
+              (void*)(music.fillBuf + refillOffset),
+              toRead
+          );
+
+      refillOffset += n;
+
+      // 要求量より少なくしか読めなかった場合は
+      // 曲末尾に到達したとみなし、次回は先頭から続ける。
+      //
+      // 途中まで読めたデータは捨てず、
+      // fillBuf内にそのまま残しておく。
+      if (n < toRead) {
         file.seek(0);
-        refillOffset = 0;
-        eofReached = true;
-      } else {
-        refillOffset += n;
       }
     }
+
     critical_section_exit(&sdLock);
 
-    if (refillOffset >= MUSIC::BUF_SIZE || eofReached) {
+    // 裏バッファ1個分が完成したら再生側へ公開
+    if (refillOffset >= MUSIC::BUF_SIZE) {
+
       noInterrupts();
-      music.fillBytes = refillOffset;
-      music.needs_refill = false;
+
+      music.fillBytes =
+          MUSIC::BUF_SIZE;
+
+      music.needs_refill =
+          false;
+
       interrupts();
+
       refillOffset = 0;
     }
   }
