@@ -5184,6 +5184,8 @@ public:
     String firstLine =
         file.readStringUntil('\n');
 
+    firstLine.trim();
+
     bool isNewFormat =
         (firstLine == SAVE_MAGIC);
 
