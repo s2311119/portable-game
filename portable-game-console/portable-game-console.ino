@@ -6604,6 +6604,9 @@ public:
         // スキル情報取得
         Skill currentSkill(0);
 
+        // 実行時に予約対象を変更したか
+        bool targetChanged = false;
+
         // 行動予約後に沈黙を受けている可能性があるため、
         // 実行時にもスキル使用可否を確認する
         if (pendingActionType == ActionType::SKILL &&
@@ -6627,7 +6630,36 @@ public:
           currentSkill.dependence = Skill::StatDependence::ATK;
           currentSkill.category = Skill::Category::PHYSICAL;
 
+          // 予約していた攻撃対象がすでに倒れていた場合
+          if (currentTarget == nullptr ||
+              currentTarget->getHp() <= 0)
+          {
+            std::vector<Status*> candidates =
+                currentActor->isPlayer()
+                    ? getAliveEnemies()
+                    : getAliveAllies();
+
+            if (candidates.empty()) {
+              message =
+                  String(currentActor->getname()) +
+                  " の攻撃！\n対象がいない！";
+
+              messageFlow = MessageFlow::END_TURN;
+              currentBattleState = STATE_ACTION_MSG;
+              break;
+            }
+
+            currentTarget =
+                candidates[random((int)candidates.size())];
+
+            targetChanged = true;
+          }
+
           message = String(currentActor->getname()) + " の攻撃！";
+
+          if (targetChanged) {
+            message += "\n対象を変更した！";
+          }
         }
         else if (pendingActionType == ActionType::SKILL) {
           std::vector<Skill>& skills = currentActor->getLearnedSkills();
@@ -6666,7 +6698,7 @@ public:
             currentTarget =
                 candidates[random((int)candidates.size())];
 
-            message += "\n対象を変更した！";
+            targetChanged = true;
           }
 
           // 単体蘇生の対象が、実行前に別の蘇生で既に復活していた場合
@@ -6678,6 +6710,36 @@ public:
             messageFlow = MessageFlow::END_TURN;
             currentBattleState = STATE_ACTION_MSG;
             break;
+          }
+
+          // 単体回復・単体バフの予約対象が倒れていた場合
+          if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
+              (currentSkill.type == Skill::EffectType::HEAL ||
+              currentSkill.type == Skill::EffectType::BUFF) &&
+              (currentTarget == nullptr || currentTarget->getHp() <= 0))
+          {
+            // 使用者から見た生存中の味方
+            std::vector<Status*> candidates =
+                currentActor->isPlayer()
+                    ? getAliveAllies()
+                    : getAliveEnemies();
+
+            if (candidates.empty()) {
+              message =
+                  String(currentActor->getname()) +
+                  " の " +
+                  currentSkill.name +
+                  "！\n対象がいない！";
+
+              messageFlow = MessageFlow::END_TURN;
+              currentBattleState = STATE_ACTION_MSG;
+              break;
+            }
+
+            currentTarget =
+                candidates[random((int)candidates.size())];
+
+            targetChanged = true;
           }
 
           // TP消費をここに集約
@@ -6693,6 +6755,10 @@ public:
             " の " +
             currentSkill.name +
             "！";
+
+          if (targetChanged) {
+            message += "\n対象を変更した！";
+          }
         }
         else {
           message = "行動指定エラー";
