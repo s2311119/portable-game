@@ -3100,65 +3100,8 @@ public:
     if (spdDebuffTurns > 0) spdDebuffTurns--;
     if (senDebuffTurns > 0) senDebuffTurns--;
     if (lckDebuffTurns > 0) lckDebuffTurns--;
-  }
 
-  int ApplyTurnEffects() {
-    int value = 0; // このターンで発生したダメージ/回復
-
-    // --- 1. 継続効果の発動 (毒・リジェネなど) ---
-    if (hpRegenTurns > 0) {
-        int heal = getMaxHp() * 0.1; // (例: 最大HPの10%回復)
-        if (heal < 1) heal = 1;
-        ReceiveHeal(heal);
-        value = -heal; // 回復は負数
-    }
-    if (tpRegenTurns > 0) {
-        // (例: 最大TPの5%回復)
-        ReceiveTP(getMaxTp() * 0.05); 
-    }
-    // ★ 毒の処理 (isPoisoned -> poisonTurns > 0)
-    if (poisonTurns > 0) {
-        // 通常毒: 最大HPの10%
-        // 猛毒:   最大HPの20%
-        int poisonRate = (poisonLevel >= 2) ? 20 : 10;
-        int poisonDmg = getMaxHp() * poisonRate / 100;
-
-        if (poisonDmg < 1) poisonDmg = 1;
-
-        if (attributeResistTurns > 0) {
-            poisonDmg /= 2;
-            if (poisonDmg < 1) poisonDmg = 1;
-        }
-
-        takedamage(poisonDmg);
-        value = poisonDmg;
-    }
-    // --- 2. 状態異常による行動不能判定 ---
-    // (麻痺・混乱などは ApplyTurnEffects の責務ではないので Battle 側で処理)
-
-    // --- 3. バフ/デバフの持続ターンを1減らす ---
-    // バフ
-    if (atkBuffTurns > 0) atkBuffTurns--;
-    if (defBuffTurns > 0) defBuffTurns--;
-    if (spdBuffTurns > 0) spdBuffTurns--;
-    if (senBuffTurns > 0) senBuffTurns--;
-    if (lckBuffTurns > 0) lckBuffTurns--;
-    if (evaBuffTurns > 0) evaBuffTurns--;
-    if (hpRegenTurns > 0) hpRegenTurns--;
-    if (tpRegenTurns > 0) tpRegenTurns--;
-    if (invalidDamageTurns > 0) invalidDamageTurns--;
-    if (reflectPhysicalTurns > 0) reflectPhysicalTurns--;
-    if (reflectMagicTurns > 0) reflectMagicTurns--;
-    // (その他特殊効果のターンもここで減らす)
-
-    // デバフ
-    if (atkDebuffTurns > 0) atkDebuffTurns--;
-    if (defDebuffTurns > 0) defDebuffTurns--;
-    if (spdDebuffTurns > 0) spdDebuffTurns--;
-    if (senDebuffTurns > 0) senDebuffTurns--;
-    if (lckDebuffTurns > 0) lckDebuffTurns--;
-    
-    // 状態異常 (ターンで解除されるもの)
+    // 状態異常
     if (poisonTurns > 0) {
       poisonTurns--;
 
@@ -3166,13 +3109,43 @@ public:
         poisonLevel = 0;
       }
     }
+
     if (paralyzedTurns > 0) paralyzedTurns--;
     if (silencedTurns > 0) silencedTurns--;
     if (confusedTurns > 0) confusedTurns--;
-    // (例: isSilencedTurns > 0 なら isSilencedTurns-- など)
+  }
 
+  int ApplyTurnEffects() {
+    int value = 0;
+
+    if (hpRegenTurns > 0) {
+      int heal = getMaxHp() * 0.1;
+      if (heal < 1) heal = 1;
+      ReceiveHeal(heal);
+      value = -heal;
+    }
+
+    if (tpRegenTurns > 0) {
+      ReceiveTP(getMaxTp() * 0.05);
+    }
+
+    if (poisonTurns > 0) {
+      int poisonRate = (poisonLevel >= 2) ? 20 : 10;
+      int poisonDmg = getMaxHp() * poisonRate / 100;
+
+      if (poisonDmg < 1) poisonDmg = 1;
+
+      if (attributeResistTurns > 0) {
+        poisonDmg /= 2;
+        if (poisonDmg < 1) poisonDmg = 1;
+      }
+
+      takedamage(poisonDmg);
+      value = poisonDmg;
+    }
     return value;
   }
+
   void saveTo(FsFile& file) {
     file.println(who);
     file.println(Level);
@@ -6498,8 +6471,9 @@ public:
             battleWon = true;
             if(aPressed) currentBattleState = STATE_SHOW_XP_GAIN; // XP獲得へ
           } else {
-            currentActorIndex++; // 次の行動者へ
-            currentBattleState = STATE_ACTOR_SELECT; 
+            currentActor->UpdateTurn();
+            currentActorIndex++;
+            currentBattleState = STATE_ACTOR_SELECT;
           }
         }
         break;
@@ -6529,11 +6503,10 @@ public:
           battleWon = false; // 敗北
           if(aPressed) currentBattleState = STATE_BATTLE_END;
         } else {
-          // 誰か生きているなら続行（次の人のターンへ）
+          currentActor->UpdateTurn();
           currentActorIndex++; 
           currentBattleState = STATE_ACTOR_SELECT;
         }
-        // ★★★★★★★★★★★★★★★★★★★★
       }
       break;
 
