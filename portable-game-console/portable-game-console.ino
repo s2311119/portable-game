@@ -5555,14 +5555,15 @@ public:
     STATE_PRE_ACTION_EFFECTS, 
     
     STATE_ENEMY_AI,         // 7. 敵のAI実行
-    STATE_ACTION_CALC,      // 8. 行動実行（計算）
-    STATE_ACTION_MSG,       // 9. 行動結果のメッセージ
-    STATE_CHECK_BATTLE_RESULT, // 10. 勝敗だけ確認
-    STATE_END_ACTOR_TURN,      // 11. 現在の行動者のターン終了処理
-    STATE_SHOW_XP_GAIN,     // 12. XP獲得表示
-    STATE_BATTLE_END,       // 15. 戦闘終了
-    STATE_CHECK_STATUS,      // 16. Yボタンステータス
-    STATE_SHOW_RESULT_MESSAGE
+    STATE_ACTION_READY,     // 8. 行動内容をBattleActionとして確定
+    STATE_ACTION_CALC,      // 9. 行動実行（計算）
+    STATE_ACTION_MSG,       // 10. 行動結果のメッセージ
+    STATE_CHECK_BATTLE_RESULT, // 11. 勝敗だけ確認
+    STATE_END_ACTOR_TURN,      // 12. 現在の行動者のターン終了処理
+    STATE_SHOW_XP_GAIN,     // 13. XP獲得表示
+    STATE_BATTLE_END,       // 14. 戦闘終了
+    STATE_CHECK_STATUS,      // 15. Yボタンステータス
+    STATE_SHOW_RESULT_MESSAGE // 16. メッセージ表示
   };
   BattleState currentBattleState;
   static const int CMD_COUNT = 4;
@@ -5639,6 +5640,7 @@ public:
   Status* currentActor = nullptr; // 現在行動中のキャラのStatus
   // 1ターン分の行動予定
   std::vector<BattleAction> plannedActions;
+  BattleAction currentBattleAction;
   int lastDamage = 0;             // 直前のダメージ計算結果
   String lastActionMessage = "";
   int lastGainedXP = 0;
@@ -5721,6 +5723,7 @@ public:
     enemyTargetIndex = 0;
     allyTargetIndex = 0;
     plannedActions.clear();
+    currentBattleAction = BattleAction();
 
     // 参加メンバーへの参照を保存
     heroRef = &hero;
@@ -5966,14 +5969,13 @@ public:
             }
           }
           else if (commandSelected == 3) {
-            music.playSE(0); // 決定音
-            // pendingAction = 200; // ★ 防御を表す特殊コード (200とする)
+            music.playSE(0);
             pendingActionType = ActionType::DEFEND;
             pendingSkillIndex = -1;
             
-            // ターゲット選択は不要なので、直接計算フェーズへ
-            currentTarget = currentActor; // 対象は自分
-            currentBattleState = STATE_ACTION_CALC;
+            // ターゲット選択は不要なので、行動確定へ
+            currentTarget = currentActor;
+            currentBattleState = STATE_ACTION_READY;
           }
         }
         break;
@@ -6009,8 +6011,8 @@ public:
             // ★★★ スキルの対象範囲(scope)によって分岐 ★★★
             switch (skill.scope) {
               case Skill::TargetScope::SELF:
-                currentTarget = currentActor; // 自分自身が対象
-                currentBattleState = STATE_ACTION_CALC;
+                currentTarget = currentActor;
+                currentBattleState = STATE_ACTION_READY;
                 break;
               case Skill::TargetScope::SINGLE_ENEMY:
                 enemyTargetIndex = 0; // 敵カーソルをリセット
@@ -6023,8 +6025,8 @@ public:
               case Skill::TargetScope::ALL_ENEMIES:
               case Skill::TargetScope::ALL_ALLIES:
               case Skill::TargetScope::RANDOM_ENEMY:
-                currentTarget = nullptr; // 対象が複数
-                currentBattleState = STATE_ACTION_CALC;
+                currentTarget = nullptr;
+                currentBattleState = STATE_ACTION_READY;
                 break;
             }
           } else {
@@ -6067,7 +6069,7 @@ public:
         if (aPressed) {
           music.playSE(0);
           currentTarget = activeEnemies[enemyTargetIndex]->status;
-          currentBattleState = STATE_ACTION_CALC;
+          currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンでキャンセル
         if (bPressed) {
@@ -6102,7 +6104,7 @@ public:
         if (aPressed) {
           music.playSE(0);
           currentTarget = allies[allyTargetIndex];
-          currentBattleState = STATE_ACTION_CALC;
+          currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンで旋律選択に戻る
         if (bPressed) {
@@ -6184,13 +6186,13 @@ public:
               }
               
               if (allTargets.empty()) {
-                  currentTarget = nullptr; // 対象がいない
+                currentTarget = nullptr;
               } else {
-                  currentTarget = allTargets[random(0, allTargets.size())];
+                currentTarget = allTargets[random(0, allTargets.size())];
               }
-              
-              currentBattleState = STATE_ACTION_CALC; // 計算へ
-              break; 
+
+              currentBattleState = STATE_ACTION_READY;
+              break;
           }
           // (暴走しなかった場合は、メッセージ表示(Aボタン待ち)へ)
         }
@@ -6226,12 +6228,11 @@ public:
         // ノイズ・キング(37): 70%で逃げる (より逃げやすい)
         if (who == 37 && random(100) < 40) willFlee = true;
         if (willFlee) {
-          // pendingAction = 255; // ★ "255" を「逃げる」という特殊コードにする
           pendingActionType = ActionType::FLEE;
           pendingSkillIndex = -1;
           message = enemyName + " は逃げ出した！";
-          currentBattleState = STATE_ACTION_CALC;
-          break; // 以下の攻撃ロジックをスキップして計算へ
+          currentBattleState = STATE_ACTION_READY;
+          break;
         }
         // 1. デフォルトターゲット (プレイヤー側からランダム)
         std::vector<Status*> playerSide = getAliveAllies();
@@ -6359,7 +6360,23 @@ public:
           }
         }
         
-        currentBattleState = STATE_ACTION_CALC; 
+        currentBattleState = STATE_ACTION_READY;
+        break;
+      }
+
+      // 8. 
+      case STATE_ACTION_READY: {
+        currentBattleAction = createBattleAction(
+            currentActor,
+            pendingActionType,
+            pendingSkillIndex,
+            currentTarget
+        );
+
+        // 今はまだ即実行する。
+        // 次の段階でここを plannedActions への登録処理に変更する。
+        currentBattleState = STATE_ACTION_CALC;
+
         break;
       }
 
