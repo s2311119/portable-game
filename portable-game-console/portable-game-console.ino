@@ -3356,7 +3356,7 @@ const Status::EvolutionRule Status::evolutionTable[] = {
   { 60, Status::TRIGGER_ITEM,  18, 74 }, // 72 + アイテム18 -> 74 (Bルート)
 
   //特殊
-  { 75, Status::TRIGGER_ITEM,  19, 76 }
+  { 75, Status::TRIGGER_ITEM,   4, 76 } // 金の歯車で進化
 };
 // サイズも同様に定義
 const int Status::evolutionRuleCount = sizeof(Status::evolutionTable) / sizeof(Status::EvolutionRule);
@@ -3759,7 +3759,7 @@ public:
       // --- 5. 4段階目（最終）進化 (Lv 40-42) ---
       // ※ さらに上位の歯車や、レアアイテムを落とす
       
-      case 22: // オーバーロード (紅の歯車)
+      case 22: // オーバーロード (赤の歯車)
         name = "オーバーロード"; dropItemId = 11; status = new Status(level, who); dropRatePercent = 15; xpYield = 400; break;
       case 23: // デストロイヤー (紅の歯車)
         name = "デストロイヤー"; dropItemId = 12; status = new Status(level, who); dropRatePercent = 15; xpYield = 400; break;
@@ -3768,7 +3768,7 @@ public:
       case 25: // ヴォイド・ストーカー (紅の歯車)
         name = "ヴォイド・ストーカー"; dropItemId = 12; status = new Status(level, who); dropRatePercent = 15; xpYield = 400; break;
         
-      case 26: // アダマンタイト (蒼の歯車)
+      case 26: // アダマンタイト (青の歯車)
         name = "アダマンタイト"; dropItemId = 14; status = new Status(level, who); dropRatePercent = 15; xpYield = 420; break;
       case 27: // インヴィンシブル (蒼の歯車)
         name = "インヴィンシブル"; dropItemId = 15; status = new Status(level, who);dropRatePercent = 15; xpYield = 450; break;
@@ -3777,17 +3777,17 @@ public:
       case 29: // リジェネレーター (蒼の歯車)
         name = "リジェネレーター"; dropItemId = 15; status = new Status(level, who); dropRatePercent = 15; xpYield = 430; break;
 
-      case 30: // シルフィード (銀の歯車: 換金)
+      case 30: // シルフィード (速度の歯車)
         name = "シルフィード"; dropItemId = 16; status = new Status(level, who); dropRatePercent = 20; xpYield = 390; break;
       case 31: // アクセラレーター (銀の歯車)
         name = "アクセラレーター"; dropItemId = 3; status = new Status(level, who); dropRatePercent = 20; xpYield = 390; break;
         
-      case 32: // アーク・ハーモニスト (リペアキット大)
+      case 32: // アーク・ハーモニスト (回復の歯車)
         name = "アーク・ハーモニスト"; dropItemId = 17; status = new Status(level, who);dropRatePercent = 20; xpYield = 410; break;
       case 33: // シンフォニア (リペアキット大)
         name = "シンフォニア"; dropItemId = 102; status = new Status(level, who); dropRatePercent = 20; xpYield = 410; break;
         
-      case 34: // パンデモニウム (謎のパーツ: 換金)
+      case 34: // パンデモニウム (感応の歯車)
         name = "パンデモニウム"; dropItemId =18; status = new Status(level, who);dropRatePercent = 30; xpYield = 400; break;
       case 35: // ジョーカー (謎のパーツ)
         name = "ジョーカー"; dropItemId = 5; status = new Status(level, who); dropRatePercent = 30; xpYield = 400; break;
@@ -3796,7 +3796,7 @@ public:
       case 36: // はぐれノイズ (XP特化)
         name = "はぐれノイズ";
         status = new Status(5, who);
-        dropItemId = 19; // 金の歯車 (500G)
+        dropItemId = 4; // 金の歯車
         dropRatePercent = 100; // 確定ドロップ
         xpYield = 10000; 
         break;
@@ -3816,7 +3816,7 @@ public:
         status->forceLearnSkill(21);
         status->forceLearnSkill(106);
         status->forceLearnSkill(47);
-        dropItemId = 3; // パワーリング
+        dropItemId = 500; // パワーリング
         dropRatePercent = 100; 
         xpYield = 500;
         break;
@@ -3829,7 +3829,7 @@ public:
         status->forceLearnSkill(52);
         status->forceLearnSkill(34);
         status->forceLearnSkill(87);
-        dropItemId = 4; // ガードリング
+        dropItemId = 501; // ガードリング
         dropRatePercent = 100;
         xpYield = 1500;
         break;
@@ -3845,7 +3845,7 @@ public:
         status->forceLearnSkill(113); // カオスフィールド (混乱)
         // 攻撃スキル
         status->forceLearnSkill(42);  // アサシネイト (確率で即死級ダメージ)
-        dropItemId = 5; // トリニティ・コア(激レア)
+        dropItemId = 599; // トリニティ・コア
         dropRatePercent = 100; // 50%
         xpYield = 4000;
         break;
@@ -3861,7 +3861,7 @@ public:
         status->forceLearnSkill(25);  // ソードダンス (攻撃・素早さUP)
         status->forceLearnSkill(123); // ファントムラッシュ (ランダム2~5回攻撃)
         status->forceLearnSkill(80);  // インビジブルエッジ (回避無視の必中攻撃)
-        dropItemId = 504; // 創世のタクト
+        dropItemId = 399; // 創世のタクト
         dropRatePercent = 100;
         xpYield = 10000;
         break;
