@@ -5011,6 +5011,7 @@ public:
   // 進化画面
   int listCursor = 0;
   bool active = false;
+  bool saveSucceeded = false;
   std::vector<int> shopItemList;
   int selectedItemIndex = -1; // 選択中の道具のインデックス保存用
   int storageMode = 0; // 0:メニュー選択, 1:引き出す, 2:預ける
@@ -5251,7 +5252,12 @@ public:
         g->lineSprite.setTextSize(2);
         g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setCursor(x + 30, y + 20);
-        g->lineSprite.print("記録しました");
+        if (saveSucceeded) {
+          g->lineSprite.print("記録しました");
+        }
+        else {
+          g->lineSprite.print("記録に失敗しました");
+        }
       }else if (currentMenuState == STATE_EQUIP_SLOT) {
         int x = 10, y = 40 + yOffset;
         int w = 300, h = 190;
@@ -8120,7 +8126,9 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           currentMenuState = STATE_EQUIP_SLOT; 
           listCursor = 0; 
         }else if (mainSelected == 4) { // 「記録」
-          saveMgr.saveGame(sd, music, map, hero, party, inventory, bossFlags);
+          saveSucceeded =
+              saveMgr.saveGame(sd, music, map, hero, party, inventory, bossFlags);
+
           currentMenuState = STATE_SAVE_RESULT;
         }else if (mainSelected == 5) {
           currentMenuState = STATE_CONFIG;
