@@ -68,7 +68,6 @@ enum GameState {
   STATE_EVENT,
   STATE_GAME_OVER
 };
-#include <malloc.h> // これが必要です
 
 class MemoryMonitor {
 private:
@@ -1460,7 +1459,6 @@ public:
   int tauntTurns = 0;
   int twoActionsTurns = 0;
   int untargetableTurns = 0;
-  int maxHpBuffTurns = 0;
   int physDamageOneTurns = 0;
   int endureTurns = 0;
   int counterTurns = 0;
@@ -4886,7 +4884,6 @@ public:
   int pendingTrack = -1;
   size_t refillOffset = 0;
   SdFat sdfat;
-  absolute_time_t refill_block_until = 0;
   Sd() {
     pinMode(SD_CS_PIN, OUTPUT);
     digitalWrite(SD_CS_PIN, HIGH);
