@@ -5026,138 +5026,424 @@ public:
 class SaveManager {
 public:
   const char* SAVE_FILENAME = "/save.dat";
+  const char* SAVE_MAGIC = "PGSAVE2";
 
   // ★ セーブ実行
-  bool saveGame(Sd& sd, MUSIC& music, Map& map, Caractor& hero, Party& party, Inventory& inventory, bool* bossFlags) {
-    music.paused = true; 
+  bool saveGame(
+      Sd& sd,
+      MUSIC& music,
+      Map& map,
+      Caractor& hero,
+      Party& party,
+      Inventory& inventory,
+      bool* bossFlags
+  ) {
+    music.paused = true;
     critical_section_enter_blocking(&sdLock);
 
-    FsFile file = sd.sdfat.open(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
+    FsFile file =
+        sd.sdfat.open(
+            SAVE_FILENAME,
+            O_WRITE | O_CREAT | O_TRUNC
+        );
+
     if (!file) {
       critical_section_exit(&sdLock);
       music.paused = false;
-      return false; 
+      return false;
     }
 
-    // --- 1. マップ情報 ---
-    file.println(map.currentFloor);    // 階層
-    file.println((int)map.currentType); // ★ マップタイプ(TOWN/DUNGEON)を保存
-    
-    // --- 2. 主人公 ---
+    // -------------------------------------------------
+    // セーブ形式
+    // -------------------------------------------------
+    file.println(SAVE_MAGIC);
+
+    // -------------------------------------------------
+    // 1. 現在のマップ状態
+    // -------------------------------------------------
+    file.println(map.currentFloor);
+    file.println((int)map.currentType);
+
+    file.println(map.MAP_WIDTH);
+    file.println(map.MAP_HEIGHT);
+
+    // マップ上の未回収オートマタの種類
+    file.println(map.automatonWhoId);
+
+    // 主人公の現在位置・向き
+    file.println(hero.X);
+    file.println(hero.Y);
+    file.println((int)hero.direction);
+
+    // マップそのもの
+    file.println((int)map.mapData.size());
+
+    for (uint8_t tile : map.mapData) {
+      file.println((int)tile);
+    }
+
+    // -------------------------------------------------
+    // 2. 主人公
+    // -------------------------------------------------
     hero.status->saveTo(file);
 
-    // --- 3. インベントリ ---
+    // -------------------------------------------------
+    // 3. インベントリ
+    // -------------------------------------------------
     inventory.saveTo(file);
 
-    // --- 4. パーティー ---
+    // -------------------------------------------------
+    // 4. パーティー
+    // -------------------------------------------------
     file.println(party.members.size());
+
     for (auto* member : party.members) {
       member->status->saveTo(file);
     }
 
-    // --- 5. 預かり所 (★ここもしっかり保存されます) ---
+    // -------------------------------------------------
+    // 5. 預かり所
+    // -------------------------------------------------
     file.println(party.storage.size());
+
     for (auto* member : party.storage) {
       member->status->saveTo(file);
     }
 
+    // -------------------------------------------------
+    // 6. ボス撃破状態
+    // -------------------------------------------------
     for (int i = 0; i < 5; i++) {
-      file.println(bossFlags[i]); 
+      file.println(bossFlags[i]);
     }
 
     file.close();
+
     critical_section_exit(&sdLock);
     music.paused = false;
+
     return true;
   }
 
   // ★ ロード実行
-  bool loadGame(Sd& sd, MUSIC& music, Map& map, Caractor& hero, Party& party, Inventory& inventory, bool* bossFlags) {
-    // (※ setupで呼ぶ場合はmusicはまだ動いていないが、ロックしても無害)
-    music.paused = true; 
+  bool loadGame(
+      Sd& sd,
+      MUSIC& music,
+      Map& map,
+      Caractor& hero,
+      Party& party,
+      Inventory& inventory,
+      bool* bossFlags
+  ) {
+    music.paused = true;
     critical_section_enter_blocking(&sdLock);
 
-    FsFile file = sd.sdfat.open(SAVE_FILENAME, O_READ);
+    FsFile file =
+        sd.sdfat.open(
+            SAVE_FILENAME,
+            O_READ
+        );
+
     if (!file) {
       critical_section_exit(&sdLock);
       music.paused = false;
-      return false; // ファイルがない
+      return false;
     }
 
-    // 1. マップ情報を読み込む
-    map.currentFloor = file.readStringUntil('\n').toInt();
-    int typeVal = file.readStringUntil('\n').toInt();
+    // ロード失敗時の共通終了処理
+    auto failLoad = [&]() -> bool {
+      file.close();
+      critical_section_exit(&sdLock);
+      music.paused = false;
+      return false;
+    };
+
+    // -------------------------------------------------
+    // セーブ形式判定
+    // -------------------------------------------------
+    String firstLine =
+        file.readStringUntil('\n');
+
+    bool isNewFormat =
+        (firstLine == SAVE_MAGIC);
 
     Map::MapType loadedType =
-        static_cast<Map::MapType>(typeVal);
+        Map::TYPE_DUNGEON;
 
-    // ★ここではまだマップを再生成しない
-    // bossFlagsを読み終わってから最終的なMapTypeを決める
+    int savedHeroX = 0;
+    int savedHeroY = 0;
+    int savedDirection =
+        (int)Caractor::DIR_DOWN;
 
-    // 2. 主人公復元
+    if (isNewFormat) {
+      // -------------------------------------------------
+      // PGSAVE2
+      // -------------------------------------------------
+      map.currentFloor =
+          file.readStringUntil('\n').toInt();
+
+      int typeVal =
+          file.readStringUntil('\n').toInt();
+
+      if (typeVal < (int)Map::TYPE_MAZE ||
+          typeVal > (int)Map::TYPE_BOSS_ROOM)
+      {
+        return failLoad();
+      }
+
+      loadedType =
+          static_cast<Map::MapType>(
+              typeVal
+          );
+
+      int savedWidth =
+          file.readStringUntil('\n').toInt();
+
+      int savedHeight =
+          file.readStringUntil('\n').toInt();
+
+      // 異常なセーブデータで巨大なvectorを確保しないための保護
+      if (savedWidth <= 0 ||
+          savedHeight <= 0 ||
+          savedWidth > 64 ||
+          savedHeight > 64)
+      {
+        return failLoad();
+      }
+
+      map.automatonWhoId =
+          file.readStringUntil('\n').toInt();
+
+      savedHeroX =
+          file.readStringUntil('\n').toInt();
+
+      savedHeroY =
+          file.readStringUntil('\n').toInt();
+
+      savedDirection =
+          file.readStringUntil('\n').toInt();
+
+      if (savedDirection < (int)Caractor::DIR_DOWN ||
+          savedDirection > (int)Caractor::DIR_RIGHT)
+      {
+        return failLoad();
+      }
+
+      int mapDataCount =
+          file.readStringUntil('\n').toInt();
+
+      if (mapDataCount !=
+          savedWidth * savedHeight)
+      {
+        return failLoad();
+      }
+
+      if (savedHeroX < 0 ||
+          savedHeroY < 0 ||
+          savedHeroX >= savedWidth * Map::TILE_SIZE ||
+          savedHeroY >= savedHeight * Map::TILE_SIZE)
+      {
+        return failLoad();
+      }
+
+      map.currentType =
+          loadedType;
+
+      map.MAP_WIDTH =
+          savedWidth;
+
+      map.MAP_HEIGHT =
+          savedHeight;
+
+      map.isTown =
+          (loadedType == Map::TYPE_TOWN);
+
+      map.mapData.assign(
+          mapDataCount,
+          Map::TILE_WALL
+      );
+
+      for (int i = 0;
+          i < mapDataCount;
+          i++)
+      {
+        int tile =
+            file.readStringUntil('\n').toInt();
+
+        if (tile < 0 || tile > 255) {
+          return failLoad();
+        }
+
+        map.mapData[i] =
+            (uint8_t)tile;
+      }
+    }
+    else {
+      // -------------------------------------------------
+      // 旧形式
+      //
+      // 旧セーブにはマップ本体がないため、
+      // 従来どおり階層とMapTypeだけ読み、
+      // 最後にマップを再生成する。
+      // -------------------------------------------------
+      map.currentFloor =
+          firstLine.toInt();
+
+      int typeVal =
+          file.readStringUntil('\n').toInt();
+
+      if (typeVal < (int)Map::TYPE_MAZE ||
+          typeVal > (int)Map::TYPE_BOSS_ROOM)
+      {
+        return failLoad();
+      }
+
+      loadedType =
+          static_cast<Map::MapType>(
+              typeVal
+          );
+    }
+
+    // -------------------------------------------------
+    // 主人公
+    // -------------------------------------------------
     hero.status->loadFrom(file);
-    
-    // 3. インベントリ復元
+
+    // -------------------------------------------------
+    // インベントリ
+    // -------------------------------------------------
     inventory.loadFrom(file);
 
-    // 4. パーティー復元
-    for(auto* m : party.members) delete m;
+    // -------------------------------------------------
+    // パーティー
+    // -------------------------------------------------
+    for (auto* member : party.members) {
+      delete member;
+    }
+
     party.members.clear();
-    int memberCount = file.readStringUntil('\n').toInt();
-    for(int i=0; i<memberCount; i++) {
-      Automaton* ally = new Automaton(1, 0);
+
+    int memberCount =
+        file.readStringUntil('\n').toInt();
+
+    for (int i = 0;
+        i < memberCount;
+        i++)
+    {
+      Automaton* ally =
+          new Automaton(1, 0);
+
       ally->status->loadFrom(file);
+
       party.members.push_back(ally);
     }
 
-    // 5. 預かり所復元
-    for(auto* m : party.storage) delete m;
+    // -------------------------------------------------
+    // 預かり所
+    // -------------------------------------------------
+    for (auto* member : party.storage) {
+      delete member;
+    }
+
     party.storage.clear();
-    int storageCount = file.readStringUntil('\n').toInt();
-    for(int i=0; i<storageCount; i++) {
-      Automaton* ally = new Automaton(1, 0);
+
+    int storageCount =
+        file.readStringUntil('\n').toInt();
+
+    for (int i = 0;
+        i < storageCount;
+        i++)
+    {
+      Automaton* ally =
+          new Automaton(1, 0);
+
       ally->status->loadFrom(file);
+
       party.storage.push_back(ally);
     }
 
+    // -------------------------------------------------
+    // ボス撃破状態
+    // -------------------------------------------------
     for (int i = 0; i < 5; i++) {
-      bossFlags[i] = (file.readStringUntil('\n').toInt() != 0);
+      bossFlags[i] =
+          (
+            file.readStringUntil('\n').toInt()
+            != 0
+          );
     }
 
-    // -------------------------
-    // ボス撃破状態とマップ状態を整合させる
-    // -------------------------
-    Map::MapType finalType = loadedType;
+    // -------------------------------------------------
+    // マップ・主人公位置の復元
+    // -------------------------------------------------
+    if (isNewFormat) {
+      // 新形式は保存したマップをそのまま使用する。
+      // regenerate() は絶対に呼ばない。
 
-    // 10F / 20F / 30F / 40F / 50F
-    if (map.currentFloor >= 10 &&
-        map.currentFloor <= 50 &&
-        map.currentFloor % 10 == 0)
-    {
-      int bossIndex =
-          (map.currentFloor / 10) - 1;
+      hero.X =
+          savedHeroX;
 
-      if (bossFlags[bossIndex]) {
-        // 撃破済みなら必ず集落
-        finalType = Map::TYPE_TOWN;
-      }
-      else {
-        // 未撃破なら必ずボス部屋
-        finalType = Map::TYPE_BOSS_ROOM;
-      }
+      hero.Y =
+          savedHeroY;
+
+      hero.oldX =
+          savedHeroX;
+
+      hero.oldY =
+          savedHeroY;
+
+      hero.direction =
+          (Caractor::Direction)
+              savedDirection;
+
+      hero.moved = false;
     }
+    else {
+      // 旧形式はマップ本体を持っていないので
+      // 従来どおり再生成する。
 
-    // bossFlagsを反映した最終状態でマップ生成
-    map.regenerate(20, 20, finalType);
-    map.isTown = (finalType == Map::TYPE_TOWN);
+      Map::MapType finalType =
+          loadedType;
 
-    // 最終マップが決まってから主人公を配置
-    hero.reset(map);
+      // ボス階ではbossFlagsを優先
+      if (map.currentFloor >= 10 &&
+          map.currentFloor <= 50 &&
+          map.currentFloor % 10 == 0)
+      {
+        int bossIndex =
+            (map.currentFloor / 10) - 1;
+
+        if (bossIndex >= 0 &&
+            bossIndex < 5)
+        {
+          if (bossFlags[bossIndex]) {
+            finalType =
+                Map::TYPE_TOWN;
+          }
+          else {
+            finalType =
+                Map::TYPE_BOSS_ROOM;
+          }
+        }
+      }
+
+      map.regenerate(
+          20,
+          20,
+          finalType
+      );
+
+      map.isTown =
+          (finalType == Map::TYPE_TOWN);
+
+      hero.reset(map);
+    }
 
     file.close();
+
     critical_section_exit(&sdLock);
     music.paused = false;
-    
+
     return true;
   }
   
