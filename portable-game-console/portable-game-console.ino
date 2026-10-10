@@ -2895,16 +2895,36 @@ public:
       // 魔法(旋律)攻撃も基本必中とするならここに追加(今回は物理と同じ扱いで計算)
 
       if (!isSureHit) {
-        // 命中率 = 95 + (自分のSPD - 相手のSPD)
-        int hitRate = 95 + (this->getSpeed() - target->getSpeed());
-        
-        // 上限・下限設定
-        if(hitRate > 100) hitRate = 100;
-        if(hitRate < 20) hitRate = 20; // 最低でも20%は当たるようにする
+        // 基本命中率
+        int hitRate =
+            95 +
+            (this->getSpeed() - target->getSpeed());
 
-        // 判定
+        // まず通常状態での「回避率」を求める
+        if (hitRate > 100) hitRate = 100;
+        if (hitRate < 20) hitRate = 20;
+
+        int missRate = 100 - hitRate;
+
+        // 対象の回避率バフを反映
+        // 例：回避率2倍なら、通常5%回避 → 10%回避
+        float evasionBonus =
+            target->getEvasionBonus();
+
+        missRate =
+            static_cast<int>(
+                missRate * evasionBonus
+            );
+
+        hitRate = 100 - missRate;
+
+        // 最終的な命中率も20～100%に制限
+        if (hitRate > 100) hitRate = 100;
+        if (hitRate < 20) hitRate = 20;
+
+        // 命中判定
         if (random(0, 100) >= hitRate) {
-          return 0; // ★ ミス！ (ダメージ0を返す)
+          return 0;
         }
       }
     }
