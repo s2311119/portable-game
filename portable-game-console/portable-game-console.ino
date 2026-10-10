@@ -8728,16 +8728,31 @@ bool audio_timer_callback(struct repeating_timer *t) {
   } else {
     // バッファ切れまたは停止中はBGM音量0
     // refill要求などはここで行う
-    if (!music->paused && music->fillBytes > 0 && music->sampleIndex >= music->playBytes) {
+    if (!music->paused &&
+        music->fillBytes > 0 &&
+        music->sampleIndex >= music->playBytes)
+    {
       noInterrupts();
+
+      // 読み込み済みの裏バッファを再生側へ切り替える
       volatile uint8_t* tmp = music->playBuf;
       music->playBuf = music->fillBuf;
       music->fillBuf = (uint8_t*)tmp;
+
       music->playBytes = music->fillBytes;
       music->fillBytes = 0;
       music->sampleIndex = 0;
+
+      // 今まで再生していたバッファが空いたので、
+      // core1へ次のデータ補充をすぐ要求する
+      music->needs_refill = true;
+
       interrupts();
-    } else if (!music->paused && music->fillBytes == 0) {
+    }
+    else if (!music->paused &&
+            music->fillBytes == 0)
+    {
+      // 裏バッファがまだ準備できていない場合も補充要求を出す
       music->needs_refill = true;
     }
   }
