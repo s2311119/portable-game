@@ -161,6 +161,14 @@ public:
     return MAP_HEIGHT;
   }
 
+  uint8_t getTile(int x, int y) const {
+    return mapData[y * MAP_WIDTH + x];
+  }
+
+  void setTile(int x, int y, uint8_t tile) {
+    mapData[y * MAP_WIDTH + x] = tile;
+  }
+
   bool isTown() const {
     return currentType == TYPE_TOWN;
   }
@@ -3962,7 +3970,7 @@ public:
     // 最初の草タイル(TILE_GRASS)を探す
     for (int y = 1; y < map.getMAP_HEIGHT() - 1; y++) {
       for (int x = 1; x < map.getMAP_WIDTH() - 1; x++) {
-        if (map.mapData[y * map.getMAP_WIDTH() + x] == Map::TILE_GRASS) {
+        if (map.getTile(x, y) == Map::TILE_GRASS) {
           // 見つけたら、そこをピクセル座標のスタート地点に
           X = x * Map::TILE_SIZE;
           Y = y * Map::TILE_SIZE;
@@ -4135,7 +4143,7 @@ public:
               continue;
             }
 
-            int tileType = map.mapData[ty * map.getMAP_WIDTH() + tx];
+            int tileType = map.getTile(tx, ty);
             int drawX = tx * Map::TILE_SIZE - cameraX;
             int drawY_local = ty * Map::TILE_SIZE - worldY_Start; // スプライト内での相対Y座標
 
@@ -4219,7 +4227,7 @@ public:
             
             int screenX = tx * Map::TILE_SIZE - cameraX;
             int screenY = ty * Map::TILE_SIZE - cameraY;
-            int tileType = map.mapData[ty * map.getMAP_WIDTH() + tx];
+            int tileType = map.getTile(tx, ty);
 
             // 背景を復元 (直接描画)
             const uint16_t* currentGrassBmp = tileBitmapFor(Map::TILE_GRASS);
@@ -4381,10 +4389,7 @@ public:
       int tileY =
           py / Map::TILE_SIZE;
 
-      return
-          map.mapData[
-              tileY * map.getMAP_WIDTH() + tileX
-          ] == Map::TILE_WALL;
+      return map.getTile(tileX, tileY) == Map::TILE_WALL;
     };
 
     if (isWallOrOutOfBounds(left,  top) ||
@@ -4418,11 +4423,7 @@ public:
     }
 
     // 2. その場所のタイルタイプを取得
-    uint8_t tileType =
-        map.mapData[
-            heroTileY * map.getMAP_WIDTH() +
-            heroTileX
-        ];
+    uint8_t tileType = map.getTile(heroTileX, heroTileY);
 
     // 3. タイルタイプに応じて分岐
     switch (tileType) {
@@ -9682,7 +9683,7 @@ void loop() {
         int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
 
         // 2b. マップデータを「開いた」状態に更新
-        map.mapData[heroTileY * map.getMAP_WIDTH() + heroTileX] = Map::TILE_BOX_OPEN;
+        map.setTile(heroTileX, heroTileY, Map::TILE_BOX_OPEN);
           
         // 2. 中身の抽選
         int floor = map.currentFloor;
@@ -9809,7 +9810,11 @@ void loop() {
         // タイルを消す
         int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
         int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-        map.mapData[heroTileY * map.getMAP_WIDTH() + heroTileX] = Map::TILE_GRASS;
+        map.setTile(
+            heroTileX,
+            heroTileY,
+            Map::TILE_GRASS
+        );
         
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
