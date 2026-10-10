@@ -3030,11 +3030,20 @@ public:
     if (retIsCrit) heal = heal * 2.0; // 会心なら1.5倍回復
     // ------------------------
     
-    float variance = (float)random(90, 111) / 100.0;
-    heal = (int)((float)heal * variance);
-    
-    if (heal < 1) heal = 1;
+    float variance =
+        (float)random(90, 111) / 100.0;
+
+    heal =
+        (int)((float)heal * variance);
+
+    // ゲームバランス用の最終補正
     heal /= 4;
+
+    // 最終結果として最低1は回復する
+    if (heal < 1) {
+      heal = 1;
+    }
+
     return heal;
   }
 
