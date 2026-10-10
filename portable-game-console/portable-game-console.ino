@@ -4885,21 +4885,18 @@ public:
       return false; // ファイルがない
     }
 
-    // 1. マップ情報復元
+    // 1. マップ情報を読み込む
     map.currentFloor = file.readStringUntil('\n').toInt();
     int typeVal = file.readStringUntil('\n').toInt();
-    
-    // ★ 保存された階層とタイプでマップを再生成
-    Map::MapType loadedType = (Map::MapType)typeVal;
-    map.regenerate(20, 20, loadedType);
-    
-    // (集落フラグも合わせる)
-    map.isTown = (loadedType == Map::TYPE_TOWN);
+
+    Map::MapType loadedType =
+        static_cast<Map::MapType>(typeVal);
+
+    // ★ここではまだマップを再生成しない
+    // bossFlagsを読み終わってから最終的なMapTypeを決める
 
     // 2. 主人公復元
     hero.status->loadFrom(file);
-    // ★ マップが変わったので、主人公を安全な位置(スタート地点)に移動させる
-    hero.reset(map);
     
     // 3. インベントリ復元
     inventory.loadFrom(file);
@@ -4931,6 +4928,37 @@ public:
     for (int i = 0; i < 5; i++) {
       bossFlags[i] = (file.readStringUntil('\n').toInt() != 0);
     }
+
+    // -------------------------
+    // ボス撃破状態とマップ状態を整合させる
+    // -------------------------
+    Map::MapType finalType = loadedType;
+
+    // 10F / 20F / 30F / 40F / 50F
+    if (map.currentFloor >= 10 &&
+        map.currentFloor <= 50 &&
+        map.currentFloor % 10 == 0)
+    {
+      int bossIndex =
+          (map.currentFloor / 10) - 1;
+
+      if (bossFlags[bossIndex]) {
+        // 撃破済みなら必ず集落
+        finalType = Map::TYPE_TOWN;
+      }
+      else {
+        // 未撃破なら必ずボス部屋
+        finalType = Map::TYPE_BOSS_ROOM;
+      }
+    }
+
+    // bossFlagsを反映した最終状態でマップ生成
+    map.regenerate(20, 20, finalType);
+    map.isTown = (finalType == Map::TYPE_TOWN);
+
+    // 最終マップが決まってから主人公を配置
+    hero.reset(map);
+
     file.close();
     critical_section_exit(&sdLock);
     music.paused = false;
@@ -9044,18 +9072,56 @@ void loop() {
         currentEvent = EVENT_NONE;
         break;
       }
+
       case EVENT_BOSS_BATTLE: {
-        vib.trigger(500); // 警告振動
+
+        int bossIndex =
+            (map.currentFloor / 10) - 1;
+
+        // 撃破済みボスのタイルが何らかの理由で残っていた場合
+        if (map.currentFloor >= 10 &&
+            map.currentFloor <= 50 &&
+            map.currentFloor % 10 == 0 &&
+            bossIndex >= 0 &&
+            bossIndex < 5 &&
+            ctx->bossDefeated[bossIndex])
+        {
+          // ボスを復活させず、集落へ補正する
+          map.regenerate(
+              20,
+              20,
+              Map::TYPE_TOWN
+          );
+
+          map.isTown = true;
+          hero.reset(map);
+
+          music.switchTrack(0, sd);
+
+          state = STATE_GAME;
+          currentEvent = EVENT_NONE;
+          break;
+        }
+
+        // 未撃破なら通常どおりボス戦
+        vib.trigger(500);
+
         state = STATE_BATTLE;
-        
-        // ボスBGM (階層に応じて変えるならここでID指定)
-        // 10F=ID3, 50F=ID4 など
-        // startの中で判定しているので、ここではそのまま呼ぶ
-        ctx->battle->start(music, sd, hero, party, map.currentFloor, imgmgr, map);
-        
+
+        ctx->battle->start(
+            music,
+            sd,
+            hero,
+            party,
+            map.currentFloor,
+            imgmgr,
+            map
+        );
+
         currentEvent = EVENT_NONE;
         break;
       }
+
       case EVENT_NONE:
       default:
         // 何らかのバグでイベントタイプが未設定の場合
