@@ -5585,7 +5585,25 @@ public:
   bool heroLeveledUp = false;
   bool isBossBattleMode = false;
 
-  int pendingAction = 0;   // 実行待機中の行動 (0=たたかう, 100+=旋律ID)
+  enum class ActionType {
+    NONE,
+    ATTACK,
+    SKILL,
+    DEFEND,
+    FLEE
+  };
+
+  enum class MessageFlow {
+    ACTION_COMPLETE, // 実際の行動が終わった
+    CONTINUE_TURN,   // 毒・回復等の表示後、まだ行動する
+    END_TURN         // 死亡・麻痺等でこの人の行動を終了
+  };
+
+  ActionType pendingActionType = ActionType::NONE;
+  int pendingSkillIndex = -1;
+
+  MessageFlow messageFlow = MessageFlow::ACTION_COMPLETE;
+
   int enemyTargetIndex = 0;   // 敵リスト(activeEnemies)のカーソル (targetIndexから変更)
   int allyTargetIndex = 0;    // 味方リストのカーソル (新規)
   Status* currentTarget = nullptr; // ターゲットのStatus
@@ -5631,7 +5649,9 @@ public:
     turnCount = 1;
     heroLeveledUp = false;
     // ★★★ 変数の完全リセット (重要) ★★★
-    pendingAction = 0;
+    pendingActionType = ActionType::NONE;
+    pendingSkillIndex = -1;
+    messageFlow = MessageFlow::ACTION_COMPLETE;
     currentTarget = nullptr;
     currentActor = nullptr;
     currentActorIndex = 0;
@@ -5860,7 +5880,8 @@ public:
         if (aPressed) {
           if (commandSelected == 0) { // たたかう
             music.playSE(0);
-            pendingAction = 0; // 0 = たたかう
+            pendingActionType = ActionType::ATTACK;
+            pendingSkillIndex = -1;
             enemyTargetIndex = 0;   // ★ 敵カーソルをリセット
             currentBattleState = STATE_TARGET_SELECT_ENEMY; // ★ 敵選択へ
           } 
@@ -5884,7 +5905,9 @@ public:
           }
           else if (commandSelected == 3) {
             music.playSE(0); // 決定音
-            pendingAction = 200; // ★ 防御を表す特殊コード (200とする)
+            // pendingAction = 200; // ★ 防御を表す特殊コード (200とする)
+            pendingActionType = ActionType::DEFEND;
+            pendingSkillIndex = -1;
             
             // ターゲット選択は不要なので、直接計算フェーズへ
             currentTarget = currentActor; // 対象は自分
@@ -5915,9 +5938,11 @@ public:
         if (aPressed) {
           Skill& skill = currentActor->getLearnedSkills()[skillSelected];
           
-          if (currentActor->useTP(skill.tpCost)) {
+          if (currentActor->getTp() >= skill.tpCost) {
             music.playSE(0);
-            pendingAction = 100 + skillSelected;
+
+            pendingActionType = ActionType::SKILL;
+            pendingSkillIndex = skillSelected;
             
             // ★★★ スキルの対象範囲(scope)によって分岐 ★★★
             switch (skill.scope) {
@@ -5985,8 +6010,11 @@ public:
         // Bボタンでキャンセル
         if (bPressed) {
           music.playSE(1);
-          if (pendingAction >= 100) currentBattleState = STATE_SKILL_SELECT; // 旋律選択に戻る
-          else currentBattleState = STATE_COMMAND_SELECT; // コマンド選択に戻る
+          if (pendingActionType == ActionType::SKILL) {
+            currentBattleState = STATE_SKILL_SELECT;
+          } else {
+            currentBattleState = STATE_COMMAND_SELECT;
+          }
         }
         break;
       }
@@ -6046,8 +6074,8 @@ public:
             message += "\n" + String(currentActor->getname()) + " は自動蘇生した！";
           }else{
             message = String(currentActor->getname()) + " は力尽きた…";
-            pendingAction = -1; // 行動不能フラグ
-            currentBattleState = STATE_ACTION_MSG; 
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
             break;
           }
         }
@@ -6056,8 +6084,8 @@ public:
         if (currentActor->getParalyzedTurns() > 0) {
           if (random(100) < 50) { // (例: 50%で行動不能)
             message = String(currentActor->getname()) + " は痺れて動けない！";
-            pendingAction = -1; // 行動不能フラグ
-            currentBattleState = STATE_ACTION_MSG; 
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
             break;
           }
         }
@@ -6068,7 +6096,9 @@ public:
           // (例: 50%で暴走)
           if (random(100) < 50) {
               message += "\nわけがわからず攻撃！";
-              pendingAction = 0; // 「たたかう」に強制
+              // pendingAction = 0;
+              pendingActionType = ActionType::ATTACK;
+              pendingSkillIndex = -1;
               
               // ターゲットを敵味方全員からランダムで選択
               std::vector<Status*> allTargets = getAliveAllies(); // 味方リスト
@@ -6090,8 +6120,8 @@ public:
 
         // 5. メッセージがあるか？
         if (message != "") { // 毒/回復/混乱(不発)のメッセージがあった
-          pendingAction = -2; // 継続効果メッセージフラグ
-          currentBattleState = STATE_ACTION_MSG; // 結果表示(Aボタン待ち)へ
+          messageFlow = MessageFlow::CONTINUE_TURN;
+          currentBattleState = STATE_ACTION_MSG;
         } else {
           // 継続効果が何もなければ、通常の行動へ
           if (currentActor->isPlayer()) {
@@ -6107,7 +6137,10 @@ public:
       case STATE_ENEMY_AI: {
         String enemyName = currentActor->getname();
         message = enemyName + " の攻撃!";
-        pendingAction = 0; // デフォルトは通常攻撃
+        // pendingAction = 0; // デフォルトは通常攻撃
+        pendingActionType = ActionType::ATTACK;
+        pendingSkillIndex = -1;
+        
         bool willFlee = false;
         // はぐれノイズ(36): 50%で逃げる
         int who = currentActor->getWho();
@@ -6116,7 +6149,9 @@ public:
         // ノイズ・キング(37): 70%で逃げる (より逃げやすい)
         if (who == 37 && random(100) < 40) willFlee = true;
         if (willFlee) {
-          pendingAction = 255; // ★ "255" を「逃げる」という特殊コードにする
+          // pendingAction = 255; // ★ "255" を「逃げる」という特殊コードにする
+          pendingActionType = ActionType::FLEE;
+          pendingSkillIndex = -1;
           message = enemyName + " は逃げ出した！";
           currentBattleState = STATE_ACTION_CALC;
           break; // 以下の攻撃ロジックをスキップして計算へ
@@ -6130,120 +6165,121 @@ public:
         std::vector<Skill>& skills = currentActor->getLearnedSkills();
         
         if (!skills.empty() && currentActor->getSilencedTurns() <= 0) {
-            int who = currentActor->getWho();
-            int curTP = currentActor->getTp();
-            int curHP = currentActor->getHp();
-            int maxHP = currentActor->getMaxHp();
-            int selectedSkillIndex = -1; 
+          int who = currentActor->getWho();
+          int curTP = currentActor->getTp();
+          int curHP = currentActor->getHp();
+          int maxHP = currentActor->getMaxHp();
+          int selectedSkillIndex = -1; 
 
-            // [ヘルパー] IDでスキルを探す
-            auto findSkillIndex = [&](int id) -> int {
-                for(int i=0; i<skills.size(); i++) {
-                    if(skills[i].id == id && skills[i].tpCost <= curTP) return i;
+          // [ヘルパー] IDでスキルを探す
+          auto findSkillIndex = [&](int id) -> int {
+            for(int i=0; i<skills.size(); i++) {
+              if(skills[i].id == id && skills[i].tpCost <= curTP) return i;
+            }
+            return -1;
+          };
+
+          // --- 特殊AI ---
+          if (who == 80) { // スプラウト・ギア
+            if (curHP < maxHP / 2 && random(100) < 50) selectedSkillIndex = findSkillIndex(47); 
+            else if (random(100) < 30) selectedSkillIndex = findSkillIndex(21); 
+          }
+          else if (who == 81) { // ソレイユ
+            if (curHP < maxHP / 2) { 
+              if (random(100) < 60) selectedSkillIndex = findSkillIndex(34); 
+              else if (random(100) < 40) selectedSkillIndex = findSkillIndex(87); 
+            } else { 
+              if (random(100) < 50) selectedSkillIndex = findSkillIndex(52); 
+            }
+          }
+          else if (who == 82) { // ハーベスト・スティンガー
+            if (currentTarget && currentTarget->poisonTurns > 0) selectedSkillIndex = findSkillIndex(42);
+            else if (random(100) < 70) {
+              int r = random(3);
+              if (r==0) selectedSkillIndex = findSkillIndex(105); 
+              else if(r==1) selectedSkillIndex = findSkillIndex(45); 
+              else selectedSkillIndex = findSkillIndex(113); 
+            }
+          }
+          else if (who == 83) { // 雪影
+            if (curHP < maxHP / 3) selectedSkillIndex = findSkillIndex(123); 
+            else if (turnCount % 3 == 0) selectedSkillIndex = findSkillIndex(random(100)<50 ? 39 : 73);
+          }
+          else if (who == 84) { // ラスボス
+            if (curHP < maxHP / 4) selectedSkillIndex = findSkillIndex(127); 
+            else if (turnCount % 4 == 0) selectedSkillIndex = findSkillIndex(114); 
+            else if (random(100) < 30) selectedSkillIndex = findSkillIndex(86);
+          }
+          // ★★★ 修正: 回復役 (仲間も回復するAI) ★★★
+          else if (who == 3 || who == 8 || who == 13 || who == 20 || who == 32) {
+            // 1. まず回復スキルがあるか確認
+            int healIdx = findSkillIndex(100);
+            if (healIdx == -1) healIdx = findSkillIndex(101); // 上位回復
+
+            if (healIdx != -1) {
+              // 2. 傷ついた仲間（自分含む）を探す
+              Status* injuredTarget = nullptr;
+              
+              // 敵全員をチェック
+              for (auto e : activeEnemies) {
+                if (e->status->getHp() > 0 && e->status->getHp() < e->status->getMaxHp() / 2) {
+                  injuredTarget = e->status;
+                  break; // 最初に見つけた瀕死の仲間を助ける
                 }
-                return -1;
-            };
-
-            // --- 特殊AI ---
-            if (who == 80) { // スプラウト・ギア
-                if (curHP < maxHP / 2 && random(100) < 50) selectedSkillIndex = findSkillIndex(47); 
-                else if (random(100) < 30) selectedSkillIndex = findSkillIndex(21); 
-            }
-            else if (who == 81) { // ソレイユ
-                if (curHP < maxHP / 2) { 
-                     if (random(100) < 60) selectedSkillIndex = findSkillIndex(34); 
-                     else if (random(100) < 40) selectedSkillIndex = findSkillIndex(87); 
-                } else { 
-                     if (random(100) < 50) selectedSkillIndex = findSkillIndex(52); 
-                }
-            }
-            else if (who == 82) { // ハーベスト・スティンガー
-                 if (currentTarget && currentTarget->poisonTurns > 0) selectedSkillIndex = findSkillIndex(42);
-                 else if (random(100) < 70) {
-                     int r = random(3);
-                     if (r==0) selectedSkillIndex = findSkillIndex(105); 
-                     else if(r==1) selectedSkillIndex = findSkillIndex(45); 
-                     else selectedSkillIndex = findSkillIndex(113); 
-                 }
-            }
-            else if (who == 83) { // 雪影
-                 if (curHP < maxHP / 3) selectedSkillIndex = findSkillIndex(123); 
-                 else if (turnCount % 3 == 0) selectedSkillIndex = findSkillIndex(random(100)<50 ? 39 : 73);
-            }
-            else if (who == 84) { // ラスボス
-                 if (curHP < maxHP / 4) selectedSkillIndex = findSkillIndex(127); 
-                 else if (turnCount % 4 == 0) selectedSkillIndex = findSkillIndex(114); 
-                 else if (random(100) < 30) selectedSkillIndex = findSkillIndex(86);
-            }
-            // ★★★ 修正: 回復役 (仲間も回復するAI) ★★★
-            else if (who == 3 || who == 8 || who == 13 || who == 20 || who == 32) {
-                 // 1. まず回復スキルがあるか確認
-                 int healIdx = findSkillIndex(100);
-                 if (healIdx == -1) healIdx = findSkillIndex(101); // 上位回復
-
-                 if (healIdx != -1) {
-                     // 2. 傷ついた仲間（自分含む）を探す
-                     Status* injuredTarget = nullptr;
-                     
-                     // 敵全員をチェック
-                     for (auto e : activeEnemies) {
-                         if (e->status->getHp() > 0 && e->status->getHp() < e->status->getMaxHp() / 2) {
-                             injuredTarget = e->status;
-                             break; // 最初に見つけた瀕死の仲間を助ける
-                         }
-                     }
-
-                     // 3. 見つかったら回復実行
-                     if (injuredTarget != nullptr) {
-                         selectedSkillIndex = healIdx;
-                         currentTarget = injuredTarget; // ★ターゲットをその仲間に変更
-                     }
-                 }
-            }
-
-            // --- 汎用AI ---
-            if (selectedSkillIndex == -1 && random(100) < 30) {
-              std::vector<int> usableIndices;
-              for(int i=0; i<skills.size(); i++) {
-                if (skills[i].tpCost <= curTP) usableIndices.push_back(i);
               }
-              if (!usableIndices.empty()) {
-                selectedSkillIndex = usableIndices[random(0, usableIndices.size())];
+
+              // 3. 見つかったら回復実行
+              if (injuredTarget != nullptr) {
+                selectedSkillIndex = healIdx;
+                currentTarget = injuredTarget; // ★ターゲットをその仲間に変更
               }
             }
+          }
 
-            // --- 行動確定後のターゲット調整 ---
-            if (selectedSkillIndex != -1) {
-                pendingAction = 100 + selectedSkillIndex; 
-                Skill& s = skills[selectedSkillIndex];
-                message = enemyName + " の " + s.name + "!";
-                
-                // ★★★ 重要: スキル範囲によるターゲットの強制変更 ★★★
-                
-                // 自分のみ
-                if (s.scope == Skill::TargetScope::SELF) {
-                    currentTarget = currentActor;
-                }
-                // 味方単体（敵から見た味方＝他の敵）
-                else if (s.scope == Skill::TargetScope::SINGLE_ALLY) {
-                    // もしターゲットが「プレイヤー側」になっていたら、「敵側」に切り替える
-                    if (currentTarget == nullptr || currentTarget->isPlayer()) {
-                        // 生きている敵リストを作成
-                        std::vector<Status*> livingEnemies;
-                        for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
-                        
-                        if (!livingEnemies.empty()) {
-                            // ランダムな仲間にかける（回復AIですでに決まっている場合は上書きしないよう注意が必要だが、
-                            // ここでは「回復AI以外で選ばれた補助魔法」を想定してランダムにする）
-                            // ※回復AIでcurrentTargetを変えた場合、isPlayer()はfalseなのでここには入らない。完璧。
-                            currentTarget = livingEnemies[random(0, livingEnemies.size())];
-                        } else {
-                            currentTarget = currentActor; // 誰もいなければ自分
-                        }
-                    }
-                }
-                // (全体攻撃やランダム攻撃の場合、STATE_ACTION_CALC でループ処理されるので currentTarget は無視でOK)
+          // --- 汎用AI ---
+          if (selectedSkillIndex == -1 && random(100) < 30) {
+            std::vector<int> usableIndices;
+            for(int i=0; i<skills.size(); i++) {
+              if (skills[i].tpCost <= curTP) usableIndices.push_back(i);
             }
+            if (!usableIndices.empty()) {
+              selectedSkillIndex = usableIndices[random(0, usableIndices.size())];
+            }
+          }
+
+          // --- 行動確定後のターゲット調整 ---
+          if (selectedSkillIndex != -1) {
+            pendingActionType = ActionType::SKILL;
+            pendingSkillIndex = selectedSkillIndex;
+            Skill& s = skills[selectedSkillIndex];
+            message = enemyName + " の " + s.name + "!";
+            
+            // ★★★ 重要: スキル範囲によるターゲットの強制変更 ★★★
+            
+            // 自分のみ
+            if (s.scope == Skill::TargetScope::SELF) {
+              currentTarget = currentActor;
+            }
+            // 味方単体（敵から見た味方＝他の敵）
+            else if (s.scope == Skill::TargetScope::SINGLE_ALLY) {
+              // もしターゲットが「プレイヤー側」になっていたら、「敵側」に切り替える
+              if (currentTarget == nullptr || currentTarget->isPlayer()) {
+                // 生きている敵リストを作成
+                std::vector<Status*> livingEnemies;
+                for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
+                
+                if (!livingEnemies.empty()) {
+                  // ランダムな仲間にかける（回復AIですでに決まっている場合は上書きしないよう注意が必要だが、
+                  // ここでは「回復AI以外で選ばれた補助魔法」を想定してランダムにする）
+                  // ※回復AIでcurrentTargetを変えた場合、isPlayer()はfalseなのでここには入らない。完璧。
+                  currentTarget = livingEnemies[random(0, livingEnemies.size())];
+                } else {
+                  currentTarget = currentActor; // 誰もいなければ自分
+                }
+              }
+            }
+            // (全体攻撃やランダム攻撃の場合、STATE_ACTION_CALC でループ処理されるので currentTarget は無視でOK)
+          }
         }
         
         currentBattleState = STATE_ACTION_CALC; 
@@ -6255,6 +6291,7 @@ public:
         lastDamage = 0;
         lastActionMessage = "";
         
+        messageFlow = MessageFlow::ACTION_COMPLETE;
         // ★★★ 修正A: フリーズ防止 (ポインタチェックを追加) ★★★
         if (heroRef && heroRef->status) heroRef->status->clearPopups();
         if (partyRef) {
@@ -6262,7 +6299,7 @@ public:
         }
         for(auto e : activeEnemies) if(e && e->status) e->status->clearPopups();
 
-        if (pendingAction == 255) {
+        if (pendingActionType == ActionType::FLEE) {
           // 1. 経験値とドロップを0にする (倒した扱いにはしない)
           // (StatusからはEnemyオブジェクトに辿れないので、リストから探す)
           for (auto e : activeEnemies) {
@@ -6281,10 +6318,11 @@ public:
           music.playSE(3); // シュッという音など
 
           // 4. メッセージ表示へ
+          messageFlow = MessageFlow::ACTION_COMPLETE;
           currentBattleState = STATE_ACTION_MSG;
           break; 
         }
-        if (pendingAction == 200) { // 防御
+        if (pendingActionType == ActionType::DEFEND) { // 防御
           // 1. 防御フラグを立てる
           currentActor->isDefending = true;
 
@@ -6293,41 +6331,73 @@ public:
           message = String(currentActor->getname()) + " は身を守っている！";
           
           // 3. メッセージ表示ステートへ
+          messageFlow = MessageFlow::ACTION_COMPLETE;
           currentBattleState = STATE_ACTION_MSG;
           break; 
         }
         // 行動者がいない場合はスキップ
         if (!currentActor) {
-            currentBattleState = STATE_ACTION_MSG;
-            break;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
         }
 
         // スキル情報取得
-        Skill currentSkill(0); 
-        if (pendingAction == 0) { 
-            // ★★★ 修正B: 「たたかう」の設定を完全にする ★★★
-            currentSkill = Skill(0); // ID 0 で初期化
-            currentSkill.name = "攻撃"; 
-            currentSkill.power = 50; 
-            currentSkill.type = Skill::EffectType::DAMAGE;
-            currentSkill.scope = Skill::TargetScope::SINGLE_ENEMY;
-            
-            // 重要: 物理攻撃であることを明示 (これが無いと判定が狂う)
-            currentSkill.dependence = Skill::StatDependence::ATK;
-            currentSkill.category = Skill::Category::PHYSICAL; 
+        Skill currentSkill(0);
 
-            message = String(currentActor->getname()) + " の攻撃！";
-        } else {
-            currentSkill = currentActor->getLearnedSkills()[pendingAction - 100];
-            message = String(currentActor->getname()) + " の " + currentSkill.name + "！";
+        if (pendingActionType == ActionType::ATTACK) {
+          currentSkill = Skill(0);
+          currentSkill.name = "攻撃";
+          currentSkill.power = 50;
+          currentSkill.type = Skill::EffectType::DAMAGE;
+          currentSkill.scope = Skill::TargetScope::SINGLE_ENEMY;
+          currentSkill.dependence = Skill::StatDependence::ATK;
+          currentSkill.category = Skill::Category::PHYSICAL;
+
+          message = String(currentActor->getname()) + " の攻撃！";
+        }
+        else if (pendingActionType == ActionType::SKILL) {
+          std::vector<Skill>& skills = currentActor->getLearnedSkills();
+
+          if (pendingSkillIndex < 0 ||
+            pendingSkillIndex >= skills.size()) {
+
+            message = "スキル指定エラー";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
+          currentSkill = skills[pendingSkillIndex];
+
+          // TP消費をここに集約
+          if (!currentActor->useTP(currentSkill.tpCost)) {
+            message = String(currentActor->getname()) + " はTPが足りない！";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
+          message =
+            String(currentActor->getname()) +
+            " の " +
+            currentSkill.name +
+            "！";
+        }
+        else {
+          message = "行動指定エラー";
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
         }
 
         // 行動不能チェック
         if (currentActor->cantMoveTurns > 0) {
-            message = String(currentActor->getname()) + " は動けない！";
-            currentActor->cantMoveTurns--;
-            currentBattleState = STATE_ACTION_MSG; 
-            break; 
+          message = String(currentActor->getname()) + " は動けない！";
+          currentActor->cantMoveTurns--;
+
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
         }
 
         // --- ターゲット解決 ---
@@ -6483,34 +6553,58 @@ public:
       
       // 9. 行動結果のメッセージ表示 (待機のみ)
       case STATE_ACTION_MSG:
-        if (aPressed) { 
+        if (aPressed) {
           hero.status->clearPopups();
-          for (auto m : party.members) m->status->clearPopups();
-          for (auto e : activeEnemies) e->status->clearPopups();
-          if (currentActor->isDoubleAction) {
-            currentActor->isDoubleAction = false; // フラグ消費
-            // ターゲット選択などはリセットされるが、同じ人のターンを継続
+          for (auto m : party.members) {
+            m->status->clearPopups();
+          }
+          for (auto e : activeEnemies) {
+            e->status->clearPopups();
+          }
+
+          if (messageFlow == MessageFlow::CONTINUE_TURN) {
+            // 毒・リジェネ等の表示が終わっただけ。
+            // まだこのキャラは行動していない。
             if (currentActor->isPlayer()) {
               currentBattleState = STATE_COMMAND_SELECT;
-              message = String(currentActor->getname()) + " の再行動！";
             } else {
               currentBattleState = STATE_ENEMY_AI;
             }
-          }else{
-            if (pendingAction == -1) { 
-              if (currentActor->isPlayer()) currentBattleState = STATE_CHECK_DEFEAT;
-              else currentBattleState = STATE_CHECK_VICTORY;
-            }else if (pendingAction == -2) { 
-              if (currentActor->isPlayer()) currentBattleState = STATE_COMMAND_SELECT;
-              else currentBattleState = STATE_ENEMY_AI;
-            }else { 
-              if (currentActor->isPlayer()) currentBattleState = STATE_CHECK_VICTORY; 
-              else currentBattleState = STATE_CHECK_DEFEAT; 
+          }
+
+          else if (messageFlow == MessageFlow::END_TURN) {
+            // 死亡・麻痺など。
+            // このキャラの行動は終了。
+            if (currentActor->isPlayer()) {
+              currentBattleState = STATE_CHECK_DEFEAT;
+            } else {
+              currentBattleState = STATE_CHECK_VICTORY;
+            }
+          }
+
+          else { // ACTION_COMPLETE
+            if (currentActor->isDoubleAction) {
+              currentActor->isDoubleAction = false;
+
+              if (currentActor->isPlayer()) {
+                currentBattleState = STATE_COMMAND_SELECT;
+                message =
+                  String(currentActor->getname()) +
+                  " の再行動！";
+              } else {
+                currentBattleState = STATE_ENEMY_AI;
+              }
+            }
+            else {
+              if (currentActor->isPlayer()) {
+                currentBattleState = STATE_CHECK_VICTORY;
+              } else {
+                currentBattleState = STATE_CHECK_DEFEAT;
+              }
             }
           }
         }
         break;
-
       // 10. 勝利判定 (旧 8)
       case STATE_CHECK_VICTORY:
         {
