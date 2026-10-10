@@ -2606,8 +2606,7 @@ public:
             autoReviveTurns = 99;
             break;
         case 62: // 最大HP上昇
-            MaxHP = (int)(MaxHP * 1.5);
-            HP = (int)(HP * 1.5);
+            boostMaxHP();
             break;
         case 63: // 無敵 (1ターン ダメージ 0)
             // 使用直後のUpdateTurnで1減るため2から開始する
@@ -3131,13 +3130,6 @@ public:
     if (damage < minDamage) damage = minDamage;
 
     return damage;
-  }
-
-  // ★★★ 3. その他の特殊処理 ★★★
-  void limitBreak() { // ID 86
-      // バフを最大ターン・最大倍率で付与 (簡易実装)
-      atkBuffRate = 3.0; atkBuffTurns = 3;
-      spdBuffRate = 3.0; spdBuffTurns = 3;
   }
 
   // ★★★ 修正: 引数に bool &retIsCrit を追加 ★★★
