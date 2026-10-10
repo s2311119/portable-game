@@ -6079,7 +6079,22 @@ public:
           }
         }
 
-        // 3. 麻痺(Paralyzed)チェック (isParalyzed -> getParalyzedTurns)
+        // 3. 強制行動不能チェック
+        if (currentActor->cantMoveTurns > 0) {
+          if (message != "") {
+            message += "\n";
+          }
+
+          message += String(currentActor->getname()) + " は動けない！";
+
+          currentActor->cantMoveTurns--;
+
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
+        }
+
+        // 4. 麻痺(Paralyzed)チェック (isParalyzed -> getParalyzedTurns)
         if (currentActor->getParalyzedTurns() > 0) {
           if (random(100) < 50) { // (例: 50%で行動不能)
             message = String(currentActor->getname()) + " は痺れて動けない！";
@@ -6089,7 +6104,7 @@ public:
           }
         }
         
-        // ★ 4. 混乱(Confused)チェック ★
+        // 5. 混乱(Confused)チェック
         if (currentActor->getConfusedTurns() > 0) {
           message = String(currentActor->getname()) + " は混乱している！";
           // (例: 50%で暴走)
@@ -6117,7 +6132,7 @@ public:
           // (暴走しなかった場合は、メッセージ表示(Aボタン待ち)へ)
         }
 
-        // 5. メッセージがあるか？
+        // 6. メッセージがあるか？
         if (message != "") { // 毒/回復/混乱(不発)のメッセージがあった
           messageFlow = MessageFlow::CONTINUE_TURN;
           currentBattleState = STATE_ACTION_MSG;
@@ -6389,16 +6404,6 @@ public:
           break;
         }
 
-        // 行動不能チェック
-        if (currentActor->cantMoveTurns > 0) {
-          message = String(currentActor->getname()) + " は動けない！";
-          currentActor->cantMoveTurns--;
-
-          messageFlow = MessageFlow::END_TURN;
-          currentBattleState = STATE_ACTION_MSG;
-          break;
-        }
-
         // --- ターゲット解決 ---
         // (単体対象の場合のみ、挑発やかばうを考慮してターゲットを変える)
         if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
@@ -6534,8 +6539,10 @@ public:
         if (lastActionMessage != "") message += "\n" + lastActionMessage;
 
         // 行動後フラグ処理
-        if (currentSkill.id == 86) currentActor->limitBreak(); 
-        if (currentSkill.id == 126) currentActor->cantMoveTurns = 2; 
+        if (currentSkill.id == 86) currentActor->limitBreak();
+        if (currentSkill.id == 126) {
+          currentActor->cantMoveTurns = 1;
+        }
         if (currentSkill.id == 85) currentActor->isDoubleAction = true; 
 
         // 振動処理
