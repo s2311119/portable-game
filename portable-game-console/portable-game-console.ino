@@ -150,8 +150,6 @@ public:
   {
     // 初期化リスト (:) ではなく、ここで代入する
     currentType = type;
-    /*MAP_WIDTH = ((type != TYPE_MAZE && type != TYPE_DUNGEON) ? random(4, max_w / 2) * 2 + 1 : random(15, max_w / 2) * 2 + 1);
-    MAP_HEIGHT = ((type != TYPE_MAZE && type != TYPE_DUNGEON) ? random(4, max_h / 2) * 2 + 1 : random(15, max_h / 2) * 2 + 1);*/
     if (type == TYPE_TOWN) {
       // 集落: 床5x5 + 周囲の壁2 = 7x7
       MAP_WIDTH = 8;
@@ -312,8 +310,6 @@ private:
   std::vector<ObjectPos> grassTiles;
   void generateMazeAndRooms(MapType type) {
     if (type == TYPE_TOWN) {
-      // 1. 全体を壁で初期化 (コンストラクタ等で既にされているが念のため)
-      // mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL); 
 
       // 2. 中央に大きな広場(草)を作る
       int margin = 2; 
@@ -4228,7 +4224,6 @@ public:
           // 重なっているので描画する
           int heroLocalY = heroScreenY - drawY; // スプライト内Y
           const uint16_t* heroBmp = getHeroImage(hero.direction);
-          //lineSprite.pushImage(heroScreenX, heroLocalY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)hero_dots, H_TRANSPARENT);
           lineSprite.pushImage(heroScreenX, heroLocalY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)heroBmp, H_TRANSPARENT);
         }
 
