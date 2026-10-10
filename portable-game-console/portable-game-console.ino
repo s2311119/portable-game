@@ -136,13 +136,17 @@ public:
   // ★★★ 修正後のコンストラクタ ★★★
   Map(int max_w, int max_h, MapType type)
   {
-    // 初期化リスト (:) ではなく、ここで代入する
     currentType = type;
-    setMapDimensions(max_w, max_h, type);
-    mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
-    generateMazeAndRooms(type);
-    placeObjects();
+
+    setMapDimensions(
+        max_w,
+        max_h,
+        type
+    );
+
+    generateMapContent(type);
   }
+
   int getMAP_WIDTH(){
     return MAP_WIDTH;
   }
@@ -223,20 +227,20 @@ public:
     return true;
   }
 
-  void regenerate(int max_w, int max_h, MapType type){
-    // public側のMAP_WIDTH/HEIGHTを変更する
+  void regenerate(
+      int max_w,
+      int max_h,
+      MapType type)
+  {
     currentType = type;
 
-    setMapDimensions(max_w, max_h, type);
+    setMapDimensions(
+        max_w,
+        max_h,
+        type
+    );
 
-    mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
-    if (type == TYPE_BOSS_ROOM) {
-      generateBossRoom();
-      return;
-    }
-    // メンバー変数を再利用して再生成
-    generateMazeAndRooms(type);
-    placeObjects();
+    generateMapContent(type);
   }
 private:
   MapType currentType;
@@ -251,6 +255,21 @@ private:
   ObjectPos playerStartPos;
   int automatonWhoId = -1;
   int currentFloor = 1;
+
+  void generateMapContent(MapType type) {
+    mapData.assign(
+        MAP_WIDTH * MAP_HEIGHT,
+        TILE_WALL
+    );
+
+    if (type == TYPE_BOSS_ROOM) {
+      generateBossRoom();
+      return;
+    }
+
+    generateMazeAndRooms(type);
+    placeObjects();
+  }
 
   void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
