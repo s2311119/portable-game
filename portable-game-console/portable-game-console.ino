@@ -135,11 +135,6 @@ public:
     int x, y;
   };
 
-  std::vector<ObjectPos> boxPositions; // 宝箱の位置リスト
-  ObjectPos stairUpPos = {-1, -1};    // 上り階段の位置
-  ObjectPos stairDownPos = {-1, -1};  // 下り階段の位置
-  ObjectPos playerStartPos; //主人公の初期位置
-
   // ★★★ 修正後のコンストラクタ ★★★
   Map(int max_w, int max_h, MapType type)
   {
@@ -192,6 +187,10 @@ public:
     return currentType == TYPE_BOSS_ROOM;
   }
 
+  ObjectPos getPlayerStartPos() const {
+    return playerStartPos;
+  }
+
   void regenerate(int max_w, int max_h, MapType type){
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
@@ -213,6 +212,11 @@ private:
   int MAP_WIDTH;
   int MAP_HEIGHT;
   std::vector<uint8_t> mapData;
+
+  std::vector<ObjectPos> boxPositions;
+  ObjectPos stairUpPos = {-1, -1};
+  ObjectPos stairDownPos = {-1, -1};
+  ObjectPos playerStartPos;
 
   void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
@@ -4019,8 +4023,11 @@ public:
     // 以前の検索ループ処理は全て削除してください
 
     // Mapクラスの方で既にランダムに決められている座標(playerStartPos)をそのまま使う
-    X = map.playerStartPos.x * Map::TILE_SIZE;
-    Y = map.playerStartPos.y * Map::TILE_SIZE;
+    Map::ObjectPos startPos =
+        map.getPlayerStartPos();
+
+    X = startPos.x * Map::TILE_SIZE;
+    Y = startPos.y * Map::TILE_SIZE;
 
     oldX = X;
     oldY = Y;
@@ -9558,9 +9565,17 @@ void setup() {
     ctx->map = new Map(20, 20, Map::TYPE_TOWN);
     ctx->map->currentFloor = 1;
     
-    ctx->hero = new Caractor(*ctx->map, 1, 38); // Lv1
-    ctx->hero->X = ctx->map->playerStartPos.x * Map::TILE_SIZE;
-    ctx->hero->Y = ctx->map->playerStartPos.y * Map::TILE_SIZE;
+    ctx->hero = new Caractor(*ctx->map, 1, 38);
+
+    Map::ObjectPos startPos =
+        ctx->map->getPlayerStartPos();
+
+    ctx->hero->X =
+        startPos.x * Map::TILE_SIZE;
+
+    ctx->hero->Y =
+        startPos.y * Map::TILE_SIZE;
+        
     ctx->inventory = new Inventory();
     // 初期アイテム
     ctx->inventory->addItem(createItemById(100)); // リペアキット
