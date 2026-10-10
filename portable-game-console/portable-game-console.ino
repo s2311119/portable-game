@@ -6664,6 +6664,43 @@ public:
           break;
         }
 
+        // --- 実行時ターゲット再確認 ---
+
+        // 単体の敵対象技で、予約していた相手がすでに倒れていた場合
+        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
+            (currentTarget == nullptr || currentTarget->getHp() <= 0))
+        {
+          // 使用者から見た「敵」の生存者を取得
+          std::vector<Status*> candidates =
+              currentActor->isPlayer()
+                  ? getAliveEnemies()
+                  : getAliveAllies();
+
+          if (candidates.empty()) {
+            message += "\n対象がいない！";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
+          // 生存している敵からランダムで新しい対象を選ぶ
+          currentTarget =
+              candidates[random((int)candidates.size())];
+
+          message += "\n対象を変更した！";
+        }
+
+        // 単体蘇生の対象が、実行前に別の蘇生で既に復活していた場合
+        if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
+            currentSkill.type == Skill::EffectType::REVIVE &&
+            (currentTarget == nullptr || currentTarget->getHp() > 0))
+        {
+          message += "\n対象はすでに復活している！";
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
+        }
+
         // --- ターゲット解決 ---
         // (単体対象の場合のみ、挑発やかばうを考慮してターゲットを変える)
         if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
@@ -6679,50 +6716,50 @@ public:
             currentSkill.scope == Skill::TargetScope::SINGLE_ALLY ||
             currentSkill.scope == Skill::TargetScope::SELF) 
         {
-            // ターゲットが存在し、生きているかチェック
-            bool targetCanReceiveSkill =
-                currentTarget != nullptr &&
-                (
-                  currentTarget->getHp() > 0 ||
-                  currentSkill.type == Skill::EffectType::REVIVE
-                );
+          // ターゲットが存在し、生きているかチェック
+          bool targetCanReceiveSkill =
+              currentTarget != nullptr &&
+              (
+                currentTarget->getHp() > 0 ||
+                currentSkill.type == Skill::EffectType::REVIVE
+              );
 
-            if (targetCanReceiveSkill) {                
-                // 1. 反射判定
-                bool isReflected = false;
-                if (currentSkill.type != Skill::EffectType::HEAL) {
-                    if (currentTarget->reflectAllTurns > 0) isReflected = true;
-                    else if (currentTarget->reflectPhysicalTurns > 0 && currentSkill.category == Skill::Category::PHYSICAL) {
-                        isReflected = true; currentTarget->reflectPhysicalTurns--;
-                    }
-                    else if (currentTarget->reflectMagicTurns > 0 && currentSkill.category == Skill::Category::MELODY) {
-                        isReflected = true; currentTarget->reflectMagicTurns--;
-                    }
-                }
-
-                if (isReflected) {
-                    music.playSE(7);
-                    message += "\n" + String(currentTarget->getname()) + " は跳ね返した！";
-                    currentTarget = currentActor; // ターゲットを自分に変更
-                }
-
-                // 2. スキル実行
-                ExecuteSkill(currentSkill, currentActor, currentTarget, music);
-                
-                // 3. カウンター判定
-                // 条件: 反射されていない & ターゲットが生きてる & カウンター持ち & 物理攻撃 & ★自分への攻撃ではない
-                if (!isReflected && currentTarget->getHp() > 0 && 
-                    currentTarget->counterTurns > 0 && 
-                    currentSkill.category == Skill::Category::PHYSICAL &&
-                    currentTarget != currentActor)
-                {
-                    message += "\n" + String(currentTarget->getname()) + " の反撃！";
-                    music.playSE(3);
-                    int cntDmg = currentTarget->getAttack(); 
-                    currentActor->takedamage(cntDmg);
-                    currentActor->addPopup(cntDmg, false);
-                }
+          if (targetCanReceiveSkill) {                
+            // 1. 反射判定
+            bool isReflected = false;
+            if (currentSkill.type != Skill::EffectType::HEAL) {
+              if (currentTarget->reflectAllTurns > 0) isReflected = true;
+              else if (currentTarget->reflectPhysicalTurns > 0 && currentSkill.category == Skill::Category::PHYSICAL) {
+                isReflected = true; currentTarget->reflectPhysicalTurns--;
+              }
+              else if (currentTarget->reflectMagicTurns > 0 && currentSkill.category == Skill::Category::MELODY) {
+                isReflected = true; currentTarget->reflectMagicTurns--;
+              }
             }
+
+            if (isReflected) {
+              music.playSE(7);
+              message += "\n" + String(currentTarget->getname()) + " は跳ね返した！";
+              currentTarget = currentActor; // ターゲットを自分に変更
+            }
+
+            // 2. スキル実行
+            ExecuteSkill(currentSkill, currentActor, currentTarget, music);
+            
+            // 3. カウンター判定
+            // 条件: 反射されていない & ターゲットが生きてる & カウンター持ち & 物理攻撃 & ★自分への攻撃ではない
+            if (!isReflected && currentTarget->getHp() > 0 && 
+                currentTarget->counterTurns > 0 && 
+                currentSkill.category == Skill::Category::PHYSICAL &&
+                currentTarget != currentActor)
+            {
+              message += "\n" + String(currentTarget->getname()) + " の反撃！";
+              music.playSE(3);
+              int cntDmg = currentTarget->getAttack(); 
+              currentActor->takedamage(cntDmg);
+              currentActor->addPopup(cntDmg, false);
+            }
+          }
         }
         // B. 全体・ランダム対象 (反射・カウンターなし)
         else if (currentSkill.scope == Skill::TargetScope::ALL_ENEMIES) {
