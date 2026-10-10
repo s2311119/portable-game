@@ -130,7 +130,6 @@ public:
     TYPE_BOSS_ROOM
   };
   MapType currentType;
-  bool isTown = false;
   // ★★★ 追加：部屋の矩形情報を保存する構造体 ★★★
   struct Room {
     int x, y, w, h;
@@ -161,11 +160,14 @@ public:
   int getMAP_HEIGHT(){
     return MAP_HEIGHT;
   }
+
+  bool isTown() const {
+    return currentType == TYPE_TOWN;
+  }
+
   void regenerate(int max_w, int max_h, MapType type){
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
-    
-    isTown = (type == TYPE_TOWN);
 
     setMapDimensions(max_w, max_h, type);
 
@@ -5113,9 +5115,6 @@ public:
       map.MAP_HEIGHT =
           savedHeight;
 
-      map.isTown =
-          (loadedType == Map::TYPE_TOWN);
-
       map.mapData.assign(
           mapDataCount,
           Map::TILE_WALL
@@ -5290,9 +5289,6 @@ public:
           20,
           finalType
       );
-
-      map.isTown =
-          (finalType == Map::TYPE_TOWN);
 
       hero.reset(map);
     }
@@ -6285,7 +6281,7 @@ public:
     if (floor >= 10 &&
         floor <= 50 &&
         floor % 10 == 0 &&
-        !map.isTown)
+        !map.isTown())
     {
       isBossBattleMode = true;
       int bossId = 0;
@@ -7851,7 +7847,6 @@ public:
             }
 
             // マップを集落に作り変える
-            map.isTown = true; 
             map.regenerate(20, 20, Map::TYPE_TOWN);
             
             // プレイヤー位置再配置
@@ -7868,8 +7863,8 @@ public:
             music.switchTrack(99, sd);
           }else {
             // 通常戦闘終了後: BGMを戻す
-            if (map.isTown) music.switchTrack(0, sd); // 集落
-            else music.switchTrack(1, sd);            // ダンジョン
+            if (map.isTown()) music.switchTrack(0, sd);
+            else music.switchTrack(1, sd);
           }
         }
         break;
@@ -9441,7 +9436,6 @@ void setup() {
     if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
     ctx->map = new Map(20, 20, Map::TYPE_TOWN);
     ctx->map->currentFloor = 1;
-    ctx->map->isTown = true;
     
     ctx->hero = new Caractor(*ctx->map, 1, 38); // Lv1
     ctx->hero->X = ctx->map->playerStartPos.x * Map::TILE_SIZE;
@@ -9467,7 +9461,7 @@ void setup() {
   int camX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
   int camY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
   ctx->graphic->drawFullBackground(*ctx->map, *ctx->hero, camX, camY);
-  if (ctx->map->isTown) {
+  if (ctx->map->isTown()) {
     // 集落なら bgm_0.raw
     ctx->music->switchTrack(0, *ctx->sd); 
   } else {
@@ -9537,8 +9531,9 @@ void loop() {
     // 3. 移動していて、メニューが開いていない場合のみイベントとエンカウントをチェック
     if (moved && !menu.active) {
       // 5. イベントが発生しなかった場合のみ、エンカウントをチェック
-      if (!eventOccurred && !map.isTown) {
-        if (!map.isTown && map.currentType != Map::MapType::TYPE_BOSS_ROOM && encounter.checkEncounter()) {
+      if (!eventOccurred && !map.isTown()) {
+        if (map.currentType != Map::MapType::TYPE_BOSS_ROOM &&
+            encounter.checkEncounter()) {
           vib.trigger(300);
           state = STATE_BATTLE;
           ctx->battle->start(music, sd, hero, party, map.currentFloor, imgmgr, map);
@@ -9701,13 +9696,11 @@ void loop() {
             if (ctx->bossDefeated[bossIndex]) {
               // 撃破済みなら集落
               nextType = Map::MapType::TYPE_TOWN;
-              map.isTown = true;
               music.switchTrack(0, sd);
             }
             else {
               // 未撃破ならボス部屋
               nextType = Map::MapType::TYPE_BOSS_ROOM;
-              map.isTown = false;
               music.switchTrack(1, sd);
             }
           }
@@ -9715,7 +9708,6 @@ void loop() {
             // 想定外の10の倍数階
             width = height = 20;
             nextType = Map::MapType::TYPE_DUNGEON;
-            map.isTown = false;
             music.switchTrack(1, sd);
           }
         }
@@ -9723,7 +9715,6 @@ void loop() {
           // 通常階
           width = height = 20;
           nextType = Map::MapType::TYPE_DUNGEON;
-          map.isTown = false;
           music.switchTrack(1, sd);
         }
 
@@ -9757,7 +9748,6 @@ void loop() {
           if (map.currentFloor == 1) {
 
             nextType = Map::MapType::TYPE_TOWN;
-            map.isTown = true;
             music.switchTrack(0, sd);
           }
 
@@ -9776,13 +9766,11 @@ void loop() {
               if (ctx->bossDefeated[bossIndex]) {
                 // 撃破済みなら集落
                 nextType = Map::MapType::TYPE_TOWN;
-                map.isTown = true;
                 music.switchTrack(0, sd);
               }
               else {
                 // 未撃破ならボス部屋
                 nextType = Map::MapType::TYPE_BOSS_ROOM;
-                map.isTown = false;
                 music.switchTrack(1, sd);
               }
             }
@@ -9790,7 +9778,6 @@ void loop() {
               // 想定外の10の倍数階
               width = height = 20;
               nextType = Map::MapType::TYPE_DUNGEON;
-              map.isTown = false;
               music.switchTrack(1, sd);
             }
           }
@@ -9799,7 +9786,6 @@ void loop() {
           else {
             width = height = 20;
             nextType = Map::MapType::TYPE_DUNGEON;
-            map.isTown = false;
             music.switchTrack(1, sd);
           }
 
@@ -9897,8 +9883,6 @@ void loop() {
               20,
               Map::TYPE_TOWN
           );
-
-          map.isTown = true;
           hero.reset(map);
 
           music.switchTrack(0, sd);
