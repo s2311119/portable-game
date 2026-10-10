@@ -7420,8 +7420,33 @@ public:
             }
           }
           
-          // お金加算
-          inventory.addItem(createItemById(100)); // ドロップ処理(仮)
+          // 4. ドロップ判定
+          // 敵ごとに設定されている dropItemId / dropRatePercent を使う。
+          // 逃走した敵は dropItemId = 0 にされているため対象外。
+          for (auto enemy : activeEnemies) {
+            if (enemy == nullptr) {
+              continue;
+            }
+
+            if (enemy->dropItemId <= 0 ||
+                enemy->dropRatePercent <= 0)
+            {
+              continue;
+            }
+
+            // 0～99 の乱数がドロップ率未満なら入手
+            if (random(0, 100) < enemy->dropRatePercent) {
+              Item droppedItem =
+                  createItemById(enemy->dropItemId);
+
+              inventory.addItem(droppedItem);
+
+              resultMessages.push_back(
+                  String(droppedItem.name) +
+                  "を手に入れた!"
+              );
+            }
+          }
 
           // ★ 最初のメッセージを表示して、順次表示ステートへ
           message = resultMessages[0];
