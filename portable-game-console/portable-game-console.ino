@@ -124,7 +124,7 @@ public:
     TYPE_BOSS_ROOM
   };
 
-  // ★★★ 追加：部屋の矩形情報を保存する構造体 ★★★
+  // 部屋の矩形情報
   struct Room {
     int x, y, w, h;
   };
@@ -133,7 +133,6 @@ public:
     int x, y;
   };
 
-  // ★★★ 修正後のコンストラクタ ★★★
   Map(int max_w, int max_h, MapType type)
   {
     currentType = type;
@@ -556,10 +555,7 @@ private:
       grassTiles[j] = grassTiles.back();
       grassTiles.pop_back();
     }
-  }
-
-  // ★★★ 追加: 迷路生成後に宝箱と階段を配置する関数 ★★★
-  
+  }  
 };
 
 class Item {
@@ -1239,7 +1235,7 @@ Item createItemById(int id) {
   
   // 基本素材
   if (id == 1) return Item(1, "鉄くず", Item::ITEM_MATERIAL, 0, 10);
-  if (id == 2) return Item(2, "銅の歯車", Item::ITEM_MATERIAL, 0, 30); // 名前修正(銅の歯車)
+  if (id == 2) return Item(2, "銅の歯車", Item::ITEM_MATERIAL, 0, 30);
   
   // 進化アイテム (値段は適当に設定、売れるようにする)
   if (id == 10) return Item(10, "攻撃の歯車", Item::ITEM_MATERIAL, 0, 100);
@@ -2436,7 +2432,7 @@ public:
     lckDebuffRate = 1.0; lckDebuffTurns = 0;
     hpRegenTurns = 0; tpRegenTurns = 0; invalidDamageTurns = 0; 
     reflectPhysicalTurns = 0; reflectMagicTurns = 0;
-    // ★★★ 初期技の習得を、テーブル参照方式に変更 ★★★
+    // 初期技をテーブルから習得
     checkLevelUpSkills(0, Level); // 0レベルから現在のレベルまで
   }
 
@@ -3026,7 +3022,7 @@ public:
     // ★ 計算結果を引数の変数に書き込む
     retIsCrit = (random(0, 100) < criticalRate);
 
-    // ダメージ計算 (前回修正した改良版の式)
+    // ダメージ計算
     float effectiveDef = (float)Defense * 0.5;
     if (retIsCrit) effectiveDef *= 0.5; // 貫通
 
@@ -3173,7 +3169,6 @@ public:
     return damage;
   }
 
-  // ★★★ 修正: 引数に bool &retIsCrit を追加 ★★★
   int calculateHealAmount(Skill& skill, bool &retIsCrit) {
     int base = this->getSense();
     float multiplier = (float)skill.power / 50.0;
@@ -3872,7 +3867,7 @@ public:
         break;
 
       // --- 4. 3段階目進化 (Lv 30-32) ---
-      // ※ ここから「進化の歯車」を落とすように設定
+      // 進化の歯車をドロップする設定
       
       case 15: // ヴァンガード (攻撃の歯車)
         name = "ヴァンガード"; status = new Status(level, who); dropItemId = 10; dropRatePercent = 20; xpYield = 150; break;
@@ -4044,7 +4039,6 @@ public:
   bool moved = false;
   int MOVE_SPEED = 8;
   Status* status;
-  // ★★★ 修正後のコンストラクタ ★★★
   // Mapオブジェクトを受け取り、安全なスタート地点を探す
   Caractor(Map& map, int level, int who) {
     status = new Status(level, who);
@@ -4073,9 +4067,7 @@ public:
   }
   
   void reset(Map& map) {
-    // 以前の検索ループ処理は全て削除してください
-
-    // Mapクラスの方で既にランダムに決められている座標(playerStartPos)をそのまま使う
+    // Mapが決めた開始位置を使用
     Map::ObjectPos startPos =
         map.getPlayerStartPos();
 
@@ -4396,7 +4388,7 @@ public:
     for (int i = 0; i < 8; ++i) {
       pinMode(btnPins[i], INPUT_PULLUP);
       lastPressTime[i] = 0;
-      // ← ここを修正：prevState は「押されているか（LOW）」の boolean として保存する
+      // 押下状態（LOW）をboolで保持
       prevState[i] = (digitalRead(btnPins[i]) == LOW);
     }
   }
@@ -4605,7 +4597,7 @@ public:
 
   volatile bool needs_refill = true;
   volatile bool paused = false;
-  // ★★★ 修正: SE用バッファを全削除し、シンセ用変数を追加 ★★★
+  // SEシンセ用の状態
   
   // 波形タイプ
   enum WaveType { OFF, SQUARE, NOISE };
@@ -4617,7 +4609,6 @@ public:
   volatile float seVol = 0;       // 音量
   volatile float seVolDecay = 0;  // 音量の減衰量 (フェードアウト)
   volatile int targetSeVol = 10;
-  // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
   float bgmVolume = 1.0;
   int masterSeVol = 10;
   void setSeVolume(int vol) {
@@ -4632,22 +4623,18 @@ public:
     pinMode(DAC_MOSI_PIN, OUTPUT);
     digitalWrite(DAC_CS_PIN, HIGH);
     // SE変数の初期化
-    // ★★★ 修正: シンセサイザー変数の初期化 ★★★
-    // (古いループ処理は削除して、以下に置き換える)
     seType = OFF;
     sePhase = 0;
     seFreq = 0;
     seFreqSlide = 0;
     seVol = 0;
     seVolDecay = 0;
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★
   }
   // MUSIC クラス内
   
   void playSE(int id) {
       sePhase = 0;
-      
-      // ★修正: 設定値(0-10)を反映させる
+      // 設定値(0-10)を反映
       // masterSeVol が 10 なら 5000.0、5 なら 2500.0、0 なら 0.0
       float baseVol = 5000.0f * ((float)masterSeVol / 10.0f);
       seVol = baseVol;
@@ -5427,13 +5414,12 @@ public:
     // --- 装備用 ---
     STATE_EQUIP_SLOT,   // どの部位？ (武器/防具/装飾)
     STATE_EQUIP_LIST,     // 何を装備する？
-    // ★★★ 追加: ショップと宿屋 ★★★
+    // ショップ・宿屋
     STATE_INN,          // 宿屋 (泊まりますか？)
     STATE_SHOP_CHOICE,  // 店 (買う/売る/出る)
     STATE_SHOP_BUY,     // 買う画面
     STATE_SHOP_SELL,     // 売る画面
     STATE_CONFIG
-    // ★★★★★★★★★★★★★★★★★★★
   };
   MenuState currentMenuState;
 
@@ -6183,7 +6169,7 @@ public:
     STATE_TARGET_SELECT_ENEMY, // 4. ターゲット選択 (敵)
     STATE_TARGET_SELECT_ALLY,  // 5. ターゲット選択 (味方)
     
-    // ★★★ 6. (新規) 行動前・継続効果処理 ★★★
+    // 6. 行動前・継続効果処理
     STATE_PRE_ACTION_EFFECTS, 
     
     STATE_ENEMY_AI,         // 7. 敵のAI実行
@@ -6371,7 +6357,6 @@ public:
     // 参加メンバーへの参照を保存
     heroRef = &hero;
     partyRef = &party;
-    // ★★★★★★★★★★★★★★★★★★★★★
     for (auto enemy : activeEnemies) {
       if (enemy) delete enemy;
     }
@@ -6548,7 +6533,7 @@ public:
     // --- メインの戦闘ステートマシン ---
     switch(currentBattleState){
 
-      // ★★★ 0. ターン開始処理 ★★★ (変更なし)
+      // 0. ターン開始処理
       case STATE_TURN_START:
         message = "ターン " + String(turnCount);
 
@@ -6574,7 +6559,7 @@ public:
         }
         break;
 
-      // ★★★ 1. 行動者を決定する (変更なし)
+      // 1. 行動者を決定する
       case STATE_ACTOR_SELECT: {
         // -------------------------
         // 全員分の行動予約が完了した
@@ -6789,7 +6774,7 @@ public:
         break;
       }
       
-      // ★★★ 5. ターゲット選択 (味方) (新規) ★★★
+      // 5. ターゲット選択 (味方)
       case STATE_TARGET_SELECT_ALLY: {
         message = "誰にかける？";
 
@@ -6841,7 +6826,7 @@ public:
         break;
       }
 
-      // ★★★ 6. (新規) 行動前・継続効果処理 ★★★
+      // 6. 行動前・継続効果処理
       case STATE_PRE_ACTION_EFFECTS: {
         message = "";
         lastDamage = 0;
@@ -6857,7 +6842,7 @@ public:
           message = String(currentActor->getname()) + " は回復:" + String(-lastDamage) + " 回復！";
         }
         if (currentActor->getHp() <= 0) {
-          // ★★★ オートリバイブ判定 (追加) ★★★
+          // オートリバイブ判定
           if (currentActor->autoReviveTurns > 0) {
             currentActor->autoReviveTurns = 0; // 効果消費
             currentActor->Revive(50); // HP半分で復活
@@ -7204,7 +7189,7 @@ public:
         pendingSkillIndex = currentBattleAction.skillIndex;
         currentTarget = currentBattleAction.target;
 
-        // 毒・麻痺・混乱などはここから処理する
+        // 毒・麻痺・混乱などの状態異常を処理
         currentBattleState = STATE_PRE_ACTION_EFFECTS;
 
         break;
@@ -7216,7 +7201,7 @@ public:
         lastActionMessage = "";
 
         messageFlow = MessageFlow::ACTION_COMPLETE;
-        // ★★★ 修正A: フリーズ防止 (ポインタチェックを追加) ★★★
+        // ポップアップを安全にクリア
         if (heroRef && heroRef->status) heroRef->status->clearPopups();
         if (partyRef) {
             for(auto m : partyRef->members) if(m && m->status) m->status->clearPopups();
@@ -7916,7 +7901,7 @@ public:
             }
           }
           
-          // ★★★ 追加: 戦闘終了時にステータスをリセットする ★★★
+          // 戦闘終了時にステータスをリセット
           hero.status->resetBattleStats();
           std::vector<Status::PopupData>().swap(hero.status->popupValues);
           for(auto m : party.members) {
@@ -7927,7 +7912,6 @@ public:
               delete enemy; // Enemyとその中のStatusを削除
           }
           activeEnemies.clear(); // リストを空にする
-          // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
           // ★ ベクタの容量自体を解放するテクニック (Swap idiom)
           std::vector<Enemy*>().swap(activeEnemies);
 
@@ -8119,10 +8103,9 @@ public:
                 g->lineSprite.setCursor(heroX + 10, pY); 
                 g->lineSprite.print("Miss"); 
               }else if (val > 0) {
-                // ★★★ 修正: 会心なら赤、通常なら黄色 ★★★
+                // 会心なら赤、通常なら黄色
                 if (isCrit) g->lineSprite.setTextColor(TFT_RED);
                 else g->lineSprite.setTextColor(TFT_YELLOW);
-                // ★★★★★★★★★★★★★★★★★★★★★★★
                 g->lineSprite.setCursor(heroX + 10, pY); 
                 g->lineSprite.print(val);
               }
@@ -8164,10 +8147,9 @@ public:
                   g->lineSprite.setCursor(allyX[i] + 20, pY);
                   g->lineSprite.print("Miss");
                 }else if (val > 0) {
-                  // ★★★ 修正: 会心なら赤、通常なら黄色 ★★★
+                  // 会心なら赤、通常なら黄色
                   if (isCrit) g->lineSprite.setTextColor(TFT_RED);
                   else g->lineSprite.setTextColor(TFT_YELLOW);
-                  // ★★★★★★★★★★★★★★★★★★★★★★★
                   g->lineSprite.setCursor(allyX[i] + 20, pY); 
                   g->lineSprite.print(val);
                 }
@@ -8272,7 +8254,7 @@ public:
         }
 
         // --- メッセージ (最下部に移動) ---
-        // ★★★ 修正: 座標を 110 -> 220 に変更して、キャラと被らないようにする ★★★
+        // メッセージをキャラと重ならない位置に表示
         g->lineSprite.setTextSize(1);
         g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setCursor(10, 220 - drawY); // ここ！
@@ -8302,7 +8284,6 @@ private:
     switch (skill.type) {
       
       case Skill::EffectType::DAMAGE:
-        // ★★★ ここから修正 ★★★
         // (user->getSense() と target->getSense() でバフ/デバフが反映された値を取得)
         value = user->caclulateSkillDamage(target, skill, isCrit);
         if (isCrit) music.playSE(4); // 会心
@@ -8791,9 +8772,7 @@ void applyFloorMapConfig(GameContext* ctx)
 bool audio_timer_callback(struct repeating_timer *t) {
   MUSIC* music = ctx->music;
   
-  // ★ 修正: BGMが一時停止中でもSEだけは鳴るようにする
-  // if (music->paused) return true; // ← これを削除またはSE用に変更
-
+  // BGM停止中でもSEは鳴らす
   int32_t mixedSample = 0;
 
   // --- 1. BGMの取得 ---
@@ -9021,7 +9000,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
       break;
     }
     case STATE_ITEM: {
-      // ★ 修正：全アイテムを対象にする (フィルタリングしない)
+      // 全アイテムを対象にする
       int itemCount = inventory.items.size();
 
       if (itemCount > 0) {
@@ -9660,7 +9639,7 @@ void setup() {
     ctx->music->switchTrack(1, *ctx->sd);
   }
 
-  // ★★★ 追加: ゲーム状態への移行 ★★★
+  // ゲーム状態へ移行
   ctx->state = STATE_GAME;
   // 4. 音楽スレッド起動
 }
@@ -9768,7 +9747,7 @@ void loop() {
 
   else if (state == STATE_EVENT) {
     
-    // ★★★ ここから修正 ★★★
+    
     
     // イベントの種類に応じて処理を分岐
     switch (currentEvent) {
@@ -9990,7 +9969,6 @@ void loop() {
         state = STATE_GAME; // とりあえずゲームに戻る
         break;
     }
-    // ★★★ 修正ここまで ★★★
   }
 
   else if (state == STATE_GAME_OVER) {
