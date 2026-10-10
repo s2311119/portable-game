@@ -2465,8 +2465,8 @@ public:
             atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
             spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
             break;
-        case 27:
-            coverTurns = 1;
+        case 27: // かばう（次の自分の行動終了まで有効）
+            coverTurns = 2;
             break;
         case 29: // トリックステップ (SPD/LCK 1.5倍)
             spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
@@ -2536,7 +2536,8 @@ public:
             HP = (int)(HP * 1.5);
             break;
         case 63: // 無敵 (1ターン ダメージ 0)
-            invalidDamageTurns = 1; // (次の行動まで)
+            // 使用直後のUpdateTurnで1減るため2から開始する
+            invalidDamageTurns = 2;
             break;
         case 64: // 全体バリア (ダメージ無効 1回)
             damageGuardCount = 1;
@@ -3160,27 +3161,48 @@ public:
     }
   }
   void UpdateTurn() {
-    // バフ
+    // -------------------------
+    // 通常バフ
+    // -------------------------
     if (atkBuffTurns > 0) atkBuffTurns--;
     if (defBuffTurns > 0) defBuffTurns--;
     if (spdBuffTurns > 0) spdBuffTurns--;
     if (senBuffTurns > 0) senBuffTurns--;
     if (lckBuffTurns > 0) lckBuffTurns--;
     if (evaBuffTurns > 0) evaBuffTurns--;
+
     if (hpRegenTurns > 0) hpRegenTurns--;
     if (tpRegenTurns > 0) tpRegenTurns--;
+
+    // -------------------------
+    // 特殊なターン制バフ
+    // -------------------------
+    if (coverTurns > 0) coverTurns--;
+    if (tauntTurns > 0) tauntTurns--;
+    if (untargetableTurns > 0) untargetableTurns--;
+    if (counterTurns > 0) counterTurns--;
+    if (physDamageOneTurns > 0) physDamageOneTurns--;
+    if (attributeResistTurns > 0) attributeResistTurns--;
+
     if (invalidDamageTurns > 0) invalidDamageTurns--;
+
+    // 反射系は現状の仕様を維持。
+    // 次のコミットで「ターン制 / 回数制」を整理する。
     if (reflectPhysicalTurns > 0) reflectPhysicalTurns--;
     if (reflectMagicTurns > 0) reflectMagicTurns--;
 
+    // -------------------------
     // デバフ
+    // -------------------------
     if (atkDebuffTurns > 0) atkDebuffTurns--;
     if (defDebuffTurns > 0) defDebuffTurns--;
     if (spdDebuffTurns > 0) spdDebuffTurns--;
     if (senDebuffTurns > 0) senDebuffTurns--;
     if (lckDebuffTurns > 0) lckDebuffTurns--;
 
+    // -------------------------
     // 状態異常
+    // -------------------------
     if (poisonTurns > 0) {
       poisonTurns--;
 
