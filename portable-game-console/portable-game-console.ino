@@ -6158,10 +6158,31 @@ public:
       // ★★★ 5. ターゲット選択 (味方) (新規) ★★★
       case STATE_TARGET_SELECT_ALLY: {
         message = "誰にかける？";
-        std::vector<Status*> allies = getAliveAllies();
-        if (allies.empty()) { // (万が一)
-            currentBattleState = STATE_SKILL_SELECT;
-            break;
+
+        bool isReviveSkill = false;
+
+        if (pendingActionType == ActionType::SKILL) {
+          std::vector<Skill>& skills = currentActor->getLearnedSkills();
+
+          if (pendingSkillIndex >= 0 &&
+              pendingSkillIndex < static_cast<int>(skills.size())) {
+            isReviveSkill =
+                (skills[pendingSkillIndex].type ==
+                Skill::EffectType::REVIVE);
+          }
+        }
+
+        std::vector<Status*> allies =
+            isReviveSkill ? getDeadAllies()
+                          : getAliveAllies();
+
+        if (allies.empty()) {
+          if (isReviveSkill) {
+            message = "倒れている味方がいない！";
+          }
+
+          currentBattleState = STATE_SKILL_SELECT;
+          break;
         }
 
         if (upPressed) {
@@ -6659,8 +6680,14 @@ public:
             currentSkill.scope == Skill::TargetScope::SELF) 
         {
             // ターゲットが存在し、生きているかチェック
-            if (currentTarget != nullptr && currentTarget->getHp() > 0) {
-                
+            bool targetCanReceiveSkill =
+                currentTarget != nullptr &&
+                (
+                  currentTarget->getHp() > 0 ||
+                  currentSkill.type == Skill::EffectType::REVIVE
+                );
+
+            if (targetCanReceiveSkill) {                
                 // 1. 反射判定
                 bool isReflected = false;
                 if (currentSkill.type != Skill::EffectType::HEAL) {
@@ -6722,9 +6749,23 @@ public:
           }
         }
         else if (currentSkill.scope == Skill::TargetScope::ALL_ALLIES) {
-          // 使用者から見た「味方」を取得
-          std::vector<Status*> targets =
-            currentActor->isPlayer() ? getAliveAllies() : getAliveEnemies();
+          std::vector<Status*> targets;
+
+          if (currentActor->isPlayer()) {
+
+            if (currentSkill.type == Skill::EffectType::REVIVE) {
+              // 全体蘇生は死亡者も含める
+              targets = getAllAllies();
+            }
+            else {
+              targets = getAliveAllies();
+            }
+
+          }
+          else {
+            // 敵側は現状どおり
+            targets = getAliveEnemies();
+          }
 
           for (auto target : targets) {
             ExecuteSkill(currentSkill, currentActor, target, music);
@@ -7315,7 +7356,26 @@ public:
           
         // ターゲットカーソル(味方)
         if (currentBattleState == STATE_TARGET_SELECT_ALLY) {
-          std::vector<Status*> allies = getAliveAllies();
+          bool isReviveSkill = false;
+
+          if (currentActor &&
+              pendingActionType == ActionType::SKILL) {
+
+            std::vector<Skill>& skills =
+                currentActor->getLearnedSkills();
+
+            if (pendingSkillIndex >= 0 &&
+                pendingSkillIndex < static_cast<int>(skills.size())) {
+              isReviveSkill =
+                  (skills[pendingSkillIndex].type ==
+                  Skill::EffectType::REVIVE);
+            }
+          }
+
+          std::vector<Status*> allies =
+              isReviveSkill ? getDeadAllies()
+                            : getAliveAllies();
+
           if (allyTargetIndex < allies.size()) {
             Status* targetedAlly = allies[allyTargetIndex];
             int tx = 0, ty = 0;
@@ -7646,6 +7706,46 @@ private:
         allies.push_back(ally->status);
       }
     }
+    return allies;
+  }
+
+  std::vector<Status*> getDeadAllies() {
+    std::vector<Status*> allies;
+
+    // 主人公
+    if (heroRef && heroRef->status &&
+        heroRef->status->getHp() <= 0) {
+      allies.push_back(heroRef->status);
+    }
+
+    // 仲間
+    if (partyRef) {
+      for (auto ally : partyRef->members) {
+        if (ally && ally->status &&
+            ally->status->getHp() <= 0) {
+          allies.push_back(ally->status);
+        }
+      }
+    }
+
+    return allies;
+  }
+
+  std::vector<Status*> getAllAllies() {
+    std::vector<Status*> allies;
+
+    if (heroRef && heroRef->status) {
+      allies.push_back(heroRef->status);
+    }
+
+    if (partyRef) {
+      for (auto ally : partyRef->members) {
+        if (ally && ally->status) {
+          allies.push_back(ally->status);
+        }
+      }
+    }
+
     return allies;
   }
 
