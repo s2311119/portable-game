@@ -8620,6 +8620,8 @@ FloorMapConfig getFloorMapConfig(
     int floor,
     const bool bossDefeated[5]);
 
+void applyFloorMapConfig(GameContext* ctx);
+
 FloorMapConfig getFloorMapConfig(
     int floor,
     const bool bossDefeated[5])
@@ -8664,6 +8666,32 @@ FloorMapConfig getFloorMapConfig(
     Map::TYPE_DUNGEON,
     1
   };
+}
+
+void applyFloorMapConfig(GameContext* ctx)
+{
+  FloorMapConfig config =
+      getFloorMapConfig(
+          ctx->map->currentFloor,
+          ctx->bossDefeated
+      );
+
+  ctx->music->switchTrack(
+      config.bgmTrack,
+      *ctx->sd
+  );
+
+  ctx->graphic->setFloor(
+      ctx->map->currentFloor
+  );
+
+  ctx->map->regenerate(
+      config.width,
+      config.height,
+      config.type
+  );
+
+  ctx->hero->reset(*ctx->map);
 }
 
 // タイマー割り込み関数
@@ -9739,23 +9767,7 @@ void loop() {
 
         map.currentFloor++;
 
-        FloorMapConfig config =
-            getFloorMapConfig(
-                map.currentFloor,
-                ctx->bossDefeated
-            );
-
-        music.switchTrack(config.bgmTrack, sd);
-
-        ctx->graphic->setFloor(map.currentFloor);
-
-        ctx->map->regenerate(
-            config.width,
-            config.height,
-            config.type
-        );
-
-        ctx->hero->reset(*ctx->map);
+        applyFloorMapConfig(ctx);
 
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
@@ -9766,23 +9778,7 @@ void loop() {
         if (map.currentFloor > 1) {
           map.currentFloor--;
 
-          FloorMapConfig config =
-              getFloorMapConfig(
-                  map.currentFloor,
-                  ctx->bossDefeated
-              );
-
-          music.switchTrack(config.bgmTrack, sd);
-
-          ctx->graphic->setFloor(map.currentFloor);
-
-          ctx->map->regenerate(
-              config.width,
-              config.height,
-              config.type
-          );
-
-          ctx->hero->reset(*ctx->map);
+          applyFloorMapConfig(ctx);
         }
 
         state = STATE_GAME;
