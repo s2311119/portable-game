@@ -103,7 +103,6 @@ public:
 
 class Map {
 public:
-  int automatonWhoId = -1;
   int currentFloor = 1;
   // マップの寸法（コンストラクタで決定）  
   static const int TILE_SIZE = 32;
@@ -191,6 +190,14 @@ public:
     return playerStartPos;
   }
 
+  int getAutomatonWhoId() const {
+    return automatonWhoId;
+  }
+
+  void restoreAutomatonWhoId(int whoId) {
+    automatonWhoId = whoId;
+  }
+
   void regenerate(int max_w, int max_h, MapType type){
     // public側のMAP_WIDTH/HEIGHTを変更する
     currentType = type;
@@ -217,6 +224,7 @@ private:
   ObjectPos stairUpPos = {-1, -1};
   ObjectPos stairDownPos = {-1, -1};
   ObjectPos playerStartPos;
+  int automatonWhoId = -1;
 
   void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
@@ -4966,7 +4974,7 @@ public:
     file.println(map.getMAP_HEIGHT());
 
     // マップ上の未回収オートマタの種類
-    file.println(map.automatonWhoId);
+    file.println(map.getAutomatonWhoId());
 
     // 主人公の現在位置・向き
     file.println(hero.X);
@@ -5116,8 +5124,9 @@ public:
         return failLoad();
       }
 
-      map.automatonWhoId =
-          file.readStringUntil('\n').toInt();
+      map.restoreAutomatonWhoId(
+          file.readStringUntil('\n').toInt()
+      );
 
       savedHeroX =
           file.readStringUntil('\n').toInt();
@@ -9575,7 +9584,7 @@ void setup() {
 
     ctx->hero->Y =
         startPos.y * Map::TILE_SIZE;
-        
+
     ctx->inventory = new Inventory();
     // 初期アイテム
     ctx->inventory->addItem(createItemById(100)); // リペアキット
@@ -9836,10 +9845,8 @@ void loop() {
 
         // (今はAボタンで即座に仲間になる)
         // (Aボタンは check_event の呼び出し元で押されている)
-
-        // TODO: 今は who=39 (初号機) で固定。
-        // 将来はフロア番号やマップの保持データから who ID を決定する
-        int who_to_add = map.automatonWhoId;
+        int who_to_add =
+            map.getAutomatonWhoId();
         Automaton* newAlly = new Automaton(1, who_to_add); // 主人公と同じレベルで加入
         
         int result = party.addMember(newAlly);
