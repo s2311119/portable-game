@@ -2476,9 +2476,10 @@ public:
             atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
             defBuffRate = 1.5; defBuffTurns = DEFAULT_BUFF_TURNS;
             break;
-        case 32: // キングス・シールド (物理・旋律反射)
-            reflectAllTurns = 1;
-            break;
+        case 32: // キングス・シールド (1ターン物理・旋律反射)
+          // 使用した行動の終了時に1減るため、2から開始
+          reflectAllTurns = 2;
+          break;
         case 34: // バーサーク (ATK 2倍 / DEF 0.5倍)
             atkBuffRate = 2.0; atkBuffTurns = LONG_BUFF_TURNS;
             defDebuffRate = 0.5; defDebuffTurns = LONG_BUFF_TURNS; // (※デバフも付く)
@@ -3188,7 +3189,11 @@ public:
 
     // 反射系は現状の仕様を維持。
     // 次のコミットで「ターン制 / 回数制」を整理する。
-    if (reflectPhysicalTurns > 0) reflectPhysicalTurns--;
+
+    // キングス・シールド：ターン制
+    if (reflectAllTurns > 0) reflectAllTurns--;
+
+    // 旋律反射：ターン制
     if (reflectMagicTurns > 0) reflectMagicTurns--;
 
     // -------------------------
@@ -5748,20 +5753,28 @@ private:
     bool isReflected = false;
 
     if (isOffensive) {
+      // キングス・シールド：
+      // 有効ターン中は物理・旋律を何度でも反射する
       if (defender->reflectAllTurns > 0) {
         isReflected = true;
       }
+
+      // リフレクト：
+      // 物理攻撃を1回だけ反射して、その場で消費する
       else if (defender->reflectPhysicalTurns > 0 &&
               skill.category == Skill::Category::PHYSICAL)
       {
         isReflected = true;
-        defender->reflectPhysicalTurns--;
+        defender->reflectPhysicalTurns = 0;
       }
+
+      // 旋律反射：
+      // 有効ターン中は旋律攻撃を反射する
+      // 反射した回数ではなくUpdateTurn()で寿命を減らす
       else if (defender->reflectMagicTurns > 0 &&
               skill.category == Skill::Category::MELODY)
       {
         isReflected = true;
-        defender->reflectMagicTurns--;
       }
     }
 
