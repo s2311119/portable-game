@@ -173,36 +173,8 @@ public:
 
     mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
     if (type == TYPE_BOSS_ROOM) {
-      // --- ボス部屋の描画 ---
-      
-      // 全体を床にする
-      for (int i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) mapData[i] = TILE_GRASS;
-      
-      // 周囲を壁にする
-      for (int x = 0; x < MAP_WIDTH; x++) { 
-          mapData[x] = TILE_WALL; 
-          mapData[(MAP_HEIGHT-1)*MAP_WIDTH + x] = TILE_WALL; 
-      }
-      for (int y = 0; y < MAP_HEIGHT; y++) { 
-          mapData[y*MAP_WIDTH] = TILE_WALL; 
-          mapData[y*MAP_WIDTH + (MAP_WIDTH-1)] = TILE_WALL; 
-      }
-
-      // 下り階段 (入り口)
-      // 座標が範囲外にならないよう中央下付近に固定
-      int stairX = MAP_WIDTH / 2;
-      int stairY = MAP_HEIGHT - 3;
-      mapData[stairY * MAP_WIDTH + stairX] = TILE_STAIR_DOWN;
-      
-      // プレイヤー開始位置
-      playerStartPos = {stairX, stairY};
-
-      // ★ボス配置 (部屋の中央奥)
-      int bossX = MAP_WIDTH / 2;
-      int bossY = 5;
-      mapData[bossY * MAP_WIDTH + bossX] = TILE_BOSS;
-
-      return; // ボス部屋生成完了
+      generateBossRoom();
+      return;
     }
     // メンバー変数を再利用して再生成
     generateMazeAndRooms(type);
@@ -254,6 +226,41 @@ private:
           ) * 2 + 1;
     }
   }
+
+  void generateBossRoom() {
+    // 全体を床にする
+    for (int i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) {
+      mapData[i] = TILE_GRASS;
+    }
+
+    // 外周を壁にする
+    for (int x = 0; x < MAP_WIDTH; x++) {
+      mapData[x] = TILE_WALL;
+      mapData[(MAP_HEIGHT - 1) * MAP_WIDTH + x] = TILE_WALL;
+    }
+
+    for (int y = 0; y < MAP_HEIGHT; y++) {
+      mapData[y * MAP_WIDTH] = TILE_WALL;
+      mapData[y * MAP_WIDTH + (MAP_WIDTH - 1)] = TILE_WALL;
+    }
+
+    // 入り口となる下り階段
+    int stairX = MAP_WIDTH / 2;
+    int stairY = MAP_HEIGHT - 3;
+
+    mapData[stairY * MAP_WIDTH + stairX] =
+        TILE_STAIR_DOWN;
+
+    playerStartPos = {stairX, stairY};
+
+    // ボスを部屋の奥に配置
+    int bossX = MAP_WIDTH / 2;
+    int bossY = 5;
+
+    mapData[bossY * MAP_WIDTH + bossX] =
+        TILE_BOSS;
+  }
+
   std::vector<int> pathX, pathY;
   std::vector<int> dirs;
   std::vector<Room> placedRooms;
