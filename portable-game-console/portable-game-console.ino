@@ -103,8 +103,6 @@ public:
 
 class Map {
 public:
-  int MAP_WIDTH;
-  int MAP_HEIGHT;
   int automatonWhoId = -1;
   int currentFloor = 1;
   // マップの寸法（コンストラクタで決定）  
@@ -120,8 +118,6 @@ public:
   static const int TILE_SHOP = 8;    // 店
   static const int TILE_STORAGE = 9; // 預かり所
   static const int TILE_BOSS = 99;//ボス
-  // マップデータを保持する動的配列
-  std::vector<uint8_t> mapData;
 
   enum MapType {
     TYPE_MAZE,
@@ -213,6 +209,11 @@ public:
   }
 private:
   MapType currentType;
+
+  int MAP_WIDTH;
+  int MAP_HEIGHT;
+  std::vector<uint8_t> mapData;
+
   void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
       MAP_WIDTH = 8;
