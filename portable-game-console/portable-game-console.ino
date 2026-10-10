@@ -5556,14 +5556,15 @@ public:
     
     STATE_ENEMY_AI,         // 7. 敵のAI実行
     STATE_ACTION_READY,     // 8. 行動内容をBattleActionとして確定
-    STATE_ACTION_CALC,      // 9. 行動実行（計算）
-    STATE_ACTION_MSG,       // 10. 行動結果のメッセージ
-    STATE_CHECK_BATTLE_RESULT, // 11. 勝敗だけ確認
-    STATE_END_ACTOR_TURN,      // 12. 現在の行動者のターン終了処理
-    STATE_SHOW_XP_GAIN,     // 13. XP獲得表示
-    STATE_BATTLE_END,       // 14. 戦闘終了
-    STATE_CHECK_STATUS,      // 15. Yボタンステータス
-    STATE_SHOW_RESULT_MESSAGE // 16. メッセージ表示
+    STATE_EXECUTE_NEXT_ACTION, // 9. 
+    STATE_ACTION_CALC,      // 10. 行動実行（計算）
+    STATE_ACTION_MSG,       // 11. 行動結果のメッセージ
+    STATE_CHECK_BATTLE_RESULT, // 12. 勝敗だけ確認
+    STATE_END_ACTOR_TURN,      // 13. 現在の行動者のターン終了処理
+    STATE_SHOW_XP_GAIN,     // 14. XP獲得表示
+    STATE_BATTLE_END,       // 15. 戦闘終了
+    STATE_CHECK_STATUS,      // 16. Yボタンステータス
+    STATE_SHOW_RESULT_MESSAGE // 17. メッセージ表示
   };
   BattleState currentBattleState;
   static const int CMD_COUNT = 4;
@@ -5581,6 +5582,13 @@ public:
   };
 
   BattleEndReason battleEndReason = BattleEndReason::NONE;
+
+  enum class BattlePhase {
+    PLANNING,   // 行動を決めている段階
+    EXECUTING   // 決めた行動を実行している段階
+  };
+
+  BattlePhase battlePhase = BattlePhase::PLANNING;
 
   bool inBattle = false;
   bool heroLeveledUp = false;
@@ -5641,6 +5649,7 @@ public:
   // 1ターン分の行動予定
   std::vector<BattleAction> plannedActions;
   BattleAction currentBattleAction;
+  int currentPlannedActionIndex = 0;
   int lastDamage = 0;             // 直前のダメージ計算結果
   String lastActionMessage = "";
   int lastGainedXP = 0;
@@ -5724,6 +5733,8 @@ public:
     allyTargetIndex = 0;
     plannedActions.clear();
     currentBattleAction = BattleAction();
+    battlePhase = BattlePhase::PLANNING;
+    currentPlannedActionIndex = 0;
 
     // 参加メンバーへの参照を保存
     heroRef = &hero;
@@ -5980,6 +5991,7 @@ public:
         }
         break;
 
+      
       // 3. 旋律（せんりつ）選択
       case STATE_SKILL_SELECT: {
         int skillCount = currentActor->getLearnedSkills().size();
@@ -6203,10 +6215,17 @@ public:
           currentBattleState = STATE_ACTION_MSG;
         } else {
           // 継続効果が何もなければ、通常の行動へ
-          if (currentActor->isPlayer()) {
-            currentBattleState = STATE_COMMAND_SELECT;
-          } else {
-            currentBattleState = STATE_ENEMY_AI;
+          if (battlePhase == BattlePhase::EXECUTING) {
+            // すでに行動内容は決まっているので、そのまま実行
+            currentBattleState = STATE_ACTION_CALC;
+          }
+          else {
+            // まだ行動を決める段階
+            if (currentActor->isPlayer()) {
+              currentBattleState = STATE_COMMAND_SELECT;
+            } else {
+              currentBattleState = STATE_ENEMY_AI;
+            }
           }
         }
         break;
@@ -6380,7 +6399,38 @@ public:
         break;
       }
 
-      // 8. 行動の実行（計算）
+      // 9. 
+      case STATE_EXECUTE_NEXT_ACTION: {
+        // 全ての予約行動を実行し終えた
+        if (currentPlannedActionIndex >= plannedActions.size()) {
+          battlePhase = BattlePhase::PLANNING;
+          currentBattleState = STATE_TURN_START;
+          break;
+        }
+
+        currentBattleAction = plannedActions[currentPlannedActionIndex];
+
+        currentActor = currentBattleAction.actor;
+
+        // 行動前に倒されていたキャラはスキップ
+        if (currentActor == nullptr || currentActor->getHp() <= 0) {
+          currentPlannedActionIndex++;
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
+          break;
+        }
+
+        // BattleActionの内容を既存実行系に戻す
+        pendingActionType = currentBattleAction.type;
+        pendingSkillIndex = currentBattleAction.skillIndex;
+        currentTarget = currentBattleAction.target;
+
+        // 実行直前に状態異常などを処理する
+        currentBattleState = STATE_PRE_ACTION_EFFECTS;
+
+        break;
+      }
+
+      // 10. 行動の実行（計算）
       case STATE_ACTION_CALC: {
         lastDamage = 0;
         lastActionMessage = "";
@@ -6637,7 +6687,7 @@ public:
         break;
       }
       
-      // 9. 行動結果のメッセージ表示 (待機のみ)
+      // 11. 行動結果のメッセージ表示 (待機のみ)
       case STATE_ACTION_MSG:
         if (aPressed) {
           hero.status->clearPopups();
@@ -6651,12 +6701,18 @@ public:
           }
 
           if (messageFlow == MessageFlow::CONTINUE_TURN) {
-            // 毒・リジェネ等の表示が終わっただけ。
-            // まだこのキャラは行動していない。
-            if (currentActor->isPlayer()) {
-              currentBattleState = STATE_COMMAND_SELECT;
-            } else {
-              currentBattleState = STATE_ENEMY_AI;
+            if (battlePhase == BattlePhase::EXECUTING) {
+              // 毒やリジェネのメッセージを見終えたので、
+              // 予約済みの行動をそのまま実行する
+              currentBattleState = STATE_ACTION_CALC;
+            }
+            else {
+              // まだ行動決定段階
+              if (currentActor->isPlayer()) {
+                currentBattleState = STATE_COMMAND_SELECT;
+              } else {
+                currentBattleState = STATE_ENEMY_AI;
+              }
             }
           }
           else {
@@ -6666,7 +6722,7 @@ public:
           }
         }
         break;
-      // 10. 勝利判定 (旧 8)
+      // 12. 勝利判定 (旧 8)
       case STATE_CHECK_BATTLE_RESULT: {
         // -------------------------
         // 1. 敵側が全滅しているか
@@ -6755,7 +6811,7 @@ public:
         currentBattleState = STATE_END_ACTOR_TURN;
         break;
       }
-
+      // 13. 
       case STATE_END_ACTOR_TURN: {
         // -------------------------
         // 1. 2回行動
@@ -6802,13 +6858,18 @@ public:
         // -------------------------
         // 3. 次の行動者へ
         // -------------------------
-        currentActorIndex++;
-        currentBattleState = STATE_ACTOR_SELECT;
-
+        if (battlePhase == BattlePhase::EXECUTING) {
+          currentPlannedActionIndex++;
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
+        }
+        else {
+          currentActorIndex++;
+          currentBattleState = STATE_ACTOR_SELECT;
+        }
         break;
       }
 
-      // 12. XP獲得 (旧 10)
+      // 14. XP獲得 (旧 10)
       case STATE_SHOW_XP_GAIN:
         {
           // メッセージキューをクリア
@@ -6845,6 +6906,8 @@ public:
           currentBattleState = STATE_SHOW_RESULT_MESSAGE;
         }
         break;
+      
+      //15. 
       case STATE_SHOW_RESULT_MESSAGE:
         if (aPressed) {
           resultMessageIndex++;
@@ -6856,7 +6919,7 @@ public:
           }
         }
         break;
-      // 15. 戦闘終了 (旧 13)
+      // 16. 戦闘終了 (旧 13)
       case STATE_BATTLE_END:
         if(bPressed || aPressed){
           bool actualBossDefeated =
