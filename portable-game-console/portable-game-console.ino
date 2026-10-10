@@ -6454,28 +6454,54 @@ public:
             else if (turnCount % 4 == 0) selectedSkillIndex = findSkillIndex(114); 
             else if (random(100) < 30) selectedSkillIndex = findSkillIndex(86);
           }
-          // ★★★ 修正: 回復役 (仲間も回復するAI) ★★★
-          else if (who == 3 || who == 8 || who == 13 || who == 20 || who == 32) {
-            // 1. まず回復スキルがあるか確認
-            int healIdx = findSkillIndex(100);
-            if (healIdx == -1) healIdx = findSkillIndex(101); // 上位回復
+          // --- 回復役AI ---
+          else if (who == 3 ||
+                  who == 8 ||
+                  who == 13 ||
+                  who == 20 ||
+                  who == 32)
+          {
+            // HPが半分未満の生存中の味方を探す
+            Status* injuredTarget = nullptr;
 
-            if (healIdx != -1) {
-              // 2. 傷ついた仲間（自分含む）を探す
-              Status* injuredTarget = nullptr;
-              
-              // 敵全員をチェック
-              for (auto e : activeEnemies) {
-                if (e->status->getHp() > 0 && e->status->getHp() < e->status->getMaxHp() / 2) {
-                  injuredTarget = e->status;
-                  break; // 最初に見つけた瀕死の仲間を助ける
+            for (auto e : activeEnemies) {
+              if (e != nullptr &&
+                  e->status != nullptr &&
+                  e->status->getHp() > 0 &&
+                  e->status->getHp() < e->status->getMaxHp() / 2)
+              {
+                injuredTarget = e->status;
+                break;
+              }
+            }
+
+            // 回復が必要な味方がいる場合だけ回復技を探す
+            if (injuredTarget != nullptr) {
+
+              int healIdx = -1;
+              int bestHealPower = -1;
+
+              for (int i = 0;
+                  i < static_cast<int>(skills.size());
+                  i++)
+              {
+                const Skill& skill = skills[i];
+
+                // 使用可能な回復スキルだけを対象にする
+                if (skill.type == Skill::EffectType::HEAL &&
+                    skill.tpCost <= curTP)
+                {
+                  // 複数ある場合は威力が高いものを使う
+                  if (skill.power > bestHealPower) {
+                    bestHealPower = skill.power;
+                    healIdx = i;
+                  }
                 }
               }
 
-              // 3. 見つかったら回復実行
-              if (injuredTarget != nullptr) {
+              if (healIdx != -1) {
                 selectedSkillIndex = healIdx;
-                currentTarget = injuredTarget; // ★ターゲットをその仲間に変更
+                currentTarget = injuredTarget;
               }
             }
           }
