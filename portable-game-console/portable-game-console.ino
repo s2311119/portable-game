@@ -5567,11 +5567,23 @@ public:
   BattleState currentBattleState;
   static const int CMD_COUNT = 4;
   const char* commands[CMD_COUNT] = {"たたかう", "にげる", "せんりつ", "ぼうぎょ"};
-  int selected = 0;
+
+  // UIカーソルは用途ごとに分離
+  int commandSelected = 0;
+  int skillSelected = 0;
+
+  enum class BattleEndReason {
+    NONE,
+    VICTORY,
+    DEFEAT,
+    ESCAPE
+  };
+
+  BattleEndReason battleEndReason = BattleEndReason::NONE;
+
   bool inBattle = false;
   bool heroLeveledUp = false;
-  bool isBossBattleMode = false; // 今回の戦闘はボス戦か？
-  bool battleWon = false;        // 勝ったか？ (逃げた場合は false)
+  bool isBossBattleMode = false;
 
   int pendingAction = 0;   // 実行待機中の行動 (0=たたかう, 100+=旋律ID)
   int enemyTargetIndex = 0;   // 敵リスト(activeEnemies)のカーソル (targetIndexから変更)
@@ -5613,9 +5625,10 @@ public:
     inBattle = true;
     message = "敵が現れた！";
     isBossBattleMode = false; 
-    battleWon = false;
-    selected = 0;
-    turnCount = 1; // ターンを1にリセット
+    battleEndReason = BattleEndReason::NONE;
+    commandSelected = 0;
+    skillSelected = 0;
+    turnCount = 1;
     heroLeveledUp = false;
     // ★★★ 変数の完全リセット (重要) ★★★
     pendingAction = 0;
@@ -5839,24 +5852,25 @@ public:
       // 2. 味方のコマンド入力
       case STATE_COMMAND_SELECT: 
         message = String(currentActor->getname()) + "：コマンドを選ぼう！";
-        if (leftPressed) {selected = (selected - 1 + CMD_COUNT) % CMD_COUNT;music.playSE(2);}
-        if (upPressed)   {selected = (selected - 2 + CMD_COUNT) % CMD_COUNT;music.playSE(2);}
-        if (rightPressed){selected = (selected + 1) % CMD_COUNT;music.playSE(2);}
-        if (downPressed) {selected = (selected + 2) % CMD_COUNT;music.playSE(2);}
+        if (leftPressed) {commandSelected = (commandSelected - 1 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
+        if (upPressed)   {commandSelected = (commandSelected - 2 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
+        if (rightPressed){commandSelected = (commandSelected + 1) % CMD_COUNT; music.playSE(2);}
+        if (downPressed) {commandSelected = (commandSelected + 2) % CMD_COUNT; music.playSE(2);}
 
         if (aPressed) {
-          if (selected == 0) { // たたかう
+          if (commandSelected == 0) { // たたかう
             music.playSE(0);
             pendingAction = 0; // 0 = たたかう
             enemyTargetIndex = 0;   // ★ 敵カーソルをリセット
             currentBattleState = STATE_TARGET_SELECT_ENEMY; // ★ 敵選択へ
           } 
-          else if (selected == 1) { // にげる
+          else if (commandSelected == 1) { // にげる
             music.playSE(0);
             message = "逃げ出した！";
+            battleEndReason = BattleEndReason::ESCAPE;
             currentBattleState = STATE_BATTLE_END;
           } 
-          else if (selected == 2) { // せんりつ
+          else if (commandSelected == 2) { // せんりつ
             if (currentActor->getSilencedTurns() > 0) {
               music.playSE(1);
               message = String(currentActor->getname()) + " は沈黙している！";
@@ -5864,11 +5878,11 @@ public:
               if(ctrl.pressed(ctrl.BTN_A)) delay(200);
             } else {
               music.playSE(0);
-              selected = 0; 
+              skillSelected = 0;
               currentBattleState = STATE_SKILL_SELECT;
             }
           }
-          else if (selected == 3) {
+          else if (commandSelected == 3) {
             music.playSE(0); // 決定音
             pendingAction = 200; // ★ 防御を表す特殊コード (200とする)
             
@@ -5889,15 +5903,21 @@ public:
         }
         
         message = "どの旋律を使う？";
-        if (upPressed)   {selected = (selected - 1 + skillCount) % skillCount;music.playSE(2);}
-        if (downPressed) {selected = (selected + 1) % skillCount;music.playSE(2);}
+        if (upPressed) {
+          skillSelected = (skillSelected - 1 + skillCount) % skillCount;
+          music.playSE(2);
+        }
+        if (downPressed) {
+          skillSelected = (skillSelected + 1) % skillCount;
+          music.playSE(2);
+        }
 
         if (aPressed) {
-          Skill& skill = currentActor->getLearnedSkills()[selected];
+          Skill& skill = currentActor->getLearnedSkills()[skillSelected];
           
           if (currentActor->useTP(skill.tpCost)) {
             music.playSE(0);
-            pendingAction = 100 + selected; // 旋律行動をマーク
+            pendingAction = 100 + skillSelected;
             
             // ★★★ スキルの対象範囲(scope)によって分岐 ★★★
             switch (skill.scope) {
@@ -6504,7 +6524,7 @@ public:
           
           if (allEnemiesDefeated) {
             message = "敵を倒した！";
-            battleWon = true;
+            battleEndReason = BattleEndReason::VICTORY;
             if(aPressed) currentBattleState = STATE_SHOW_XP_GAIN; // XP獲得へ
           } else {
             currentActor->UpdateTurn();
@@ -6536,7 +6556,7 @@ public:
         if (!anyoneAlive) {
           // 全員死んだら敗北確定
           message = "全滅した…";
-          battleWon = false; // 敗北
+          battleEndReason = BattleEndReason::DEFEAT;
           if(aPressed) currentBattleState = STATE_BATTLE_END;
         } else {
           currentActor->UpdateTurn();
@@ -6597,14 +6617,12 @@ public:
       // 15. 戦闘終了 (旧 13)
       case STATE_BATTLE_END:
         if(bPressed || aPressed){
-          bool actualBossDefeated = isBossBattleMode && battleWon;
+          bool actualBossDefeated =
+            isBossBattleMode &&
+            battleEndReason == BattleEndReason::VICTORY;
           inBattle = false;
-          if (!battleWon && selected != 1) { 
-            // 敗北 かつ 逃走でない(selected!=1) 場合
-            state = STATE_GAME_OVER; // ゲームオーバー状態へ遷移
-            
-            // カーソルをリセット (Battleクラスにこの変数を持たせておく)
-            // ゲームオーバーBGMがあるならここで再生
+          if (battleEndReason == BattleEndReason::DEFEAT) {
+            state = STATE_GAME_OVER;
           }
           else{
             state = STATE_GAME;
@@ -6656,7 +6674,7 @@ public:
 
             // BGMを集落用に変更 (ID:0)
             music.switchTrack(0, sd); 
-          } else if(!battleWon && selected != 1){
+          }else if (battleEndReason == BattleEndReason::DEFEAT) {
             music.switchTrack(99, sd);
           }else {
             // 通常戦闘終了後: BGMを戻す
@@ -6919,7 +6937,7 @@ public:
           int x_offset = cmdX + 10;
           int y_offset = cmdY + 10;
           for (int i = 0; i < CMD_COUNT; i++) {
-            uint16_t color = (i == selected) ? TFT_YELLOW : TFT_WHITE;
+            uint16_t color = (i == commandSelected) ? TFT_YELLOW : TFT_WHITE;
             g->lineSprite.setTextColor(color);
             g->lineSprite.setCursor(x_offset, y_offset);
             g->lineSprite.print(commands[i]);
@@ -6934,14 +6952,14 @@ public:
             // スクロール計算
             int itemsPerPage = 3;
             int startIdx = 0;
-            if (selected >= itemsPerPage) {
-              startIdx = selected - (itemsPerPage - 1);
+            if (skillSelected >= itemsPerPage) {
+              startIdx = skillSelected - (itemsPerPage - 1);
             }
             int endIdx = startIdx + itemsPerPage;
             if (endIdx > skillCount) endIdx = skillCount;
 
             for (int i = startIdx; i < endIdx; i++) {
-              uint16_t color = (i == selected) ? TFT_YELLOW : TFT_WHITE;
+              uint16_t color = (i == skillSelected) ? TFT_YELLOW : TFT_WHITE;
               g->lineSprite.setTextColor(color);
               int relativeIndex = i - startIdx;
               g->lineSprite.setCursor(cmdX + 10, cmdY + 5 + (relativeIndex * 20)); 
