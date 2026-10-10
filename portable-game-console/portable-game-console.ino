@@ -2883,31 +2883,30 @@ public:
     // 回復・バフ・デバフ・蘇生・治療は必中とする
     // 攻撃系(DAMAGE, MULTI_HIT, SPECIAL)のみ判定を行う
     if (skill.type == Skill::EffectType::DAMAGE || 
-        skill.type == Skill::EffectType::MULTI_HIT_DAMAGE ||
-        skill.type == Skill::EffectType::SPECIAL) 
+      skill.type == Skill::EffectType::MULTI_HIT_DAMAGE ||
+      skill.type == Skill::EffectType::SPECIAL) 
     {
-        bool isSureHit = false;
+      bool isSureHit = false;
+
+      // 回避無視スキル
+      if (skill.id == 80) { // インビジブルエッジ
+        isSureHit = true;
+      }
+      // 魔法(旋律)攻撃も基本必中とするならここに追加(今回は物理と同じ扱いで計算)
+
+      if (!isSureHit) {
+        // 命中率 = 95 + (自分のSPD - 相手のSPD)
+        int hitRate = 95 + (this->getSpeed() - target->getSpeed());
         
-        // ★★★ 必中スキルIDリスト ★★★
-        // 38:ソニックブレイド, 80:インビジブルエッジ, 84:マッハブレイド, 121:ソニックダガー
-        if (skill.id == 38 || skill.id == 80 || skill.id == 84 || skill.id == 121) {
-            isSureHit = true;
-        }
-        // 魔法(旋律)攻撃も基本必中とするならここに追加(今回は物理と同じ扱いで計算)
+        // 上限・下限設定
+        if(hitRate > 100) hitRate = 100;
+        if(hitRate < 20) hitRate = 20; // 最低でも20%は当たるようにする
 
-        if (!isSureHit) {
-            // 命中率 = 95 + (自分のSPD - 相手のSPD)
-            int hitRate = 95 + (this->getSpeed() - target->getSpeed());
-            
-            // 上限・下限設定
-            if(hitRate > 100) hitRate = 100;
-            if(hitRate < 20) hitRate = 20; // 最低でも20%は当たるようにする
-
-            // 判定
-            if (random(0, 100) >= hitRate) {
-                return 0; // ★ ミス！ (ダメージ0を返す)
-            }
+        // 判定
+        if (random(0, 100) >= hitRate) {
+          return 0; // ★ ミス！ (ダメージ0を返す)
         }
+      }
     }
     if ((target->getWho() == 36 || target->getWho() == 37|| target->getWho() == 75 || target->getWho() == 76) && 
         skill.dependence == Skill::StatDependence::SEN) {
