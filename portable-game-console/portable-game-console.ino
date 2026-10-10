@@ -8609,6 +8609,63 @@ struct GameContext {
 
 GameContext* ctx = nullptr;
 
+struct FloorMapConfig {
+  int width;
+  int height;
+  Map::MapType type;
+  int bgmTrack;
+};
+
+FloorMapConfig getFloorMapConfig(
+    int floor,
+    const bool bossDefeated[5]);
+
+FloorMapConfig getFloorMapConfig(
+    int floor,
+    const bool bossDefeated[5])
+{
+  // 1Fは集落
+  if (floor == 1) {
+    return {
+      0,
+      0,
+      Map::TYPE_TOWN,
+      0
+    };
+  }
+
+  // 10F / 20F / 30F / 40F / 50F
+  if (floor % 10 == 0) {
+    int bossIndex = (floor / 10) - 1;
+
+    if (bossIndex >= 0 && bossIndex < 5) {
+      if (bossDefeated[bossIndex]) {
+        return {
+          5,
+          5,
+          Map::TYPE_TOWN,
+          0
+        };
+      }
+
+      return {
+        5,
+        5,
+        Map::TYPE_BOSS_ROOM,
+        1
+      };
+    }
+  }
+
+  // 通常階
+  return {
+    20,
+    20,
+    Map::TYPE_DUNGEON,
+    1
+  };
+}
+
 // タイマー割り込み関数
 
 bool audio_timer_callback(struct repeating_timer *t) {
@@ -9682,55 +9739,20 @@ void loop() {
 
         map.currentFloor++;
 
-        int width = 0;
-        int height = 0;
+        FloorMapConfig config =
+            getFloorMapConfig(
+                map.currentFloor,
+                ctx->bossDefeated
+            );
 
-        Map::MapType nextType =
-            Map::MapType::TYPE_DUNGEON;
-
-        // 10F / 20F / 30F / 40F / 50F
-        if (map.currentFloor % 10 == 0) {
-
-          int bossIndex =
-              (map.currentFloor / 10) - 1;
-
-          // bossDefeated[] の範囲内だけ参照する
-          if (bossIndex >= 0 &&
-              bossIndex < 5)
-          {
-            width = height = 5;
-
-            if (ctx->bossDefeated[bossIndex]) {
-              // 撃破済みなら集落
-              nextType = Map::MapType::TYPE_TOWN;
-              music.switchTrack(0, sd);
-            }
-            else {
-              // 未撃破ならボス部屋
-              nextType = Map::MapType::TYPE_BOSS_ROOM;
-              music.switchTrack(1, sd);
-            }
-          }
-          else {
-            // 想定外の10の倍数階
-            width = height = 20;
-            nextType = Map::MapType::TYPE_DUNGEON;
-            music.switchTrack(1, sd);
-          }
-        }
-        else {
-          // 通常階
-          width = height = 20;
-          nextType = Map::MapType::TYPE_DUNGEON;
-          music.switchTrack(1, sd);
-        }
+        music.switchTrack(config.bgmTrack, sd);
 
         ctx->graphic->setFloor(map.currentFloor);
 
         ctx->map->regenerate(
-            width,
-            height,
-            nextType
+            config.width,
+            config.height,
+            config.type
         );
 
         ctx->hero->reset(*ctx->map);
@@ -9742,66 +9764,22 @@ void loop() {
 
       case EVENT_STAIR_DOWN: {
         if (map.currentFloor > 1) {
-
           map.currentFloor--;
 
-          int width = 0;
-          int height = 0;
+          FloorMapConfig config =
+              getFloorMapConfig(
+                  map.currentFloor,
+                  ctx->bossDefeated
+              );
 
-          Map::MapType nextType =
-              Map::MapType::TYPE_DUNGEON;
-
-          // 1Fは集落
-          if (map.currentFloor == 1) {
-
-            nextType = Map::MapType::TYPE_TOWN;
-            music.switchTrack(0, sd);
-          }
-
-          // 10F / 20F / 30F / 40F / 50F
-          else if (map.currentFloor % 10 == 0) {
-
-            int bossIndex =
-                (map.currentFloor / 10) - 1;
-
-            // bossDefeated[] の範囲内だけ参照
-            if (bossIndex >= 0 &&
-                bossIndex < 5)
-            {
-              width = height = 5;
-
-              if (ctx->bossDefeated[bossIndex]) {
-                // 撃破済みなら集落
-                nextType = Map::MapType::TYPE_TOWN;
-                music.switchTrack(0, sd);
-              }
-              else {
-                // 未撃破ならボス部屋
-                nextType = Map::MapType::TYPE_BOSS_ROOM;
-                music.switchTrack(1, sd);
-              }
-            }
-            else {
-              // 想定外の10の倍数階
-              width = height = 20;
-              nextType = Map::MapType::TYPE_DUNGEON;
-              music.switchTrack(1, sd);
-            }
-          }
-
-          // 通常階
-          else {
-            width = height = 20;
-            nextType = Map::MapType::TYPE_DUNGEON;
-            music.switchTrack(1, sd);
-          }
+          music.switchTrack(config.bgmTrack, sd);
 
           ctx->graphic->setFloor(map.currentFloor);
 
           ctx->map->regenerate(
-              width,
-              height,
-              nextType
+              config.width,
+              config.height,
+              config.type
           );
 
           ctx->hero->reset(*ctx->map);
