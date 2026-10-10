@@ -169,6 +169,25 @@ public:
     mapData[y * MAP_WIDTH + x] = tile;
   }
 
+  MapType getType() const {
+    return currentType;
+  }
+
+  void beginRestoreFromSave(
+      MapType type,
+      int width,
+      int height)
+  {
+    currentType = type;
+    MAP_WIDTH = width;
+    MAP_HEIGHT = height;
+
+    mapData.assign(
+        MAP_WIDTH * MAP_HEIGHT,
+        TILE_WALL
+    );
+  }
+
   bool isTown() const {
     return currentType == TYPE_TOWN;
   }
@@ -4928,10 +4947,10 @@ public:
     // 1. 現在のマップ状態
     // -------------------------------------------------
     file.println(map.currentFloor);
-    file.println((int)map.currentType);
+    file.println((int)map.getType());
 
-    file.println(map.MAP_WIDTH);
-    file.println(map.MAP_HEIGHT);
+    file.println(map.getMAP_WIDTH());
+    file.println(map.getMAP_HEIGHT());
 
     // マップ上の未回収オートマタの種類
     file.println(map.automatonWhoId);
@@ -4942,10 +4961,15 @@ public:
     file.println((int)hero.direction);
 
     // マップそのもの
-    file.println((int)map.mapData.size());
+    file.println(
+        map.getMAP_WIDTH() *
+        map.getMAP_HEIGHT()
+    );
 
-    for (uint8_t tile : map.mapData) {
-      file.println((int)tile);
+    for (int y = 0; y < map.getMAP_HEIGHT(); y++) {
+      for (int x = 0; x < map.getMAP_WIDTH(); x++) {
+        file.println((int)map.getTile(x, y));
+      }
     }
 
     // -------------------------------------------------
@@ -5114,18 +5138,10 @@ public:
         return failLoad();
       }
 
-      map.currentType =
-          loadedType;
-
-      map.MAP_WIDTH =
-          savedWidth;
-
-      map.MAP_HEIGHT =
-          savedHeight;
-
-      map.mapData.assign(
-          mapDataCount,
-          Map::TILE_WALL
+      map.beginRestoreFromSave(
+          loadedType,
+          savedWidth,
+          savedHeight
       );
 
       for (int i = 0;
@@ -5139,8 +5155,14 @@ public:
           return failLoad();
         }
 
-        map.mapData[i] =
-            (uint8_t)tile;
+        int x = i % savedWidth;
+        int y = i / savedWidth;
+
+        map.setTile(
+            x,
+            y,
+            (uint8_t)tile
+        );
       }
     }
     else {
