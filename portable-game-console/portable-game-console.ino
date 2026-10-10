@@ -7680,7 +7680,6 @@ public:
         if (lastActionMessage != "") message += "\n" + lastActionMessage;
 
         // 行動後フラグ処理
-        if (currentSkill.id == 86) currentActor->limitBreak();
         if (currentSkill.id == 126) {
           currentActor->cantMoveTurns = 1;
         }
