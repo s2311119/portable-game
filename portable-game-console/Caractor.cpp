@@ -1,10 +1,10 @@
 #include "Caractor.h"
 
 #include "Map.h"
-#include "Status.h"
+#include "CharacterState.h"
 
 Caractor::Caractor(Map& map, int level, int who) {
-    status = new Status(level, who);
+    status = new CharacterState(level, who);
     bool positionFound = false;
     // 最初の草タイル(TILE_GRASS)を探す
     for (int y = 1; y < map.getMAP_HEIGHT() - 1; y++) {

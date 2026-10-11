@@ -11,7 +11,7 @@
 
 class FsFile;
 
-class Status{
+class CharacterState{
 private:
   CoreStats coreStats;
   Equipment equipment;
@@ -151,7 +151,7 @@ public:
   const SkillSet& skills() const;
 
   void forceLearnSkill(int skillId);
-  Status(int level, int w);
+  CharacterState(int level, int w);
 
   void resetBattleStats();
   // ★ MaxHP増加処理 (ID 62)
@@ -171,8 +171,8 @@ public:
   void ReceiveTP(int amount);
 
   void AddBuff(int skillId);
-  bool checkDebuffHit(int baseChance, Status* user);
-  bool AddDebuff(int skillId, Status* user = nullptr);
+  bool checkDebuffHit(int baseChance, CharacterState* user);
+  bool AddDebuff(int skillId, CharacterState* user = nullptr);
 
   int calculateNextXP(int level);
 
@@ -184,7 +184,7 @@ public:
 
   int caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int ALuck, int DLuck, bool &retIsCrit);
 
-  int caclulateSkillDamage(Status* target, Skill& skill, bool &retIsCrit);
+  int caclulateSkillDamage(CharacterState* target, Skill& skill, bool &retIsCrit);
 
   int calculateHealAmount(Skill& skill, bool &retIsCrit);
 
@@ -208,5 +208,5 @@ public:
   void addPopup(int value, bool isCrit = false);
 
   void clearPopups();
-  ~Status();
+  ~CharacterState();
 };

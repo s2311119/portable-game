@@ -1,7 +1,7 @@
 #pragma once
 
 class Map;
-class Status;
+class CharacterState;
 
 class Caractor {
 public:
@@ -10,7 +10,7 @@ public:
   int X, oldX, Y, oldY;
   bool moved = false;
   int MOVE_SPEED = 8;
-  Status* status;
+  CharacterState* status;
   // Mapオブジェクトを受け取り、安全なスタート地点を探す
   Caractor(Map& map, int level, int who);
   

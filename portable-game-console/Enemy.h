@@ -1,10 +1,10 @@
 #pragma once
 
-class Status;
+class CharacterState;
 
 class Enemy{
 public:
-  Status* status;
+  CharacterState* status;
   const char* name;
   int who;
   int dropItemId;

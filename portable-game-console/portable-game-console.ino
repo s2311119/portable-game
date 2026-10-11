@@ -6,7 +6,7 @@
 #include "bmp.h"
 #include "Item.h"
 #include "ItemCatalog.h"
-#include "Status.h"
+#include "CharacterState.h"
 #include "Automaton.h"
 #include "Party.h"
 #include "Enemy.h"
@@ -1233,7 +1233,7 @@ public:
         g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
         g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
         
-        Status* s = hero.status; // 主人公固定
+        CharacterState* s = hero.status; // 主人公固定
         
         g->lineSprite.setTextSize(2);
         g->lineSprite.setTextColor(TFT_WHITE);
@@ -1501,7 +1501,7 @@ private:
 
   // Battle クラス内 (private)
 
-  Status* resolveTarget(Status* originalTarget, Skill& skill) {
+  CharacterState* resolveTarget(CharacterState* originalTarget, Skill& skill) {
     if (originalTarget == nullptr) return nullptr; // 安全対策
     if (originalTarget->getHp() <= 0) return originalTarget;
     
@@ -1517,7 +1517,7 @@ private:
       return originalTarget;
     }
     // --- 1. 挑発 (Taunt) ---
-    Status* tauntTarget = nullptr;
+    CharacterState* tauntTarget = nullptr;
     if (originalTarget->isPlayer()) { // 敵→味方
          if (originalTarget->getTauntTurns() > 0) return originalTarget;
          if (heroRef && heroRef->status->getTauntTurns() > 0 && heroRef->status->getHp() > 0) tauntTarget = heroRef->status;
@@ -1528,7 +1528,7 @@ private:
          }
     } else { // 味方→敵
          if (originalTarget->getTauntTurns() > 0) return originalTarget;
-         std::vector<Status*> taunters;
+         std::vector<CharacterState*> taunters;
          for (auto* enemy : activeEnemies) {
              if (enemy && enemy->status && enemy->status->getTauntTurns() > 0 && enemy->status->getHp() > 0) {
                  taunters.push_back(enemy->status);
@@ -1541,7 +1541,7 @@ private:
     // --- 2. ステルス (Untargetable) ---
     // 狙われた人がステルス中なら、別の生存者に逸らす
     if (originalTarget->getUntargetableTurns() > 0) {
-         std::vector<Status*> others;
+         std::vector<CharacterState*> others;
          if (originalTarget->isPlayer()) {
              // 主人公・仲間から「自分以外」かつ「生存者」を探す
              if (heroRef->status != originalTarget && heroRef->status->getHp() > 0) others.push_back(heroRef->status);
@@ -1576,8 +1576,8 @@ private:
 
   bool executeHostileSkillOnTarget(
       Skill& skill,
-      Status* attacker,
-      Status* originalTarget,
+      CharacterState* attacker,
+      CharacterState* originalTarget,
       MUSIC& music,
       bool allowTargetRedirect)
   {
@@ -1591,7 +1591,7 @@ private:
     // 単体攻撃・ランダム攻撃では
     // 挑発・ステルス・かばうによる対象変更を行う。
     // 全体攻撃では行わない。
-    Status* defender = originalTarget;
+    CharacterState* defender = originalTarget;
 
     if (allowTargetRedirect) {
       defender = resolveTarget(originalTarget, skill);
@@ -1767,10 +1767,10 @@ public:
   };
 
   struct BattleAction {
-    Status* actor = nullptr;          // 行動するキャラ
+    CharacterState* actor = nullptr;          // 行動するキャラ
     ActionType type = ActionType::NONE;
     int skillIndex = -1;             // SKILLの場合のみ使用
-    Status* target = nullptr;         // 単体対象。全体技などではnullptr可
+    CharacterState* target = nullptr;         // 単体対象。全体技などではnullptr可
 
     ActionPriority priority = ActionPriority::NORMAL;
     int speedSnapshot = 0;           // 行動決定時点のSPD
@@ -1789,7 +1789,7 @@ public:
 
   int enemyTargetIndex = 0;   // 敵リスト(activeEnemies)のカーソル (targetIndexから変更)
   int allyTargetIndex = 0;    // 味方リストのカーソル (新規)
-  Status* currentTarget = nullptr; // ターゲットのStatus
+  CharacterState* currentTarget = nullptr; // ターゲットのStatus
 
   String message = "";
   //Enemy* currentEnemy = nullptr;
@@ -1802,9 +1802,9 @@ public:
   //int lastGainedXP = 0;
 
   // ★★★ 行動順管理リスト ★★★
-  std::vector<Status*> actorList; // 戦闘参加者 (Speed順)
+  std::vector<CharacterState*> actorList; // 戦闘参加者 (Speed順)
   int currentActorIndex = 0;        // 現在行動中のキャラのインデックス
-  Status* currentActor = nullptr; // 現在行動中のキャラのStatus
+  CharacterState* currentActor = nullptr; // 現在行動中のキャラのStatus
   // 1ターン分の行動予定
   std::vector<BattleAction> plannedActions;
   BattleAction currentBattleAction;
@@ -1822,10 +1822,10 @@ public:
   int resultMessageIndex = 0;
 
   BattleAction createBattleAction(
-      Status* actor,
+      CharacterState* actor,
       ActionType type,
       int skillIndex = -1,
-      Status* target = nullptr)
+      CharacterState* target = nullptr)
   {
     BattleAction action;
 
@@ -2332,7 +2332,7 @@ public:
           }
         }
 
-        std::vector<Status*> allies =
+        std::vector<CharacterState*> allies =
             isReviveSkill ? getDeadAllies()
                           : getAliveAllies();
 
@@ -2433,7 +2433,7 @@ public:
               pendingSkillIndex = -1;
               
               // ターゲットを敵味方全員からランダムで選択
-              std::vector<Status*> allTargets = getAliveAllies(); // 味方リスト
+              std::vector<CharacterState*> allTargets = getAliveAllies(); // 味方リスト
               for (auto enemy : activeEnemies) { // 敵リスト
                   if(enemy->status->getHp() > 0) allTargets.push_back(enemy->status);
               }
@@ -2495,7 +2495,7 @@ public:
           break;
         }
         // 1. デフォルトターゲット (プレイヤー側からランダム)
-        std::vector<Status*> playerSide = getAliveAllies();
+        std::vector<CharacterState*> playerSide = getAliveAllies();
         if (playerSide.empty()) currentTarget = nullptr; 
         else currentTarget = playerSide[random(0, playerSide.size())];
 
@@ -2556,7 +2556,7 @@ public:
                   who == 32)
           {
             // HPが半分未満の生存中の味方を探す
-            Status* injuredTarget = nullptr;
+            CharacterState* injuredTarget = nullptr;
 
             for (auto e : activeEnemies) {
               if (e != nullptr &&
@@ -2629,7 +2629,7 @@ public:
               // もしターゲットが「プレイヤー側」になっていたら、「敵側」に切り替える
               if (currentTarget == nullptr || currentTarget->isPlayer()) {
                 // 生きている敵リストを作成
-                std::vector<Status*> livingEnemies;
+                std::vector<CharacterState*> livingEnemies;
                 for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
                 
                 if (!livingEnemies.empty()) {
@@ -2824,7 +2824,7 @@ public:
           if (currentTarget == nullptr ||
               currentTarget->getHp() <= 0)
           {
-            std::vector<Status*> candidates =
+            std::vector<CharacterState*> candidates =
                 currentActor->isPlayer()
                     ? getAliveEnemies()
                     : getAliveAllies();
@@ -2872,7 +2872,7 @@ public:
               (currentTarget == nullptr || currentTarget->getHp() <= 0))
           {
             // 使用者から見た「敵」の生存者を取得
-            std::vector<Status*> candidates =
+            std::vector<CharacterState*> candidates =
                 currentActor->isPlayer()
                     ? getAliveEnemies()
                     : getAliveAllies();
@@ -2909,7 +2909,7 @@ public:
               (currentTarget == nullptr || currentTarget->getHp() <= 0))
           {
             // 使用者から見た生存中の味方
-            std::vector<Status*> candidates =
+            std::vector<CharacterState*> candidates =
                 currentActor->isPlayer()
                     ? getAliveAllies()
                     : getAliveEnemies();
@@ -3007,7 +3007,7 @@ public:
         {
           bool anyDefeated = false;
 
-          std::vector<Status*> targets =
+          std::vector<CharacterState*> targets =
               currentActor->isPlayer()
                   ? getAliveEnemies()
                   : getAliveAllies();
@@ -3043,7 +3043,7 @@ public:
             currentSkill.scope ==
                 Skill::TargetScope::ALL_ALLIES)
         {
-          std::vector<Status*> targets;
+          std::vector<CharacterState*> targets;
 
           if (currentActor->isPlayer()) {
 
@@ -3087,7 +3087,7 @@ public:
             hits = random(1, 8);
           }
 
-          std::vector<Status*> targets =
+          std::vector<CharacterState*> targets =
               currentActor->isPlayer()
                   ? getAliveEnemies()
                   : getAliveAllies();
@@ -3100,7 +3100,7 @@ public:
 
               // 前のヒットで倒れている可能性があるので
               // 毎回生存者だけを作り直す
-              std::vector<Status*> live;
+              std::vector<CharacterState*> live;
 
               for (auto target : targets) {
                 if (target != nullptr &&
@@ -3114,7 +3114,7 @@ public:
                 break;
               }
 
-              Status* target =
+              CharacterState* target =
                   live[random(0, live.size())];
 
               bool defeated =
@@ -3444,10 +3444,10 @@ public:
           
           // 戦闘終了時にステータスをリセット
           hero.status->resetBattleStats();
-          std::vector<Status::PopupData>().swap(hero.status->popupValues);
+          std::vector<CharacterState::PopupData>().swap(hero.status->popupValues);
           for(auto m : party.members) {
             m->status->resetBattleStats();
-            std::vector<Status::PopupData>().swap(m->status->popupValues);
+            std::vector<CharacterState::PopupData>().swap(m->status->popupValues);
           }
           for (auto enemy : activeEnemies) {
               delete enemy; // Enemyとその中のStatusを削除
@@ -3462,7 +3462,7 @@ public:
 
           // 4. 行動順リストの解放
           actorList.clear();
-          std::vector<Status*>().swap(actorList);
+          std::vector<CharacterState*>().swap(actorList);
           if (actualBossDefeated) {
             // 撃破フラグを立てる
             int bossIndex = (map.getFloor() / 10) - 1;
@@ -3517,7 +3517,7 @@ public:
         g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setTextSize(2);
 
-        Status* s = nullptr;
+        CharacterState* s = nullptr;
         if (statusPage == 0) s = hero.status;
         else if (statusPage - 1 < party.members.size()) s = party.members[statusPage - 1]->status;
         
@@ -3724,12 +3724,12 @@ public:
             }
           }
 
-          std::vector<Status*> allies =
+          std::vector<CharacterState*> allies =
               isReviveSkill ? getDeadAllies()
                             : getAliveAllies();
 
           if (allyTargetIndex < allies.size()) {
-            Status* targetedAlly = allies[allyTargetIndex];
+            CharacterState* targetedAlly = allies[allyTargetIndex];
             int tx = 0, ty = 0;
             if (targetedAlly == hero.status) { tx = 220; ty = 20; } 
             else {
@@ -3816,7 +3816,7 @@ public:
   }
 private:
   
-  void ExecuteSkill(Skill& skill, Status* user, Status* target, MUSIC& music) {
+  void ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, MUSIC& music) {
     if (target == nullptr) return;
 
     int value = 0;
@@ -4130,8 +4130,8 @@ private:
   }
 
   // 生きている味方のリストを取得する
-  std::vector<Status*> getAliveAllies() {
-    std::vector<Status*> allies;
+  std::vector<CharacterState*> getAliveAllies() {
+    std::vector<CharacterState*> allies;
     // 主人公
     if (heroRef->status->getHp() > 0) {
       allies.push_back(heroRef->status);
@@ -4145,8 +4145,8 @@ private:
     return allies;
   }
 
-  std::vector<Status*> getDeadAllies() {
-    std::vector<Status*> allies;
+  std::vector<CharacterState*> getDeadAllies() {
+    std::vector<CharacterState*> allies;
 
     // 主人公
     if (heroRef && heroRef->status &&
@@ -4167,8 +4167,8 @@ private:
     return allies;
   }
 
-  std::vector<Status*> getAllAllies() {
-    std::vector<Status*> allies;
+  std::vector<CharacterState*> getAllAllies() {
+    std::vector<CharacterState*> allies;
 
     if (heroRef && heroRef->status) {
       allies.push_back(heroRef->status);
@@ -4185,8 +4185,8 @@ private:
     return allies;
   }
 
-  std::vector<Status*> getAliveEnemies() {
-    std::vector<Status*> enemies;
+  std::vector<CharacterState*> getAliveEnemies() {
+    std::vector<CharacterState*> enemies;
 
     for (auto enemy : activeEnemies) {
       if (enemy && enemy->status && enemy->status->getHp() > 0) {
@@ -4587,7 +4587,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
       if (aPressed) {
         music.playSE(0);
         // 対象のStatus特定
-        Status* targetStatus = nullptr;
+        CharacterState* targetStatus = nullptr;
         if (listCursor == 0) targetStatus = hero.status;
         else targetStatus = party.members[listCursor - 1]->status;
 
@@ -4683,13 +4683,13 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           bool itemUsed = false; 
           
           // 進化テーブルを検索
-          for (int i = 0; i < Status::evolutionRuleCount; i++) {
-            const Status::EvolutionRule& rule = Status::evolutionTable[i];
+          for (int i = 0; i < CharacterState::evolutionRuleCount; i++) {
+            const CharacterState::EvolutionRule& rule = CharacterState::evolutionTable[i];
             
             // 1. この仲間の進化ルールか？
             // 2. トリガーはアイテムか？
             if (rule.before_who_id == selectedAlly->status->getWho() && 
-                rule.trigger_type == Status::EvolutionTriggerType::TRIGGER_ITEM) 
+                rule.trigger_type == CharacterState::EvolutionTriggerType::TRIGGER_ITEM) 
             {
               int requiredItemId = rule.trigger_value; // 必要なアイテムID
               
@@ -4813,7 +4813,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           Item newItem = inventory.items[invIndex].item; 
 
           // ★ 主人公固定
-          Status* s = hero.status;
+          CharacterState* s = hero.status;
           
           // 1. 外す (インベントリに戻す)
           int oldId = -1;

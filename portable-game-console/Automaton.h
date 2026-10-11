@@ -1,10 +1,10 @@
 #pragma once
 
-class Status;
+class CharacterState;
 
 class Automaton {
 public:
-  Status* status;
+  CharacterState* status;
 
   /**
    * @brief 仲間（オートマタ）を生成

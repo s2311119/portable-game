@@ -1,8 +1,8 @@
 #include "Automaton.h"
-#include "Status.h"
+#include "CharacterState.h"
 
 Automaton::Automaton(int level, int w) {
-    status = new Status(level, w);
+    status = new CharacterState(level, w);
   }
 
 const char* Automaton::getname() {

@@ -1,4 +1,4 @@
-#include "Status.h"
+#include "CharacterState.h"
 #include "SkillLearnsetCatalog.h"
 #include "EvolutionCatalog.h"
 #include "CharacterCatalog.h"
@@ -8,32 +8,32 @@
 #include <SdFat.h>
 
 
-void Status::equip(EquipmentSlot slot, int itemId) { equipment.equip(slot, itemId); }
+void CharacterState::equip(EquipmentSlot slot, int itemId) { equipment.equip(slot, itemId); }
 
-void Status::unequip(EquipmentSlot slot) { equipment.unequip(slot); }
+void CharacterState::unequip(EquipmentSlot slot) { equipment.unequip(slot); }
 
-int Status::weaponId() const { return equipment.weaponId(); }
+int CharacterState::weaponId() const { return equipment.weaponId(); }
 
-int Status::armorId() const { return equipment.armorId(); }
+int CharacterState::armorId() const { return equipment.armorId(); }
 
-int Status::accessoryId() const { return equipment.accessoryId(); }
+int CharacterState::accessoryId() const { return equipment.accessoryId(); }
 
-int Status::getPreEvolution(int currentId) {
+int CharacterState::getPreEvolution(int currentId) {
     const EvolutionCatalog::Lineage lineage = EvolutionCatalog::getLineage(currentId);
     return lineage.count > 1 ? lineage.ids[1] : -1;
   }
 
-int Status::getHp(){return coreStats.getHp();}
+int CharacterState::getHp(){return coreStats.getHp();}
 
-void Status::setHp(int val){ coreStats.setHp(val);}
+void CharacterState::setHp(int val){ coreStats.setHp(val);}
 
-int Status::getMaxHp(){return coreStats.getMaxHp();}
+int CharacterState::getMaxHp(){return coreStats.getMaxHp();}
 
-int Status::getTp(){return coreStats.getTp();}
+int CharacterState::getTp(){return coreStats.getTp();}
 
-int Status::getMaxTp(){return coreStats.getMaxTp();}
+int CharacterState::getMaxTp(){return coreStats.getMaxTp();}
 
-int Status::getAttack() {
+int CharacterState::getAttack() {
     float finalValue = (float)coreStats.getAttack(); // 基礎ATK
     finalValue = equipment.applyAttackBonus(finalValue);
     // バフを適用 (例: 1.5倍 or 2.0倍)
@@ -43,7 +43,7 @@ int Status::getAttack() {
     return (int)finalValue;
   }
 
-int Status::getDefense() {
+int CharacterState::getDefense() {
     float finalValue = (float)coreStats.getDefense(); // 基礎DEF
     finalValue = equipment.applyDefenseBonus(finalValue);
     finalValue = statusEffects.applyDefenseModifiers(finalValue);
@@ -52,7 +52,7 @@ int Status::getDefense() {
     return (int)finalValue;
   }
 
-int Status::getSpeed() {
+int CharacterState::getSpeed() {
     float finalValue = (float)coreStats.getSpeed(); // 基礎SPD
     finalValue = equipment.applySpeedBonus(finalValue);
     finalValue = statusEffects.applySpeedModifiers(finalValue);
@@ -61,7 +61,7 @@ int Status::getSpeed() {
     return (int)finalValue;
   }
 
-int Status::getSense() {
+int CharacterState::getSense() {
     float finalValue = (float)coreStats.getSense(); // 基礎SEN
     finalValue = equipment.applySenseBonus(finalValue);
     finalValue = statusEffects.applySenseModifiers(finalValue);
@@ -70,7 +70,7 @@ int Status::getSense() {
     return (int)finalValue;
   }
 
-int Status::getLuck() {
+int CharacterState::getLuck() {
     float finalValue = (float)coreStats.getLuck(); // 基礎LCK
     finalValue = equipment.applyLuckBonus(finalValue);
     finalValue = statusEffects.applyLuckModifiers(finalValue);
@@ -79,46 +79,46 @@ int Status::getLuck() {
     return (int)finalValue;
   }
 
-int Status::getLevel(){return progression.level();}
+int CharacterState::getLevel(){return progression.level();}
 
-int Status::getXP(){ return progression.xp(); }
+int CharacterState::getXP(){ return progression.xp(); }
 
-int Status::getNextXP(){ return progression.nextLevelXp(); }
+int CharacterState::getNextXP(){ return progression.nextLevelXp(); }
 
-int Status::getWho(){ return who; }
+int CharacterState::getWho(){ return who; }
 
-const char* Status::getname(){return name;}
+const char* CharacterState::getname(){return name;}
 
-int Status::getPoisonTurns() const { return statusEffects.getPoisonTurns(); }
+int CharacterState::getPoisonTurns() const { return statusEffects.getPoisonTurns(); }
 
-int Status::getParalyzedTurns() const { return statusEffects.getParalyzedTurns(); }
+int CharacterState::getParalyzedTurns() const { return statusEffects.getParalyzedTurns(); }
 
-int Status::getSilencedTurns() const { return statusEffects.getSilencedTurns(); }
+int CharacterState::getSilencedTurns() const { return statusEffects.getSilencedTurns(); }
 
-int Status::getConfusedTurns() const { return statusEffects.getConfusedTurns(); }
+int CharacterState::getConfusedTurns() const { return statusEffects.getConfusedTurns(); }
 
-int Status::normalizeWho(int w) {
+int CharacterState::normalizeWho(int w) {
     if (w >= 0 && w <= 37) return w + 39;
     return w; 
   }
 
-void Status::updateName() {
+void CharacterState::updateName() {
     name = CharacterCatalog::nameFor(who);
   }
 
-float Status::getEvasionBonus() {
+float CharacterState::getEvasionBonus() {
     return statusEffects.evasionBonus();
   }
 
-const SkillSet& Status::skills() const {
+const SkillSet& CharacterState::skills() const {
     return skillSet;
   }
 
-void Status::forceLearnSkill(int skillId) {
+void CharacterState::forceLearnSkill(int skillId) {
     learnSkill(SkillCatalog::get(skillId));
   }
 
-Status::Status(int level, int w){
+CharacterState::CharacterState(int level, int w){
     progression.initialize(level);
     who = w;
     const CoreStatsData initialStats =
@@ -134,7 +134,7 @@ Status::Status(int level, int w){
     checkLevelUpSkills(0, progression.level()); // 0レベルから現在のレベルまで
   }
 
-void Status::resetBattleStats() {
+void CharacterState::resetBattleStats() {
     coreStats.restoreBaseMaxHp();
     
     // バフ・デバフ・状態異常の全解除
@@ -142,14 +142,14 @@ void Status::resetBattleStats() {
     clearPopups();
   }
 
-void Status::boostMaxHP() {
+void CharacterState::boostMaxHP() {
     if (coreStats.getMaxHp() == coreStats.getBaseMaxHp()) { // 重ね掛け防止
       coreStats.applyMaxHpIncrease((int)(coreStats.getMaxHp() * 1.5));
       coreStats.setHp((int)(coreStats.getHp() * 1.5)); // 現在HPも割合で増やす
     }
   }
 
-int Status::takedamage(
+int CharacterState::takedamage(
       int damage,
       Skill::Category damageCategory
   ){
@@ -183,23 +183,23 @@ int Status::takedamage(
     return damage;
   }
 
-void Status::ReceiveHeal(int amount) {
+void CharacterState::ReceiveHeal(int amount) {
     coreStats.heal(amount);
 }
 
-void Status::Revive(int hpPercent) {
+void CharacterState::Revive(int hpPercent) {
     coreStats.revive(hpPercent);
 }
 
-void Status::CureStatus(bool cureDebuffs) {
+void CharacterState::CureStatus(bool cureDebuffs) {
     statusEffects.cureStatus(cureDebuffs);
   }
 
-void Status::ReceiveTP(int amount) {
+void CharacterState::ReceiveTP(int amount) {
     coreStats.restoreTP(amount);
 }
 
-void Status::AddBuff(int skillId) {
+void CharacterState::AddBuff(int skillId) {
     const int DEFAULT_BUFF_TURNS = 3;
     const int LONG_BUFF_TURNS = 5;
 
@@ -364,7 +364,7 @@ void Status::AddBuff(int skillId) {
     }
   }
 
-bool Status::checkDebuffHit(int baseChance, Status* user) {
+bool CharacterState::checkDebuffHit(int baseChance, CharacterState* user) {
     if (user == nullptr) return true; // ユーザー指定なしなら必中（自分への副作用など）
     
     // 基本確率 + (かけた人の運 - かけられた人の運)
@@ -377,7 +377,7 @@ bool Status::checkDebuffHit(int baseChance, Status* user) {
     return (random(0, 100) < chance);
   }
 
-bool Status::AddDebuff(int skillId, Status* user) {
+bool CharacterState::AddDebuff(int skillId, CharacterState* user) {
     if (statusEffects.getStatusImmuneTurns() > 0) {
       consumeStatusImmunity(); // 1回消費して防ぐ
       return false; // デバフを適用せずに終了
@@ -524,21 +524,21 @@ bool Status::AddDebuff(int skillId, Status* user) {
     return true;
   }
 
-int Status::calculateNextXP(int level) {
+int CharacterState::calculateNextXP(int level) {
     return Progression::nextLevelXpFor(level);
   }
 
-void Status::recalculateStats() {
+void CharacterState::recalculateStats() {
     const CoreStatsData stats =
         CharacterCatalog::statsFor(who, progression.level());
     coreStats.applyRecalculatedStats(stats);
 }
 
-bool Status::useTP(int cost) {
+bool CharacterState::useTP(int cost) {
     return coreStats.spendTP(cost);
 }
 
-int Status::gainXP(int amount) {
+int CharacterState::gainXP(int amount) {
     if (progression.level() >= 99) {
       return 0;
     }
@@ -618,7 +618,7 @@ int Status::gainXP(int amount) {
     return 0; // 変化なし
   }
 
-int Status::caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int ALuck, int DLuck, bool &retIsCrit){
+int CharacterState::caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int ALuck, int DLuck, bool &retIsCrit){
     // 回避計算
     int baseHitRate = 95;
     int hitRate = baseHitRate + (ASpeed - DSpeed);
@@ -658,7 +658,7 @@ int Status::caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int A
     return damage;
   }
 
-int Status::caclulateSkillDamage(Status* target, Skill& skill, bool &retIsCrit) {
+int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, bool &retIsCrit) {
     // --- 0. 命中判定 (ここが抜けていました) ---
     // 回復・バフ・デバフ・蘇生・治療は必中とする
     // 攻撃系(DAMAGE, MULTI_HIT, SPECIAL)のみ判定を行う
@@ -787,7 +787,7 @@ int Status::caclulateSkillDamage(Status* target, Skill& skill, bool &retIsCrit) 
     return damage;
   }
 
-int Status::calculateHealAmount(Skill& skill, bool &retIsCrit) {
+int CharacterState::calculateHealAmount(Skill& skill, bool &retIsCrit) {
     int base = this->getSense();
     float multiplier = (float)skill.power / 50.0;
     int heal = (int)((float)base * multiplier);
@@ -819,19 +819,19 @@ int Status::calculateHealAmount(Skill& skill, bool &retIsCrit) {
     return heal;
   }
 
-bool Status::isPlayer() {
+bool CharacterState::isPlayer() {
     return (who >= 38 && who <= 79); // GDDのID定義 (38以上は味方)
   }
 
-void Status::addAttack(int amount) {
+void CharacterState::addAttack(int amount) {
     coreStats.addAttack(amount);
 }
 
-void Status::learnSkill(const Skill& newSkill) {
+void CharacterState::learnSkill(const Skill& newSkill) {
     skillSet.learn(newSkill.id);
   }
 
-void Status::evolve(int newWhoId) {
+void CharacterState::evolve(int newWhoId) {
     // 1. 自分のIDを進化先のものに変更
     int oldLevel = progression.level();
     this->who = newWhoId;
@@ -846,7 +846,7 @@ void Status::evolve(int newWhoId) {
     checkLevelUpSkills(0, oldLevel);
   }
 
-void Status::checkLevelUpSkills(int oldLevel, int newLevel) {
+void CharacterState::checkLevelUpSkills(int oldLevel, int newLevel) {
     
     // チェック対象のID (最初は今の自分)
     int checkID = this->who;
@@ -867,11 +867,11 @@ void Status::checkLevelUpSkills(int oldLevel, int newLevel) {
     }
   }
 
-void Status::UpdateTurn() {
+void CharacterState::UpdateTurn() {
     statusEffects.updateTurn();
   }
 
-int Status::ApplyTurnEffects() {
+int CharacterState::ApplyTurnEffects() {
     int value = 0;
 
     if (statusEffects.getHpRegenTurns() > 0) {
@@ -902,7 +902,7 @@ int Status::ApplyTurnEffects() {
     return value;
   }
 
-void Status::saveTo(FsFile& file) {
+void CharacterState::saveTo(FsFile& file) {
     file.println(who);
     file.println(progression.level());
     file.println(progression.xp());
@@ -918,7 +918,7 @@ void Status::saveTo(FsFile& file) {
     }
   }
 
-void Status::loadFrom(FsFile& file) {
+void CharacterState::loadFrom(FsFile& file) {
     // -------------------------
     // 保存値を読み込む
     // -------------------------
@@ -966,193 +966,193 @@ void Status::loadFrom(FsFile& file) {
     checkLevelUpSkills(0, progression.level());
   }
 
-void Status::addPopup(int value, bool isCrit) {
+void CharacterState::addPopup(int value, bool isCrit) {
     popupValues.push_back({value, isCrit});
   }
 
-void Status::clearPopups() {
+void CharacterState::clearPopups() {
     popupValues.clear();
   }
 
-Status::~Status() {
+CharacterState::~CharacterState() {
     skillSet.releaseStorage();
     
     popupValues.clear();
     std::vector<PopupData>().swap(popupValues);
   }
 
-const Status::EvolutionRule* const Status::evolutionTable = EvolutionCatalog::getRules().rules;
+const CharacterState::EvolutionRule* const CharacterState::evolutionTable = EvolutionCatalog::getRules().rules;
 // サイズも同様に定義
-const int Status::evolutionRuleCount = EvolutionCatalog::RULE_COUNT;
+const int CharacterState::evolutionRuleCount = EvolutionCatalog::RULE_COUNT;
 
-int Status::getPoisonLevel() const { return statusEffects.getPoisonLevel(); }
+int CharacterState::getPoisonLevel() const { return statusEffects.getPoisonLevel(); }
 
-int Status::getCoverTurns() const { return statusEffects.getCoverTurns(); }
+int CharacterState::getCoverTurns() const { return statusEffects.getCoverTurns(); }
 
-float Status::getAtkBuffRate() const { return statusEffects.getAtkBuffRate(); }
+float CharacterState::getAtkBuffRate() const { return statusEffects.getAtkBuffRate(); }
 
-int Status::getAtkBuffTurns() const { return statusEffects.getAtkBuffTurns(); }
+int CharacterState::getAtkBuffTurns() const { return statusEffects.getAtkBuffTurns(); }
 
-float Status::getDefBuffRate() const { return statusEffects.getDefBuffRate(); }
+float CharacterState::getDefBuffRate() const { return statusEffects.getDefBuffRate(); }
 
-int Status::getDefBuffTurns() const { return statusEffects.getDefBuffTurns(); }
+int CharacterState::getDefBuffTurns() const { return statusEffects.getDefBuffTurns(); }
 
-float Status::getSpdBuffRate() const { return statusEffects.getSpdBuffRate(); }
+float CharacterState::getSpdBuffRate() const { return statusEffects.getSpdBuffRate(); }
 
-int Status::getSpdBuffTurns() const { return statusEffects.getSpdBuffTurns(); }
+int CharacterState::getSpdBuffTurns() const { return statusEffects.getSpdBuffTurns(); }
 
-float Status::getSenBuffRate() const { return statusEffects.getSenBuffRate(); }
+float CharacterState::getSenBuffRate() const { return statusEffects.getSenBuffRate(); }
 
-int Status::getSenBuffTurns() const { return statusEffects.getSenBuffTurns(); }
+int CharacterState::getSenBuffTurns() const { return statusEffects.getSenBuffTurns(); }
 
-float Status::getLckBuffRate() const { return statusEffects.getLckBuffRate(); }
+float CharacterState::getLckBuffRate() const { return statusEffects.getLckBuffRate(); }
 
-int Status::getLckBuffTurns() const { return statusEffects.getLckBuffTurns(); }
+int CharacterState::getLckBuffTurns() const { return statusEffects.getLckBuffTurns(); }
 
-float Status::getEvaBuffRate() const { return statusEffects.getEvaBuffRate(); }
+float CharacterState::getEvaBuffRate() const { return statusEffects.getEvaBuffRate(); }
 
-int Status::getEvaBuffTurns() const { return statusEffects.getEvaBuffTurns(); }
+int CharacterState::getEvaBuffTurns() const { return statusEffects.getEvaBuffTurns(); }
 
-float Status::getAtkDebuffRate() const { return statusEffects.getAtkDebuffRate(); }
+float CharacterState::getAtkDebuffRate() const { return statusEffects.getAtkDebuffRate(); }
 
-int Status::getAtkDebuffTurns() const { return statusEffects.getAtkDebuffTurns(); }
+int CharacterState::getAtkDebuffTurns() const { return statusEffects.getAtkDebuffTurns(); }
 
-float Status::getDefDebuffRate() const { return statusEffects.getDefDebuffRate(); }
+float CharacterState::getDefDebuffRate() const { return statusEffects.getDefDebuffRate(); }
 
-int Status::getDefDebuffTurns() const { return statusEffects.getDefDebuffTurns(); }
+int CharacterState::getDefDebuffTurns() const { return statusEffects.getDefDebuffTurns(); }
 
-float Status::getSpdDebuffRate() const { return statusEffects.getSpdDebuffRate(); }
+float CharacterState::getSpdDebuffRate() const { return statusEffects.getSpdDebuffRate(); }
 
-int Status::getSpdDebuffTurns() const { return statusEffects.getSpdDebuffTurns(); }
+int CharacterState::getSpdDebuffTurns() const { return statusEffects.getSpdDebuffTurns(); }
 
-float Status::getSenDebuffRate() const { return statusEffects.getSenDebuffRate(); }
+float CharacterState::getSenDebuffRate() const { return statusEffects.getSenDebuffRate(); }
 
-int Status::getSenDebuffTurns() const { return statusEffects.getSenDebuffTurns(); }
+int CharacterState::getSenDebuffTurns() const { return statusEffects.getSenDebuffTurns(); }
 
-float Status::getLckDebuffRate() const { return statusEffects.getLckDebuffRate(); }
+float CharacterState::getLckDebuffRate() const { return statusEffects.getLckDebuffRate(); }
 
-int Status::getLckDebuffTurns() const { return statusEffects.getLckDebuffTurns(); }
+int CharacterState::getLckDebuffTurns() const { return statusEffects.getLckDebuffTurns(); }
 
-int Status::getHpRegenTurns() const { return statusEffects.getHpRegenTurns(); }
+int CharacterState::getHpRegenTurns() const { return statusEffects.getHpRegenTurns(); }
 
-int Status::getTpRegenTurns() const { return statusEffects.getTpRegenTurns(); }
+int CharacterState::getTpRegenTurns() const { return statusEffects.getTpRegenTurns(); }
 
-int Status::getInvalidDamageTurns() const { return statusEffects.getInvalidDamageTurns(); }
+int CharacterState::getInvalidDamageTurns() const { return statusEffects.getInvalidDamageTurns(); }
 
-int Status::getReflectPhysicalTurns() const { return statusEffects.getReflectPhysicalTurns(); }
+int CharacterState::getReflectPhysicalTurns() const { return statusEffects.getReflectPhysicalTurns(); }
 
-int Status::getReflectMagicTurns() const { return statusEffects.getReflectMagicTurns(); }
+int CharacterState::getReflectMagicTurns() const { return statusEffects.getReflectMagicTurns(); }
 
-int Status::getTauntTurns() const { return statusEffects.getTauntTurns(); }
+int CharacterState::getTauntTurns() const { return statusEffects.getTauntTurns(); }
 
-int Status::getTwoActionsTurns() const { return statusEffects.getTwoActionsTurns(); }
+int CharacterState::getTwoActionsTurns() const { return statusEffects.getTwoActionsTurns(); }
 
-int Status::getUntargetableTurns() const { return statusEffects.getUntargetableTurns(); }
+int CharacterState::getUntargetableTurns() const { return statusEffects.getUntargetableTurns(); }
 
-int Status::getPhysDamageOneTurns() const { return statusEffects.getPhysDamageOneTurns(); }
+int CharacterState::getPhysDamageOneTurns() const { return statusEffects.getPhysDamageOneTurns(); }
 
-int Status::getEndureTurns() const { return statusEffects.getEndureTurns(); }
+int CharacterState::getEndureTurns() const { return statusEffects.getEndureTurns(); }
 
-int Status::getCounterTurns() const { return statusEffects.getCounterTurns(); }
+int CharacterState::getCounterTurns() const { return statusEffects.getCounterTurns(); }
 
-int Status::getAutoReviveTurns() const { return statusEffects.getAutoReviveTurns(); }
+int CharacterState::getAutoReviveTurns() const { return statusEffects.getAutoReviveTurns(); }
 
-int Status::getStatusImmuneTurns() const { return statusEffects.getStatusImmuneTurns(); }
+int CharacterState::getStatusImmuneTurns() const { return statusEffects.getStatusImmuneTurns(); }
 
-int Status::getAttributeResistTurns() const { return statusEffects.getAttributeResistTurns(); }
+int CharacterState::getAttributeResistTurns() const { return statusEffects.getAttributeResistTurns(); }
 
-int Status::getCantMoveTurns() const { return statusEffects.getCantMoveTurns(); }
+int CharacterState::getCantMoveTurns() const { return statusEffects.getCantMoveTurns(); }
 
-int Status::getReflectAllTurns() const { return statusEffects.getReflectAllTurns(); }
+int CharacterState::getReflectAllTurns() const { return statusEffects.getReflectAllTurns(); }
 
-int Status::getDamageGuardCount() const { return statusEffects.getDamageGuardCount(); }
+int CharacterState::getDamageGuardCount() const { return statusEffects.getDamageGuardCount(); }
 
-bool Status::hasDoubleAction() const { return statusEffects.getIsDoubleAction(); }
+bool CharacterState::hasDoubleAction() const { return statusEffects.getIsDoubleAction(); }
 
-bool Status::isDefending() const { return statusEffects.getIsDefending(); }
+bool CharacterState::isDefending() const { return statusEffects.getIsDefending(); }
 
-void Status::applyAttackBuff(float rate, int turns) { statusEffects.applyAttackBuff(rate, turns); }
+void CharacterState::applyAttackBuff(float rate, int turns) { statusEffects.applyAttackBuff(rate, turns); }
 
-void Status::applyDefenseBuff(float rate, int turns) { statusEffects.applyDefenseBuff(rate, turns); }
+void CharacterState::applyDefenseBuff(float rate, int turns) { statusEffects.applyDefenseBuff(rate, turns); }
 
-void Status::applySpeedBuff(float rate, int turns) { statusEffects.applySpeedBuff(rate, turns); }
+void CharacterState::applySpeedBuff(float rate, int turns) { statusEffects.applySpeedBuff(rate, turns); }
 
-void Status::applyLuckBuff(float rate, int turns) { statusEffects.applyLuckBuff(rate, turns); }
+void CharacterState::applyLuckBuff(float rate, int turns) { statusEffects.applyLuckBuff(rate, turns); }
 
-void Status::applyEvasionBuff(float rate, int turns) { statusEffects.applyEvasionBuff(rate, turns); }
+void CharacterState::applyEvasionBuff(float rate, int turns) { statusEffects.applyEvasionBuff(rate, turns); }
 
-void Status::applyAttackDebuff(float rate, int turns) { statusEffects.applyAttackDebuff(rate, turns); }
+void CharacterState::applyAttackDebuff(float rate, int turns) { statusEffects.applyAttackDebuff(rate, turns); }
 
-void Status::applyDefenseDebuff(float rate, int turns) { statusEffects.applyDefenseDebuff(rate, turns); }
+void CharacterState::applyDefenseDebuff(float rate, int turns) { statusEffects.applyDefenseDebuff(rate, turns); }
 
-void Status::applySpeedDebuff(float rate, int turns) { statusEffects.applySpeedDebuff(rate, turns); }
+void CharacterState::applySpeedDebuff(float rate, int turns) { statusEffects.applySpeedDebuff(rate, turns); }
 
-void Status::applySenseDebuff(float rate, int turns) { statusEffects.applySenseDebuff(rate, turns); }
+void CharacterState::applySenseDebuff(float rate, int turns) { statusEffects.applySenseDebuff(rate, turns); }
 
-void Status::applyLuckDebuff(float rate, int turns) { statusEffects.applyLuckDebuff(rate, turns); }
+void CharacterState::applyLuckDebuff(float rate, int turns) { statusEffects.applyLuckDebuff(rate, turns); }
 
-void Status::applyCover(int turns) { statusEffects.applyCover(turns); }
+void CharacterState::applyCover(int turns) { statusEffects.applyCover(turns); }
 
-void Status::applyAllReflection(int turns) { statusEffects.applyAllReflection(turns); }
+void CharacterState::applyAllReflection(int turns) { statusEffects.applyAllReflection(turns); }
 
-void Status::applyUntargetable(int turns) { statusEffects.applyUntargetable(turns); }
+void CharacterState::applyUntargetable(int turns) { statusEffects.applyUntargetable(turns); }
 
-void Status::applyTaunt(int turns) { statusEffects.applyTaunt(turns); }
+void CharacterState::applyTaunt(int turns) { statusEffects.applyTaunt(turns); }
 
-void Status::applyPhysicalReflection(int turns) { statusEffects.applyPhysicalReflection(turns); }
+void CharacterState::applyPhysicalReflection(int turns) { statusEffects.applyPhysicalReflection(turns); }
 
-void Status::applyCounter(int turns) { statusEffects.applyCounter(turns); }
+void CharacterState::applyCounter(int turns) { statusEffects.applyCounter(turns); }
 
-void Status::applyDamageGuard(int turns) { statusEffects.applyDamageGuard(turns); }
+void CharacterState::applyDamageGuard(int turns) { statusEffects.applyDamageGuard(turns); }
 
-void Status::applyPhysicalDamageOne(int turns) { statusEffects.applyPhysicalDamageOne(turns); }
+void CharacterState::applyPhysicalDamageOne(int turns) { statusEffects.applyPhysicalDamageOne(turns); }
 
-void Status::applyHpRegeneration(int turns) { statusEffects.applyHpRegeneration(turns); }
+void CharacterState::applyHpRegeneration(int turns) { statusEffects.applyHpRegeneration(turns); }
 
-void Status::applyLastStand(int turns) { statusEffects.applyLastStand(turns); }
+void CharacterState::applyLastStand(int turns) { statusEffects.applyLastStand(turns); }
 
-void Status::applyAutoRevive(int turns) { statusEffects.applyAutoRevive(turns); }
+void CharacterState::applyAutoRevive(int turns) { statusEffects.applyAutoRevive(turns); }
 
-void Status::applyInvulnerability(int turns) { statusEffects.applyInvulnerability(turns); }
+void CharacterState::applyInvulnerability(int turns) { statusEffects.applyInvulnerability(turns); }
 
-void Status::applyMagicReflection(int turns) { statusEffects.applyMagicReflection(turns); }
+void CharacterState::applyMagicReflection(int turns) { statusEffects.applyMagicReflection(turns); }
 
-void Status::applyAttributeResistance(int turns) { statusEffects.applyAttributeResistance(turns); }
+void CharacterState::applyAttributeResistance(int turns) { statusEffects.applyAttributeResistance(turns); }
 
-void Status::applyTpRegeneration(int turns) { statusEffects.applyTpRegeneration(turns); }
+void CharacterState::applyTpRegeneration(int turns) { statusEffects.applyTpRegeneration(turns); }
 
-void Status::applyStatusImmunity(int turns) { statusEffects.applyStatusImmunity(turns); }
+void CharacterState::applyStatusImmunity(int turns) { statusEffects.applyStatusImmunity(turns); }
 
-void Status::applyParalysis(int turns) { statusEffects.applyParalysis(turns); }
+void CharacterState::applyParalysis(int turns) { statusEffects.applyParalysis(turns); }
 
-void Status::applySilence(int turns) { statusEffects.applySilence(turns); }
+void CharacterState::applySilence(int turns) { statusEffects.applySilence(turns); }
 
-void Status::applyConfusion(int turns) { statusEffects.applyConfusion(turns); }
+void CharacterState::applyConfusion(int turns) { statusEffects.applyConfusion(turns); }
 
-void Status::applyPoison(int level, int turns) { statusEffects.applyPoison(level, turns); }
+void CharacterState::applyPoison(int level, int turns) { statusEffects.applyPoison(level, turns); }
 
-void Status::applyDoubleAction(int turns) { statusEffects.applyDoubleAction(turns); }
+void CharacterState::applyDoubleAction(int turns) { statusEffects.applyDoubleAction(turns); }
 
-void Status::clearStandardBuffs() { statusEffects.clearStandardBuffs(); }
+void CharacterState::clearStandardBuffs() { statusEffects.clearStandardBuffs(); }
 
-void Status::consumeDamageGuard() { statusEffects.consumeDamageGuard(); }
+void CharacterState::consumeDamageGuard() { statusEffects.consumeDamageGuard(); }
 
-void Status::consumeLastStand() { statusEffects.consumeLastStand(); }
+void CharacterState::consumeLastStand() { statusEffects.consumeLastStand(); }
 
-void Status::consumeStatusImmunity() { statusEffects.consumeStatusImmunity(); }
+void CharacterState::consumeStatusImmunity() { statusEffects.consumeStatusImmunity(); }
 
-void Status::consumePhysicalReflection() { statusEffects.consumePhysicalReflection(); }
+void CharacterState::consumePhysicalReflection() { statusEffects.consumePhysicalReflection(); }
 
-void Status::consumeAutoRevive() { statusEffects.consumeAutoRevive(); }
+void CharacterState::consumeAutoRevive() { statusEffects.consumeAutoRevive(); }
 
-void Status::consumeBlockedAction() { statusEffects.consumeBlockedAction(); }
+void CharacterState::consumeBlockedAction() { statusEffects.consumeBlockedAction(); }
 
-void Status::applyActionBlock(int turns) { statusEffects.applyActionBlock(turns); }
+void CharacterState::applyActionBlock(int turns) { statusEffects.applyActionBlock(turns); }
 
-void Status::enableDoubleAction() { statusEffects.enableDoubleAction(); }
+void CharacterState::enableDoubleAction() { statusEffects.enableDoubleAction(); }
 
-void Status::consumeDoubleAction() { statusEffects.consumeDoubleAction(); }
+void CharacterState::consumeDoubleAction() { statusEffects.consumeDoubleAction(); }
 
-void Status::beginDefense() { statusEffects.beginDefense(); }
+void CharacterState::beginDefense() { statusEffects.beginDefense(); }
 
-void Status::endDefense() { statusEffects.endDefense(); }
+void CharacterState::endDefense() { statusEffects.endDefense(); }
