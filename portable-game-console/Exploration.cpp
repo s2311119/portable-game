@@ -16,6 +16,47 @@ void Exploration::updateMovement(
   checkWall(hero, map);
 }
 
+ExplorationResult Exploration::completeStep(
+    Player& hero,
+    Map& map,
+    int previousX,
+    int previousY,
+    bool actionPressed) {
+  int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
+  int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
+  FieldEvent event = {FieldEventType::NONE, heroTileX, heroTileY};
+  if (actionPressed) {
+    event = detectEvent(map, heroTileX, heroTileY);
+  }
+  bool moved = (hero.X != previousX || hero.Y != previousY);
+  return {moved, event.type != FieldEventType::NONE, event};
+}
+
+FieldEvent Exploration::detectEvent(Map& map, int tileX, int tileY) const {
+  FieldEvent event = {FieldEventType::NONE, tileX, tileY};
+
+  if (tileX < 0 ||
+      tileY < 0 ||
+      tileX >= map.getMAP_WIDTH() ||
+      tileY >= map.getMAP_HEIGHT()) {
+    return event;
+  }
+
+  uint8_t tileType = map.getTile(tileX, tileY);
+  switch (tileType) {
+    case Map::TILE_BOX_CLOSE: event.type = FieldEventType::TREASURE; break;
+    case Map::TILE_STAIR_UP: event.type = FieldEventType::STAIR_UP; break;
+    case Map::TILE_STAIR_DOWN: event.type = FieldEventType::STAIR_DOWN; break;
+    case Map::TILE_AUTOMATON: event.type = FieldEventType::AUTOMATON; break;
+    case Map::TILE_INN: event.type = FieldEventType::INN; break;
+    case Map::TILE_SHOP: event.type = FieldEventType::SHOP; break;
+    case Map::TILE_STORAGE: event.type = FieldEventType::STORAGE; break;
+    case Map::TILE_BOSS: event.type = FieldEventType::BOSS_BATTLE; break;
+    default: break;
+  }
+  return event;
+}
+
 void Exploration::move(Player& c, uint32_t nowMs, const ExplorationInput& input) {
     uint32_t now = nowMs;
     if (now - lastMoveTime < moveIntervalMs) return; // まだ移動周期に達していない

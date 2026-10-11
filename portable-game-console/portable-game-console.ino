@@ -139,70 +139,21 @@ bool pressed(void* context, FieldDirection direction) {
 } // namespace field_input_adapter
 
 namespace temporary_field_bridge {
-bool checkEvent(Player &hero, Map &map, GameState &state, EventType &currentEvent) {
-    // 1. プレイヤーの現在タイル座標を取得
-    int heroTileX =
-        (hero.X + Map::TILE_SIZE / 2) /
-        Map::TILE_SIZE;
-
-    int heroTileY =
-        (hero.Y + Map::TILE_SIZE / 2) /
-        Map::TILE_SIZE;
-
-    // 万一マップ外ならイベント判定をしない
-    if (heroTileX < 0 ||
-        heroTileY < 0 ||
-        heroTileX >= map.getMAP_WIDTH() ||
-        heroTileY >= map.getMAP_HEIGHT())
-    {
-      return false;
-    }
-
-    // 2. その場所のタイルタイプを取得
-    uint8_t tileType = map.getTile(heroTileX, heroTileY);
-
-    // 3. タイルタイプに応じて分岐
-    switch (tileType) {
-      case Map::TILE_BOX_CLOSE:
-        // 閉じた宝箱の上にいる
-
-        state = STATE_EVENT; // ★ プレイヤーの操作を止める
-        currentEvent = EVENT_TREASURE_BOX; // ★ イベントタイプをセット
-
-        return true; // イベント発生
-
-      case Map::TILE_STAIR_UP:
-        state = STATE_EVENT;
-        currentEvent = EVENT_STAIR_UP;
-        return true;
-
-      case Map::TILE_STAIR_DOWN:
-        state = STATE_EVENT;
-        currentEvent = EVENT_STAIR_DOWN;
-        return true;
-      case Map::TILE_AUTOMATON:
-        state = STATE_EVENT;
-        currentEvent = EVENT_AUTOMATON;
-        return true;
-      case Map::TILE_INN:
-        state = STATE_EVENT; currentEvent = EVENT_INN; return true;
-      case Map::TILE_SHOP:
-        state = STATE_EVENT; currentEvent = EVENT_SHOP; return true;
-      case Map::TILE_STORAGE:
-        state = STATE_EVENT; currentEvent = EVENT_STORAGE; return true;
-      case Map::TILE_BOSS: // TILE_BOSS (Mapクラスで定義していない場合は99)
-        state = STATE_EVENT;
-        currentEvent = EVENT_BOSS_BATTLE;
-        return true;
-      default:
-        // TILE_GRASS など
-        return false; // イベントなし
-    }
+EventType toLegacyEventType(FieldEventType type) {
+  switch (type) {
+    case FieldEventType::TREASURE: return EVENT_TREASURE_BOX;
+    case FieldEventType::STAIR_UP: return EVENT_STAIR_UP;
+    case FieldEventType::STAIR_DOWN: return EVENT_STAIR_DOWN;
+    case FieldEventType::AUTOMATON: return EVENT_AUTOMATON;
+    case FieldEventType::INN: return EVENT_INN;
+    case FieldEventType::SHOP: return EVENT_SHOP;
+    case FieldEventType::STORAGE: return EVENT_STORAGE;
+    case FieldEventType::BOSS_BATTLE: return EVENT_BOSS_BATTLE;
+    case FieldEventType::NONE: return EVENT_NONE;
   }
-
+  return EVENT_NONE;
+}
 } // namespace temporary_field_bridge
-
-// This bridge moves into Exploration and FieldEvent in later Phase 8 commits.
 
 // ---------
 // saveクラス
@@ -4368,12 +4319,16 @@ void loop() {
     ExplorationInput fieldInput = {&ctrl, field_input_adapter::pressed};
     ctx->exploration.updateMovement(hero, map, nowMs, fieldInput);
 
-    bool eventOccurred = false;
-    if (ctrl.pressedDebounced(ctrl.BTN_A)){
-      eventOccurred = temporary_field_bridge::checkEvent(hero, map, state, currentEvent);
+    bool actionPressed = ctrl.pressedDebounced(ctrl.BTN_A);
+    ExplorationResult fieldResult =
+        ctx->exploration.completeStep(hero, map, prevX, prevY, actionPressed);
+    bool eventOccurred = fieldResult.hasEvent;
+    if (eventOccurred) {
+      state = STATE_EVENT;
+      currentEvent = temporary_field_bridge::toLegacyEventType(fieldResult.event.type);
     }
     // 2. 移動が発生したかチェック
-    bool moved = (hero.X != prevX || hero.Y != prevY);
+    bool moved = fieldResult.moved;
     // 3. 移動していて、メニューが開いていない場合のみイベントとエンカウントをチェック
     if (moved && !menu.active) {
       // 5. イベントが発生しなかった場合のみ、エンカウントをチェック

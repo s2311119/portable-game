@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "FieldEvent.h"
 
 class Player;
 class Map;
@@ -21,6 +22,12 @@ struct ExplorationInput {
   }
 };
 
+struct ExplorationResult {
+  bool moved;
+  bool hasEvent;
+  FieldEvent event;
+};
+
 class Exploration {
 public:
   void updateMovement(
@@ -28,6 +35,12 @@ public:
       Map& map,
       uint32_t nowMs,
       const ExplorationInput& input);
+  ExplorationResult completeStep(
+      Player& hero,
+      Map& map,
+      int previousX,
+      int previousY,
+      bool actionPressed);
 
 private:
   uint32_t lastMoveTime = 0;
@@ -35,4 +48,5 @@ private:
 
   void move(Player& hero, uint32_t nowMs, const ExplorationInput& input);
   void checkWall(Player& hero, Map& map);
+  FieldEvent detectEvent(Map& map, int tileX, int tileY) const;
 };
