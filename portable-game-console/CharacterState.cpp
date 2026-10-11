@@ -1,9 +1,6 @@
 #include "CharacterState.h"
-#include "SkillLearnsetCatalog.h"
-#include "EvolutionCatalog.h"
-#include "EvolutionSystem.h"
+#include "CharacterProgressionSystem.h"
 #include "CharacterCatalog.h"
-#include "SkillCatalog.h"
 
 #include <SdFat.h>
 
@@ -11,11 +8,6 @@
 void CharacterState::equip(EquipmentSlot slot, int itemId) { equipment.equip(slot, itemId); }
 
 void CharacterState::unequip(EquipmentSlot slot) { equipment.unequip(slot); }
-
-int CharacterState::getPreEvolution(int currentId) {
-    const EvolutionCatalog::Lineage lineage = EvolutionCatalog::getLineage(currentId);
-    return lineage.count > 1 ? lineage.ids[1] : -1;
-  }
 
 int CharacterState::attack() const {
     float finalValue = (float)coreStats.getAttack(); // 基礎ATK
@@ -67,11 +59,6 @@ int CharacterState::id() const{ return who; }
 
 const char* CharacterState::name() const{return nameValue;}
 
-int CharacterState::normalizeWho(int w) {
-    if (w >= 0 && w <= 37) return w + 39;
-    return w; 
-  }
-
 void CharacterState::updateName() {
     nameValue = CharacterCatalog::nameFor(who);
   }
@@ -97,7 +84,7 @@ CharacterState::CharacterState(int level, int w){
     unequip(EquipmentSlot::Accessory);
     statusEffects.initialize();
     // 初期技をテーブルから習得
-    checkLevelUpSkills(0, progression.level()); // 0レベルから現在のレベルまで
+    CharacterProgressionSystem::learnAvailableSkills(*this, 0, progression.level()); // 0レベルから現在のレベルまで
   }
 
 void CharacterState::clearBattleEffects() {
@@ -163,76 +150,9 @@ void CharacterState::restoreTP(int amount) {
     coreStats.restoreTP(amount);
 }
 
-void CharacterState::recalculateStats() {
-    const CoreStatsData stats =
-        CharacterCatalog::statsFor(who, progression.level());
-    coreStats.applyRecalculatedStats(stats);
-}
-
 bool CharacterState::spendTP(int cost) {
     return coreStats.spendTP(cost);
 }
-
-int CharacterState::gainXP(int amount) {
-    if (progression.level() >= 99) {
-      return 0;
-    }
-
-    progression.addXP(amount);
-
-    bool leveledUp = false;
-    bool evolvedDuringGain = false;
-
-    // 一度に複数レベル上がる場合でも、
-    // 1レベルずつ処理して、その都度進化判定を行う。
-    while (progression.canLevelUp())
-    {
-      int previousLevel = progression.level();
-
-      progression.levelUpOnce();
-
-      leveledUp = true;
-
-      // -------------------------------------------------
-      // このレベルで発生する自動進化を処理
-      // -------------------------------------------------
-      bool evolvedAtThisLevel = false;
-
-      while (true) {
-        const int nextId = EvolutionSystem::nextLevelEvolutionId(*this);
-        if (nextId == -1) {
-          break;
-        }
-        evolve(nextId);
-
-        evolvedDuringGain = true;
-        evolvedAtThisLevel = true;
-        // who が変わったので、新しい who でも進化条件があるか再確認する
-      }
-
-      // evolve() 内ではステータス再計算と
-      // スキル習得処理が行われるので、
-      // 進化しなかった場合だけここで処理する。
-      if (!evolvedAtThisLevel) {
-        recalculateStats();
-
-        checkLevelUpSkills(
-            previousLevel,
-            progression.level()
-        );
-      }
-    }
-
-    if (evolvedDuringGain) {
-      return 2; // レベルアップ中に進化した
-    }
-
-    if (leveledUp) {
-      return 1; // レベルアップのみ
-    }
-
-    return 0; // 変化なし
-  }
 
 bool CharacterState::isPlayer() {
     return (who >= 38 && who <= 79); // GDDのID定義 (38以上は味方)
@@ -244,41 +164,6 @@ void CharacterState::addAttack(int amount) {
 
 void CharacterState::learnSkill(int skillId) {
     skillSet.learn(skillId);
-  }
-
-void CharacterState::evolve(int newWhoId) {
-    // 1. 自分のIDを進化先のものに変更
-    int oldLevel = progression.level();
-    EvolutionSystem::applyIdentity(*this, newWhoId);
-    // 2. 既存のステータス再計算関数を呼び出す
-    // (recalculateStats は新しい who ID を使って
-    //  decide_MaxHP などを呼び出すので、これでステータスが更新される)
-    recalculateStats(); 
-
-    // 3. 進化ボーナスとしてHP/TPを全回復
-    coreStats.restoreToFull();
-    checkLevelUpSkills(0, oldLevel);
-  }
-
-void CharacterState::checkLevelUpSkills(int oldLevel, int newLevel) {
-    
-    // チェック対象のID (最初は今の自分)
-    int checkID = this->who;
-
-    // ★ 進化の系譜を遡りながら全てチェックするループ
-    while (checkID != -1) {
-        int normalizedCheckID = normalizeWho(checkID); // 味方IDに統一
-
-        const SkillLearnsetCatalog::LearnableSkills skills =
-            SkillLearnsetCatalog::getLearnableSkills(
-                normalizedCheckID, oldLevel, newLevel);
-        for (int i = 0; i < skills.count; i++) {
-          learnSkill(skills.ids[i]); // 重複チェック付きで習得
-        }
-
-        // ★ 次のループのために、進化前のIDを取得する
-        checkID = getPreEvolution(checkID);
-    }
   }
 
 void CharacterState::UpdateTurn() {
@@ -356,7 +241,7 @@ void CharacterState::loadFrom(FsFile& file) {
 
     // restore() でロードしたLevelに合わせて次の必要XPを更新済み
 
-    recalculateStats();
+    CharacterProgressionSystem::recalculateStats(*this);
 
     // -------------------------
     // 保存時の現在HP / TPを復元
@@ -377,7 +262,7 @@ void CharacterState::loadFrom(FsFile& file) {
 
     // レベル上は覚えているはずなのに、
     // 古いセーブに存在しないスキルがあれば補完
-    checkLevelUpSkills(0, progression.level());
+    CharacterProgressionSystem::learnAvailableSkills(*this, 0, progression.level());
   }
 
 void CharacterState::addPopup(int value, bool isCrit) {
@@ -394,10 +279,6 @@ CharacterState::~CharacterState() {
     popupValues.clear();
     std::vector<PopupData>().swap(popupValues);
   }
-
-const CharacterState::EvolutionRule* const CharacterState::evolutionTable = EvolutionCatalog::getRules().rules;
-// サイズも同様に定義
-const int CharacterState::evolutionRuleCount = EvolutionCatalog::RULE_COUNT;
 
 void CharacterState::applyAttackBuff(float rate, int turns) { statusEffects.applyAttackBuff(rate, turns); }
 

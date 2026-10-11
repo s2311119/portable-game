@@ -7,6 +7,7 @@
 #include "Item.h"
 #include "ItemCatalog.h"
 #include "CharacterState.h"
+#include "CharacterProgressionSystem.h"
 #include "CombatCalculator.h"
 #include "SkillEffectSystem.h"
 #include "Automaton.h"
@@ -3364,15 +3365,15 @@ public:
           
           // 2. レベルアップ・進化判定 (主人公)
           if (hero.status->stats().getHp() > 0) {
-            int res = hero.status->gainXP(lastGainedXP);
-            if (res >= 1) resultMessages.push_back("調律師はLv" + String(hero.status->progress().level()) + "になった!");
+            const ProgressionResult res = CharacterProgressionSystem::gainExperience(*hero.status, lastGainedXP);
+            if (res.newLevel > res.oldLevel) resultMessages.push_back("調律師はLv" + String(hero.status->progress().level()) + "になった!");
           }
           // 3. レベルアップ・進化判定 (仲間)
           for(auto ally : party.members) {
             if (ally->status->stats().getHp() > 0) {
-              int allyRes = ally->status->gainXP(lastGainedXP);
-              if (allyRes >= 1) resultMessages.push_back(String(ally->status->name()) + "はLv" + String(ally->status->progress().level()) + "になった!");
-              if (allyRes == 2) {
+              const ProgressionResult allyRes = CharacterProgressionSystem::gainExperience(*ally->status, lastGainedXP);
+              if (allyRes.newLevel > allyRes.oldLevel) resultMessages.push_back(String(ally->status->name()) + "はLv" + String(ally->status->progress().level()) + "になった!");
+              if (allyRes.evolved) {
                 resultMessages.push_back(
                     String(ally->status->name()) +
                     "は進化した!"
@@ -4677,41 +4678,15 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
 
         if (aPressed) {
           Automaton* selectedAlly = party.members[listCursor];
-          bool itemUsed = false; 
-          
-          // 進化テーブルを検索
-          for (int i = 0; i < CharacterState::evolutionRuleCount; i++) {
-            const CharacterState::EvolutionRule& rule = CharacterState::evolutionTable[i];
-            
-            // 1. この仲間の進化ルールか？
-            // 2. トリガーはアイテムか？
-            if (rule.before_who_id == selectedAlly->status->id() && 
-                rule.trigger_type == CharacterState::EvolutionTriggerType::TRIGGER_ITEM) 
-            {
-              int requiredItemId = rule.trigger_value; // 必要なアイテムID
-              
-              // 3. そのアイテムを持っているか？
-              int foundIndex = -1;
-              for(int j=0; j < inventory.items.size(); j++) {
-                if (inventory.items[j].item.id == requiredItemId) {
-                  foundIndex = j;
-                  break;
-                }
-              }
-
-              // 4. 持っていれば進化実行
-              if (foundIndex != -1) {
-                selectedAlly->status->evolve(rule.after_who_id);
-                
-                // ★ ここで消費する (この変数はここなら使える)
-                inventory.removeByIndex(foundIndex);
-                music.playSE(0);
-                itemUsed = true;
-                break; // 進化したらループ終了
-              }
-            }
-            music.playSE(1);
-          }
+          const ProgressionResult evolution =
+              CharacterProgressionSystem::tryItemEvolution(
+                  *selectedAlly->status, inventory,
+                  [](void* context) {
+                    static_cast<MUSIC*>(context)->playSE(1);
+                  },
+                  &music);
+          const bool itemUsed = evolution.evolved;
+          if (itemUsed) music.playSE(0);
 
           // --- 進化後の後処理 ---
           if (itemUsed) {

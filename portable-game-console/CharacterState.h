@@ -4,7 +4,6 @@
 #include "StatusEffects.h"
 #include "Progression.h"
 #include "SkillSet.h"
-#include "EvolutionCatalog.h"
 
 #include "Skill.h"
 #include <vector>
@@ -14,6 +13,7 @@ class FsFile;
 class CharacterState{
 private:
   friend class EvolutionSystem;
+  friend class CharacterProgressionSystem;
   CoreStats coreStats;
   Equipment equipment;
   StatusEffects statusEffects;
@@ -21,7 +21,6 @@ private:
   int who;
   const char* nameValue;
   SkillSet skillSet; // 習得済みの旋律リスト
-  int getPreEvolution(int currentId);
 public:
   const CoreStats& stats() const;
   const Equipment& equipmentState() const;
@@ -85,16 +84,7 @@ public:
   int luck() const;
   int id() const;
   const char* name() const;
-  int normalizeWho(int w);
   void updateName();
-  using EvolutionTriggerType = EvolutionCatalog::EvolutionTriggerType;
-  static constexpr EvolutionTriggerType TRIGGER_LEVEL = EvolutionCatalog::TRIGGER_LEVEL;
-  static constexpr EvolutionTriggerType TRIGGER_ITEM = EvolutionCatalog::TRIGGER_ITEM;
-
-  using EvolutionRule = EvolutionCatalog::EvolutionRule;
-
-  static const EvolutionRule* const evolutionTable;
-  static const int evolutionRuleCount;
   const SkillSet& skills() const;
 
   void forceLearnSkill(int skillId);
@@ -118,11 +108,7 @@ public:
 
 
 
-  void recalculateStats();
-
   bool spendTP(int cost);
-
-  int gainXP(int amount);
 
   bool isPlayer();
 
@@ -130,9 +116,6 @@ public:
 
   void learnSkill(int skillId);
   
-  void evolve(int newWhoId);
-
-  void checkLevelUpSkills(int oldLevel, int newLevel);
   void UpdateTurn();
 
   int ApplyTurnEffects();
