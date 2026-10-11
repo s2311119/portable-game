@@ -142,14 +142,6 @@ public:
   static const int evolutionRuleCount;
   std::vector<Skill>& getLearnedSkills();
 
-  int decide_MaxHP(int l, int who);
-  int decide_MaxTP(int l, int who);
-  int decide_Attack(int l, int who);
-  int decide_Defense(int l, int who);
-  int decide_Speed(int l, int who);
-  int decide_Sense(int l, int who);
-  int decide_Luck(int l, int who);
-  void setBossStats(int hp, int tp, int atk, int def, int spd, int sen, int lck);
   void forceLearnSkill(int skillId);
   Status(int level, int w);
 

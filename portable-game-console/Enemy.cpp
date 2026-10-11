@@ -129,7 +129,6 @@ Enemy::Enemy(int w, int floor){
 
       case 80: 
         status = new Status(1, 80);
-        status->setBossStats(500, 100, 40, 20, 15, 10, 10); // HP, TP, ATK, DEF, SPD, SEN, LCK
         status->forceLearnSkill(21);
         status->forceLearnSkill(106);
         status->forceLearnSkill(47);
@@ -138,7 +137,6 @@ Enemy::Enemy(int w, int floor){
       // 20階ボス
       case 81: 
         status = new Status(1, 81);
-        status->setBossStats(1200, 200, 70, 60, 10, 20, 20);
         status->forceLearnSkill(52);
         status->forceLearnSkill(34);
         status->forceLearnSkill(87);
@@ -147,7 +145,6 @@ Enemy::Enemy(int w, int floor){
       // 30階ボス
       case 82: 
         status = new Status(1, 82);
-        status->setBossStats(3000, 500, 120, 80, 60, 50, 40);
         // 状態異常3つ
         status->forceLearnSkill(105); // ポイズン (毒)
         status->forceLearnSkill(45);  // ヴォイド・ショック (麻痺)
@@ -159,7 +156,6 @@ Enemy::Enemy(int w, int floor){
       // 40階ボス
       case 83: 
         status = new Status(1, 83);
-        status->setBossStats(8000, 999, 200, 150, 80, 100, 50);
         status->forceLearnSkill(73);  // クイックステップ (素早さUP)
         status->forceLearnSkill(39);  // ミラーズエッジ (回避率2倍)
         status->forceLearnSkill(109); // サイレンス (沈黙与) -> 詠唱を封じる
@@ -171,7 +167,6 @@ Enemy::Enemy(int w, int floor){
       // 50階 ラスボス
       case 84: 
         status = new Status(1, 84);
-        status->setBossStats(20000, 9999, 300, 200, 120, 150, 100);
         status->forceLearnSkill(86);  // リミットブレイク (全能力最大強化)
         status->forceLearnSkill(118); // ワールド・ダウン (敵全体全能力DOWN)
         status->forceLearnSkill(114); // ディザスター (全状態異常付与)
