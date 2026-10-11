@@ -1,4 +1,5 @@
 #pragma once
+#include "EvolutionCatalog.h"
 
 #include "Skill.h"
 #include <vector>
@@ -118,10 +119,9 @@ public:
   int getConfusedTurns() const;
   int normalizeWho(int w);
   void updateName();
-  enum EvolutionTriggerType {
-    TRIGGER_LEVEL, // レベルアップ
-    TRIGGER_ITEM   // アイテム使用
-  };
+  using EvolutionTriggerType = EvolutionCatalog::EvolutionTriggerType;
+  static constexpr EvolutionTriggerType TRIGGER_LEVEL = EvolutionCatalog::TRIGGER_LEVEL;
+  static constexpr EvolutionTriggerType TRIGGER_ITEM = EvolutionCatalog::TRIGGER_ITEM;
   float getEvasionBonus();
   struct SkillLearningRule {
     int who_id; // 対象のID (例: 39)
@@ -131,14 +131,9 @@ public:
   static const SkillLearningRule skillLearningTable[];
   static const int skillLearningRuleCount;
 
-  struct EvolutionRule {
-    int before_who_id;
-    EvolutionTriggerType trigger_type;
-    int trigger_value; 
-    int after_who_id;
-  };
+  using EvolutionRule = EvolutionCatalog::EvolutionRule;
 
-  static const EvolutionRule evolutionTable[];
+  static const EvolutionRule* const evolutionTable;
   static const int evolutionRuleCount;
   std::vector<Skill>& getLearnedSkills();
 

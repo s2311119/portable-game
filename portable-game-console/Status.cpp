@@ -1,4 +1,5 @@
 #include "Status.h"
+#include "EvolutionCatalog.h"
 #include "CharacterCatalog.h"
 #include "SkillCatalog.h"
 
@@ -9,13 +10,8 @@
 
 
 int Status::getPreEvolution(int currentId) {
-    for (int i = 0; i < evolutionRuleCount; i++) {
-      // 進化テーブルの「進化後(after)」が自分と一致したら、「進化前(before)」を返す
-      if (evolutionTable[i].after_who_id == currentId) {
-        return evolutionTable[i].before_who_id;
-      }
-    }
-    return -1; // 進化前なし
+    const EvolutionCatalog::Lineage lineage = EvolutionCatalog::getLineage(currentId);
+    return lineage.count > 1 ? lineage.ids[1] : -1;
   }
 
 int Status::getHp(){return HP;}
@@ -1229,53 +1225,9 @@ Status::~Status() {
     std::vector<PopupData>().swap(popupValues);
   }
 
-const Status::EvolutionRule Status::evolutionTable[] = {
-  // --- 仲間1号機 (Attack: 39) の進化ツリー ---
-  { 39, Status::TRIGGER_LEVEL, 10, 44 }, // 39(Lv10) -> 44
-  { 44, Status::TRIGGER_LEVEL, 20, 49 }, // 44(Lv20) -> 49
-  { 49, Status::TRIGGER_LEVEL, 30, 54 }, // 49(Lv30) -> 54
-  { 49, Status::TRIGGER_ITEM,  10, 55 }, // 49(Lv40) -> 55 (Aルート)
-  { 54, Status::TRIGGER_LEVEL, 50, 61 }, // 54 + アイテム10 -> 61 (Bルート)
-  { 54, Status::TRIGGER_ITEM,  11, 62 }, // 54 + アイテム11 -> 62
-  { 55, Status::TRIGGER_LEVEL, 50, 63 }, // 55(Lv40) -> 63 (Aルート)
-  { 55, Status::TRIGGER_ITEM,  12, 64 }, // 55 + アイテム12 -> 64 (Bルート)
-
-  // --- 仲間2号機 (Defense: 48) の進化ツリー ---
-  { 40, Status::TRIGGER_LEVEL, 10, 45 }, // 48(Lv10) -> 49
-  { 45, Status::TRIGGER_LEVEL, 20, 50 }, // 49(Lv20) -> 50
-  { 50, Status::TRIGGER_LEVEL, 30, 56 }, // 50(Lv30) -> 51
-  { 50, Status::TRIGGER_ITEM,  13, 57 }, // 51(Lv40) -> 52 (Aルート)
-  { 56, Status::TRIGGER_LEVEL, 50, 65 }, // 51 + アイテム13 -> 53 (Bルート)
-  { 56, Status::TRIGGER_ITEM,  14, 66 }, // 50 + アイテム14 -> 54
-  { 57, Status::TRIGGER_LEVEL, 50, 67 }, // 54(Lv40) -> 55 (Aルート)
-  { 57, Status::TRIGGER_ITEM,  15, 68 }, // 54 + アイテム15 -> 56 (Bルート)
-
-  // --- 仲間3号機 (Speed: 57) の進化ツリー ---
-  { 41, Status::TRIGGER_LEVEL, 10, 46 },
-  { 46, Status::TRIGGER_LEVEL, 20, 51 },
-  { 51, Status::TRIGGER_LEVEL, 30, 58 },
-  { 58, Status::TRIGGER_LEVEL, 50, 69 }, // 60(Lv40) -> 61 (Aルート)
-  { 58, Status::TRIGGER_ITEM,  16, 70 }, // 60 + アイテム16 -> 62 (Bルート)
-
-  // --- 仲間4号機 (Heal: 63) の進化ツリー ---
-  { 42, Status::TRIGGER_LEVEL, 10, 47 },
-  { 47, Status::TRIGGER_LEVEL, 20, 52 },
-  { 52, Status::TRIGGER_LEVEL, 30, 59 },
-  { 59, Status::TRIGGER_LEVEL, 50, 71 }, // 66(Lv40) -> 67 (Aルート)
-  { 59, Status::TRIGGER_ITEM,  17, 72 }, // 66 + アイテム17 -> 68 (Bルート)
-
-  // --- 仲間5号機 (Sense: 69) の進化ツリー ---
-  { 43, Status::TRIGGER_LEVEL, 10, 48 },
-  { 48, Status::TRIGGER_LEVEL, 20, 53 },
-  { 53, Status::TRIGGER_LEVEL, 30, 60 },
-  { 60, Status::TRIGGER_LEVEL, 50, 73 }, // 72(Lv40) -> 73 (Aルート)
-  { 60, Status::TRIGGER_ITEM,  18, 74 }, // 72 + アイテム18 -> 74 (Bルート)
-
-  //特殊
-  { 75, Status::TRIGGER_ITEM,   4, 76 } // 金の歯車で進化
-};
+const Status::EvolutionRule* const Status::evolutionTable = EvolutionCatalog::getRules().rules;
 // サイズも同様に定義
-const int Status::evolutionRuleCount = sizeof(Status::evolutionTable) / sizeof(Status::EvolutionRule);
+const int Status::evolutionRuleCount = EvolutionCatalog::RULE_COUNT;
 
 const Status::SkillLearningRule Status::skillLearningTable[] = {
   // --- 仲間1号機 (ストライカー系) ---
