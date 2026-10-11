@@ -3,8 +3,8 @@
 #include <Arduino.h>
 #include <SdFat.h>
 #include "Item.h"
+#include "ItemCatalog.h"
 
-Item createItemById(int id);
 
 int Status::getPreEvolution(int currentId) {
     for (int i = 0; i < evolutionRuleCount; i++) {
@@ -30,7 +30,7 @@ int Status::getAttack() {
     float finalValue = (float)this->Attack; // 基礎ATK
     // 武器の補正
     if (equipWeaponId != -1) {
-      Item weapon = createItemById(equipWeaponId);
+      Item weapon = ItemCatalog::get(equipWeaponId);
       finalValue += weapon.value; // 武器の攻撃力を足す
     }
     // アクセの補正 (例: パワーリング ID 500)
@@ -53,7 +53,7 @@ int Status::getDefense() {
     float finalValue = (float)this->Defense; // 基礎DEF
     // 防具の補正
     if (equipArmorId != -1) {
-      Item armor = createItemById(equipArmorId);
+      Item armor = ItemCatalog::get(equipArmorId);
       finalValue += armor.value;
     }
     if (equipAccId == 501) finalValue += 10;  // ガードリング

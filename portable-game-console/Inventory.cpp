@@ -1,8 +1,8 @@
 #include "Inventory.h"
+#include "ItemCatalog.h"
 
 #include <SdFat.h>
 
-Item createItemById(int id);
 
 Inventory::Inventory() {
     // 起動時に std::vector のメモリを
@@ -71,7 +71,7 @@ void Inventory::loadFrom(FsFile& file) {
       int id = file.readStringUntil('\n').toInt();
       int qty = file.readStringUntil('\n').toInt();
       // アイテム生成してリストに追加
-      Item item = createItemById(id);
+      Item item = ItemCatalog::get(id);
       items.push_back({item, qty});
     }
 }
