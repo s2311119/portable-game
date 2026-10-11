@@ -19,6 +19,7 @@
 #include "LegacyGameTypes.h"
 #include "Controller.h"
 #include "Encounter.h"
+#include "Exploration.h"
 #include "Vibration.h"
 #include "Skill.h"
 #include "SkillCatalog.h"
@@ -124,73 +125,20 @@ const int learnableSkillCount = sizeof(learnableSkillIDs) / sizeof(int);
 bool audio_timer_callback(struct repeating_timer *t);
 
 
+namespace field_input_adapter {
+bool pressed(void* context, FieldDirection direction) {
+  Controller& ctrl = *static_cast<Controller*>(context);
+  switch (direction) {
+    case FieldDirection::UP: return ctrl.pressed(ctrl.BTN_UP);
+    case FieldDirection::DOWN: return ctrl.pressed(ctrl.BTN_DOWN);
+    case FieldDirection::LEFT: return ctrl.pressed(ctrl.BTN_LEFT);
+    case FieldDirection::RIGHT: return ctrl.pressed(ctrl.BTN_RIGHT);
+  }
+  return false;
+}
+} // namespace field_input_adapter
+
 namespace temporary_field_bridge {
-uint32_t lastMoveTime = 0;
-const uint32_t moveIntervalMs = 80;
-
-void updateCaraPoint(Controller &ctrl, Player &c) {
-    uint32_t now = millis();
-    if (now - lastMoveTime < moveIntervalMs) return; // まだ移動周期に達していない
-    // 1ステップだけ進める（長押しで連続移動だが、moveIntervalMsで抑止）
-    if (ctrl.pressed(ctrl.BTN_UP))    c.Y -= c.MOVE_SPEED;
-    if (ctrl.pressed(ctrl.BTN_DOWN))  c.Y += c.MOVE_SPEED;
-    if (ctrl.pressed(ctrl.BTN_LEFT))  c.X -= c.MOVE_SPEED;
-    if (ctrl.pressed(ctrl.BTN_RIGHT)) c.X += c.MOVE_SPEED;
-    lastMoveTime = now;
-  }
-
-void checkWall(Player &hero, Map &map) {
-    int hitbox_offset = 1;
-
-    int centerX =
-        hero.X + Map::TILE_SIZE / 2;
-
-    int centerY =
-        hero.Y + Map::TILE_SIZE / 2;
-
-    int left   = centerX - hitbox_offset;
-    int right  = centerX + hitbox_offset;
-    int top    = centerY - hitbox_offset;
-    int bottom = centerY + hitbox_offset;
-
-    const int mapPixelWidth =
-        map.getMAP_WIDTH() * Map::TILE_SIZE;
-
-    const int mapPixelHeight =
-        map.getMAP_HEIGHT() * Map::TILE_SIZE;
-
-    // マップ外は壁として扱う
-    auto isWallOrOutOfBounds =
-        [&](int px, int py) -> bool
-    {
-      if (px < 0 ||
-          py < 0 ||
-          px >= mapPixelWidth ||
-          py >= mapPixelHeight)
-      {
-        return true;
-      }
-
-      int tileX =
-          px / Map::TILE_SIZE;
-
-      int tileY =
-          py / Map::TILE_SIZE;
-
-      return map.getTile(tileX, tileY) == Map::TILE_WALL;
-    };
-
-    if (isWallOrOutOfBounds(left,  top) ||
-        isWallOrOutOfBounds(right, top) ||
-        isWallOrOutOfBounds(left,  bottom) ||
-        isWallOrOutOfBounds(right, bottom))
-    {
-      hero.X = hero.oldX;
-      hero.Y = hero.oldY;
-      hero.moved = false;
-    }
-  }
-
 bool checkEvent(Player &hero, Map &map, GameState &state, EventType &currentEvent) {
     // 1. プレイヤーの現在タイル座標を取得
     int heroTileX =
@@ -3464,6 +3412,7 @@ struct GameContext {
   Sd* sd;
   Menu* menu;
   Encounter* encounter;
+  Exploration exploration;
   FloorManager floorManager;
   GameState state;
   EventType currentEvent = EVENT_NONE;
@@ -4415,12 +4364,9 @@ void loop() {
     hero.oldY = hero.Y;
 
     int prevX = hero.X, prevY = hero.Y;
-    temporary_field_bridge::updateCaraPoint(ctrl, hero);
-    if (ctrl.pressed(ctrl.BTN_UP))    hero.direction = Player::DIR_UP;
-    if (ctrl.pressed(ctrl.BTN_DOWN))  hero.direction = Player::DIR_DOWN;
-    if (ctrl.pressed(ctrl.BTN_LEFT))  hero.direction = Player::DIR_LEFT;
-    if (ctrl.pressed(ctrl.BTN_RIGHT)) hero.direction = Player::DIR_RIGHT;
-    temporary_field_bridge::checkWall(hero, map);
+    uint32_t nowMs = millis();
+    ExplorationInput fieldInput = {&ctrl, field_input_adapter::pressed};
+    ctx->exploration.updateMovement(hero, map, nowMs, fieldInput);
 
     bool eventOccurred = false;
     if (ctrl.pressedDebounced(ctrl.BTN_A)){
