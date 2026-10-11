@@ -4,6 +4,7 @@
 #include "LGFX_RP2040_ILI9341.hpp"
 #include <LGFX_TFT_eSPI.hpp>  // フォントを使う場合に必要な場合もあります
 #include "bmp.h"
+#include "Item.h"
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -68,7 +69,6 @@ enum GameState {
   STATE_EVENT,
   STATE_GAME_OVER
 };
-#include <malloc.h> // これが必要です
 
 class MemoryMonitor {
 private:
@@ -104,10 +104,6 @@ public:
 
 class Map {
 public:
-  int MAP_WIDTH;
-  int MAP_HEIGHT;
-  int automatonWhoId;
-  int currentFloor = 1;
   // マップの寸法（コンストラクタで決定）  
   static const int TILE_SIZE = 32;
   static const int TILE_GRASS = 0;
@@ -121,8 +117,6 @@ public:
   static const int TILE_SHOP = 8;    // 店
   static const int TILE_STORAGE = 9; // 預かり所
   static const int TILE_BOSS = 99;//ボス
-  // マップデータを保持する動的配列
-  std::vector<uint8_t> mapData;
 
   enum MapType {
     TYPE_MAZE,
@@ -130,9 +124,8 @@ public:
     TYPE_TOWN,
     TYPE_BOSS_ROOM
   };
-  MapType currentType;
-  bool isTown = false;
-  // ★★★ 追加：部屋の矩形情報を保存する構造体 ★★★
+
+  // 部屋の矩形情報
   struct Room {
     int x, y, w, h;
   };
@@ -141,114 +134,229 @@ public:
     int x, y;
   };
 
-  std::vector<ObjectPos> boxPositions; // 宝箱の位置リスト
-  ObjectPos stairUpPos = {-1, -1};    // 上り階段の位置
-  ObjectPos stairDownPos = {-1, -1};  // 下り階段の位置
-  ObjectPos playerStartPos; //主人公の初期位置
-
-  // ★★★ 修正後のコンストラクタ ★★★
   Map(int max_w, int max_h, MapType type)
   {
-    // 初期化リスト (:) ではなく、ここで代入する
     currentType = type;
-    /*MAP_WIDTH = ((type != TYPE_MAZE && type != TYPE_DUNGEON) ? random(4, max_w / 2) * 2 + 1 : random(15, max_w / 2) * 2 + 1);
-    MAP_HEIGHT = ((type != TYPE_MAZE && type != TYPE_DUNGEON) ? random(4, max_h / 2) * 2 + 1 : random(15, max_h / 2) * 2 + 1);*/
-    if (type == TYPE_TOWN) {
-      // 集落: 床5x5 + 周囲の壁2 = 7x7
-      MAP_WIDTH = 8;
-      MAP_HEIGHT = 8;
-    } 
-    else if (type == TYPE_BOSS_ROOM) {
-      // ボス部屋: 床7x7 + 周囲の壁2 = 9x9
-      MAP_WIDTH = 9;
-      MAP_HEIGHT = 9;
-    }
-    else {
-      // ダンジョン: ランダム (奇数になるように調整)
-      // ※ max_w/h が渡されていますが、最低サイズを下回らないように注意
-      MAP_WIDTH = random(15, max_w / 2) * 2 + 1;
-      MAP_HEIGHT = random(15, max_h / 2) * 2 + 1;
-    }
-    mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
-    generateMazeAndRooms(type);
-    placeObjects();
+
+    setMapDimensions(
+        max_w,
+        max_h,
+        type
+    );
+
+    generateMapContent(type);
   }
+
   int getMAP_WIDTH(){
     return MAP_WIDTH;
   }
   int getMAP_HEIGHT(){
     return MAP_HEIGHT;
   }
-  void regenerate(int max_w, int max_h, MapType type){
-    // public側のMAP_WIDTH/HEIGHTを変更する
+
+  uint8_t getTile(int x, int y) const {
+    return mapData[y * MAP_WIDTH + x];
+  }
+
+  void setTile(int x, int y, uint8_t tile) {
+    mapData[y * MAP_WIDTH + x] = tile;
+  }
+
+  MapType getType() const {
+    return currentType;
+  }
+
+  void beginRestoreFromSave(
+      MapType type,
+      int width,
+      int height)
+  {
     currentType = type;
-    
-    isTown = false;
+    MAP_WIDTH = width;
+    MAP_HEIGHT = height;
+
+    mapData.assign(
+        MAP_WIDTH * MAP_HEIGHT,
+        TILE_WALL
+    );
+  }
+
+  bool isTown() const {
+    return currentType == TYPE_TOWN;
+  }
+
+  bool isBossRoom() const {
+    return currentType == TYPE_BOSS_ROOM;
+  }
+
+  ObjectPos getPlayerStartPos() const {
+    return playerStartPos;
+  }
+
+  int getAutomatonWhoId() const {
+    return automatonWhoId;
+  }
+
+  void restoreAutomatonWhoId(int whoId) {
+    automatonWhoId = whoId;
+  }
+
+  int getFloor() const {
+    return currentFloor;
+  }
+
+  void restoreFloor(int floor) {
+    currentFloor = floor;
+  }
+
+  bool advanceFloor() {
+    if (currentFloor >= 50) {
+      return false;
+    }
+
+    currentFloor++;
+    return true;
+  }
+
+  bool retreatFloor() {
+    if (currentFloor <= 1) {
+      return false;
+    }
+
+    currentFloor--;
+    return true;
+  }
+
+  void regenerate(
+      int max_w,
+      int max_h,
+      MapType type)
+  {
+    currentType = type;
+
+    setMapDimensions(
+        max_w,
+        max_h,
+        type
+    );
+
+    generateMapContent(type);
+  }
+private:
+  MapType currentType;
+
+  int MAP_WIDTH;
+  int MAP_HEIGHT;
+  std::vector<uint8_t> mapData;
+
+  std::vector<ObjectPos> boxPositions;
+  ObjectPos stairUpPos = {-1, -1};
+  ObjectPos stairDownPos = {-1, -1};
+  ObjectPos playerStartPos;
+  int automatonWhoId = -1;
+  int currentFloor = 1;
+
+  void generateMapContent(MapType type) {
+    mapData.assign(
+        MAP_WIDTH * MAP_HEIGHT,
+        TILE_WALL
+    );
+
+    if (type == TYPE_BOSS_ROOM) {
+      generateBossRoom();
+      return;
+    }
+
+    generateMazeAndRooms(type);
+    placeObjects();
+  }
+
+  void setMapDimensions(int max_w, int max_h, MapType type) {
     if (type == TYPE_TOWN) {
-      // 集落: 床5x5 + 周囲の壁2 = 7x7
       MAP_WIDTH = 8;
       MAP_HEIGHT = 8;
-      isTown = true;
-    } 
+    }
     else if (type == TYPE_BOSS_ROOM) {
-      // ボス部屋: 床7x7 + 周囲の壁2 = 9x9
       MAP_WIDTH = 9;
       MAP_HEIGHT = 9;
     }
     else {
-      // ダンジョン: ランダム (奇数になるように調整)
-      // ※ max_w/h が渡されていますが、最低サイズを下回らないように注意
-      MAP_WIDTH = random(15, max_w / 2) * 2 + 1;
-      MAP_HEIGHT = random(15, max_h / 2) * 2 + 1;
+      const int MIN_DUNGEON_SIZE = 15;
+
+      int safeMaxW =
+          (max_w < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_w;
+
+      int safeMaxH =
+          (max_h < MIN_DUNGEON_SIZE)
+              ? MIN_DUNGEON_SIZE
+              : max_h;
+
+      int maxOddW =
+          (safeMaxW % 2 == 0)
+              ? safeMaxW - 1
+              : safeMaxW;
+
+      int maxOddH =
+          (safeMaxH % 2 == 0)
+              ? safeMaxH - 1
+              : safeMaxH;
+
+      MAP_WIDTH =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddW - 1) / 2 + 1
+          ) * 2 + 1;
+
+      MAP_HEIGHT =
+          random(
+              (MIN_DUNGEON_SIZE - 1) / 2,
+              (maxOddH - 1) / 2 + 1
+          ) * 2 + 1;
     }
-    mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL);
-    if (type == TYPE_BOSS_ROOM) {
-      // --- ボス部屋の描画 ---
-      
-      // 全体を床にする
-      for (int i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) mapData[i] = TILE_GRASS;
-      
-      // 周囲を壁にする
-      for (int x = 0; x < MAP_WIDTH; x++) { 
-          mapData[x] = TILE_WALL; 
-          mapData[(MAP_HEIGHT-1)*MAP_WIDTH + x] = TILE_WALL; 
-      }
-      for (int y = 0; y < MAP_HEIGHT; y++) { 
-          mapData[y*MAP_WIDTH] = TILE_WALL; 
-          mapData[y*MAP_WIDTH + (MAP_WIDTH-1)] = TILE_WALL; 
-      }
-
-      // 下り階段 (入り口)
-      // 座標が範囲外にならないよう中央下付近に固定
-      int stairX = MAP_WIDTH / 2;
-      int stairY = MAP_HEIGHT - 3;
-      mapData[stairY * MAP_WIDTH + stairX] = TILE_STAIR_DOWN;
-      
-      // プレイヤー開始位置
-      playerStartPos = {stairX, stairY};
-
-      // ★ボス配置 (部屋の中央奥)
-      int bossX = MAP_WIDTH / 2;
-      int bossY = 5;
-      mapData[bossY * MAP_WIDTH + bossX] = TILE_BOSS;
-
-      return; // ボス部屋生成完了
-    }
-    // メンバー変数を再利用して再生成
-    generateMazeAndRooms(type);
-    placeObjects();
   }
-private:
-  //int MAP_WIDTH;
-  //int MAP_HEIGHT;
+
+  void generateBossRoom() {
+    // 全体を床にする
+    for (int i = 0; i < MAP_WIDTH * MAP_HEIGHT; i++) {
+      mapData[i] = TILE_GRASS;
+    }
+
+    // 外周を壁にする
+    for (int x = 0; x < MAP_WIDTH; x++) {
+      mapData[x] = TILE_WALL;
+      mapData[(MAP_HEIGHT - 1) * MAP_WIDTH + x] = TILE_WALL;
+    }
+
+    for (int y = 0; y < MAP_HEIGHT; y++) {
+      mapData[y * MAP_WIDTH] = TILE_WALL;
+      mapData[y * MAP_WIDTH + (MAP_WIDTH - 1)] = TILE_WALL;
+    }
+
+    // 入り口となる下り階段
+    int stairX = MAP_WIDTH / 2;
+    int stairY = MAP_HEIGHT - 3;
+
+    mapData[stairY * MAP_WIDTH + stairX] =
+        TILE_STAIR_DOWN;
+
+    playerStartPos = {stairX, stairY};
+
+    // ボスを部屋の奥に配置
+    int bossX = MAP_WIDTH / 2;
+    int bossY = 5;
+
+    mapData[bossY * MAP_WIDTH + bossX] =
+        TILE_BOSS;
+  }
+
   std::vector<int> pathX, pathY;
   std::vector<int> dirs;
   std::vector<Room> placedRooms;
   std::vector<ObjectPos> grassTiles;
   void generateMazeAndRooms(MapType type) {
     if (type == TYPE_TOWN) {
-      // 1. 全体を壁で初期化 (コンストラクタ等で既にされているが念のため)
-      // mapData.assign(MAP_WIDTH * MAP_HEIGHT, TILE_WALL); 
 
       // 2. 中央に大きな広場(草)を作る
       int margin = 2; 
@@ -448,36 +556,7 @@ private:
       grassTiles[j] = grassTiles.back();
       grassTiles.pop_back();
     }
-  }
-
-  // ★★★ 追加: 迷路生成後に宝箱と階段を配置する関数 ★★★
-  
-};
-
-class Item {
-public:
-  enum ItemType {
-    ITEM_CONSUMABLE, // 消費アイテム (回復薬など)
-    ITEM_WEAPON,     // 武器
-    ITEM_ARMOR,      // 防具
-    ITEM_ACCESSORY,  // アクセサリー
-    ITEM_MATERIAL,   // 素材 (換金用)
-    ITEM_IMPORTANT   // 大事なもの
-  };
-  ItemType type; // ★ 追加: 種類
-  int value;     // ★ 追加: 威力 (武器ならATK、防具ならDEF、薬なら回復量)
-  int price;     // ★ 追加: 買値 (売値はこの半額にするのが一般的)
-  int id;
-  const char* name;
-
-  // コンストラクタ
-  Item(int _id = 0, const char* _name = "", ItemType _type = ITEM_MATERIAL, int _value = 0, int _price = 0) {
-    id = _id;
-    name = _name;
-    type = _type;
-    value = _value;
-    price = _price;
-  }
+  }  
 };
 
 class Skill {
@@ -1051,9 +1130,9 @@ public:
         name = "ソニックダガー"; tpCost = 0; power = 120; 
         type = EffectType::DAMAGE; scope = TargetScope::SINGLE_ENEMY; 
         break; // (必ず先制攻撃)
-      case 122: 
-        name = "かく乱"; tpCost = 0; power = 0; 
-        type = EffectType::DEBUFF; scope = TargetScope::SINGLE_ENEMY; 
+      case 122:
+        name = "かく乱"; tpCost = 0; power = 90;
+        type = EffectType::SPECIAL; scope = TargetScope::SINGLE_ENEMY;
         break; // (攻撃 + 確率で混乱)
       case 123: 
         name = "ファントムラッシュ"; tpCost = 0; power = 130; 
@@ -1131,7 +1210,7 @@ Item createItemById(int id) {
   
   // 基本素材
   if (id == 1) return Item(1, "鉄くず", Item::ITEM_MATERIAL, 0, 10);
-  if (id == 2) return Item(2, "銅の歯車", Item::ITEM_MATERIAL, 0, 30); // 名前修正(銅の歯車)
+  if (id == 2) return Item(2, "銅の歯車", Item::ITEM_MATERIAL, 0, 30);
   
   // 進化アイテム (値段は適当に設定、売れるようにする)
   if (id == 10) return Item(10, "攻撃の歯車", Item::ITEM_MATERIAL, 0, 100);
@@ -1394,7 +1473,6 @@ public:
   int tauntTurns = 0;
   int twoActionsTurns = 0;
   int untargetableTurns = 0;
-  int maxHpBuffTurns = 0;
   int physDamageOneTurns = 0;
   int endureTurns = 0;
   int counterTurns = 0;
@@ -2329,7 +2407,7 @@ public:
     lckDebuffRate = 1.0; lckDebuffTurns = 0;
     hpRegenTurns = 0; tpRegenTurns = 0; invalidDamageTurns = 0; 
     reflectPhysicalTurns = 0; reflectMagicTurns = 0;
-    // ★★★ 初期技の習得を、テーブル参照方式に変更 ★★★
+    // 初期技をテーブルから習得
     checkLevelUpSkills(0, Level); // 0レベルから現在のレベルまで
   }
 
@@ -2369,7 +2447,10 @@ public:
     }
   }
 
-  int takedamage(int damage){
+  int takedamage(
+      int damage,
+      Skill::Category damageCategory = Skill::Category::OTHER
+  ){
     // 1. ターン制無敵 (ID 63)
     if (invalidDamageTurns > 0) {
         return 0; // ダメージ0で終了 (回数は減らない)
@@ -2379,10 +2460,14 @@ public:
         damageGuardCount--; // ★ 1回消費
         return 0; // ダメージ0で終了
     }
-    // 2. アダマン・ボディ (物理を1に)
-    // (厳密には物理判定が必要だが、簡易的に全てのダメージを1にする)
-    else if (physDamageOneTurns > 0) {
-        if (damage > 1) damage = 1;
+    // 2. アダマン・ボディ
+    // 物理ダメージだけを1にする
+    else if (physDamageOneTurns > 0 &&
+            damageCategory == Skill::Category::PHYSICAL)
+    {
+        if (damage > 1) {
+            damage = 1;
+        }
     }
     
     // 3. ラストスタンド (HP1で耐える)
@@ -2465,8 +2550,8 @@ public:
             atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
             spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
             break;
-        case 27:
-            coverTurns = 1;
+        case 27: // かばう（次の自分の行動終了まで有効）
+            coverTurns = 2;
             break;
         case 29: // トリックステップ (SPD/LCK 1.5倍)
             spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
@@ -2476,9 +2561,10 @@ public:
             atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
             defBuffRate = 1.5; defBuffTurns = DEFAULT_BUFF_TURNS;
             break;
-        case 32: // キングス・シールド (物理・旋律反射)
-            reflectAllTurns = 1;
-            break;
+        case 32: // キングス・シールド (1ターン物理・旋律反射)
+          // 使用した行動の終了時に1減るため、2から開始
+          reflectAllTurns = 2;
+          break;
         case 34: // バーサーク (ATK 2倍 / DEF 0.5倍)
             atkBuffRate = 2.0; atkBuffTurns = LONG_BUFF_TURNS;
             defDebuffRate = 0.5; defDebuffTurns = LONG_BUFF_TURNS; // (※デバフも付く)
@@ -2532,11 +2618,11 @@ public:
             autoReviveTurns = 99;
             break;
         case 62: // 最大HP上昇
-            MaxHP = (int)(MaxHP * 1.5);
-            HP = (int)(HP * 1.5);
+            boostMaxHP();
             break;
         case 63: // 無敵 (1ターン ダメージ 0)
-            invalidDamageTurns = 1; // (次の行動まで)
+            // 使用直後のUpdateTurnで1減るため2から開始する
+            invalidDamageTurns = 2;
             break;
         case 64: // 全体バリア (ダメージ無効 1回)
             damageGuardCount = 1;
@@ -2626,7 +2712,8 @@ public:
       return false; // デバフを適用せずに終了
     }
     const int DEFAULT_DEBUFF_TURNS = 3;
-    int baseChance = 100; // デフォルトは100%
+    int baseChance = 100;
+    bool sureHit = false;
     // --- 成功率の設定 ---
     switch (skillId) {
       // 毒系
@@ -2652,14 +2739,14 @@ public:
       case 112: baseChance = 80; break; // エリア・ブレイク
       case 118: baseChance = 70; break; // ワールド・ダウン
       // 必中系
-      case 101: baseChance = 999; break; // ディスペル(必中)
-      case 117: baseChance = 999; break; // バニッシュ(必中)
+      case 101: sureHit = true; break; // ディスペル
+      case 117: sureHit = true; break; // バニッシュ
       // 特殊
       case 114: baseChance = 40; break; // ディザスター(全体異常)
       default: baseChance = 100; break;
     }
-    if (!checkDebuffHit(baseChance, user)) {
-      return false; // ミス！
+    if (!sureHit && !checkDebuffHit(baseChance, user)) {
+      return false;
     }
     switch (skillId) {
       // --- 主人公 ---
@@ -2804,36 +2891,87 @@ public:
   }
 
   int gainXP(int amount) {
-    if (Level >= 99) return 0;
+    if (Level >= 99) {
+      return 0;
+    }
 
     currentXP += amount;
-    bool leveledUp = false;
-    int oldLevel = Level;
 
-    while (currentXP >= nextLevelXP && Level < 99) {
-      currentXP -= nextLevelXP; 
+    bool leveledUp = false;
+    bool evolvedDuringGain = false;
+
+    // 一度に複数レベル上がる場合でも、
+    // 1レベルずつ処理して、その都度進化判定を行う。
+    while (currentXP >= nextLevelXP &&
+          Level < 99)
+    {
+      int previousLevel = Level;
+
+      currentXP -= nextLevelXP;
       Level++;
-      nextLevelXP = calculateNextXP(Level);
+
+      nextLevelXP =
+          calculateNextXP(Level);
+
       leveledUp = true;
+
+      // -------------------------------------------------
+      // このレベルで発生する自動進化を処理
+      // -------------------------------------------------
+      bool evolvedAtThisLevel = false;
+
+      while (true) {
+        bool evolutionFound = false;
+
+        for (int i = 0;
+            i < evolutionRuleCount;
+            i++)
+        {
+          const EvolutionRule& rule =
+              evolutionTable[i];
+
+          if (rule.before_who_id == this->who &&
+              rule.trigger_type == TRIGGER_LEVEL &&
+              this->Level >= rule.trigger_value)
+          {
+            evolve(rule.after_who_id);
+
+            evolvedDuringGain = true;
+            evolvedAtThisLevel = true;
+            evolutionFound = true;
+
+            // who が変わったので、
+            // 新しい who でも進化条件があるか再確認する
+            break;
+          }
+        }
+
+        if (!evolutionFound) {
+          break;
+        }
+      }
+
+      // evolve() 内ではステータス再計算と
+      // スキル習得処理が行われるので、
+      // 進化しなかった場合だけここで処理する。
+      if (!evolvedAtThisLevel) {
+        recalculateStats();
+
+        checkLevelUpSkills(
+            previousLevel,
+            Level
+        );
+      }
+    }
+
+    if (evolvedDuringGain) {
+      return 2; // レベルアップ中に進化した
     }
 
     if (leveledUp) {
-      // ★ クラス内部なので、そのまま 'evolutionTable' を参照できる
-      for (int i = 0; i < evolutionRuleCount; i++) {
-        const EvolutionRule& rule = evolutionTable[i]; 
-
-        if (rule.before_who_id == this->who &&
-            rule.trigger_type == TRIGGER_LEVEL && // ★ 内部なので 'Status::' は不要
-            this->Level >= rule.trigger_value) 
-        {
-          evolve(rule.after_who_id); 
-          return 2; // 「進化した」
-        }
-      }
-      recalculateStats();
-      checkLevelUpSkills(oldLevel, Level);
-      return 1; // 「レベルアップのみ」
+      return 1; // レベルアップのみ
     }
+
     return 0; // 変化なし
   }
 
@@ -2859,7 +2997,7 @@ public:
     // ★ 計算結果を引数の変数に書き込む
     retIsCrit = (random(0, 100) < criticalRate);
 
-    // ダメージ計算 (前回修正した改良版の式)
+    // ダメージ計算
     float effectiveDef = (float)Defense * 0.5;
     if (retIsCrit) effectiveDef *= 0.5; // 貫通
 
@@ -2882,31 +3020,50 @@ public:
     // 回復・バフ・デバフ・蘇生・治療は必中とする
     // 攻撃系(DAMAGE, MULTI_HIT, SPECIAL)のみ判定を行う
     if (skill.type == Skill::EffectType::DAMAGE || 
-        skill.type == Skill::EffectType::MULTI_HIT_DAMAGE ||
-        skill.type == Skill::EffectType::SPECIAL) 
+      skill.type == Skill::EffectType::MULTI_HIT_DAMAGE ||
+      skill.type == Skill::EffectType::SPECIAL) 
     {
-        bool isSureHit = false;
-        
-        // ★★★ 必中スキルIDリスト ★★★
-        // 38:ソニックブレイド, 80:インビジブルエッジ, 84:マッハブレイド, 121:ソニックダガー
-        if (skill.id == 38 || skill.id == 80 || skill.id == 84 || skill.id == 121) {
-            isSureHit = true;
-        }
-        // 魔法(旋律)攻撃も基本必中とするならここに追加(今回は物理と同じ扱いで計算)
+      bool isSureHit = false;
 
-        if (!isSureHit) {
-            // 命中率 = 95 + (自分のSPD - 相手のSPD)
-            int hitRate = 95 + (this->getSpeed() - target->getSpeed());
-            
-            // 上限・下限設定
-            if(hitRate > 100) hitRate = 100;
-            if(hitRate < 20) hitRate = 20; // 最低でも20%は当たるようにする
+      // 回避無視スキル
+      if (skill.id == 80) { // インビジブルエッジ
+        isSureHit = true;
+      }
+      // 魔法(旋律)攻撃も基本必中とするならここに追加(今回は物理と同じ扱いで計算)
 
-            // 判定
-            if (random(0, 100) >= hitRate) {
-                return 0; // ★ ミス！ (ダメージ0を返す)
-            }
+      if (!isSureHit) {
+        // 基本命中率
+        int hitRate =
+            95 +
+            (this->getSpeed() - target->getSpeed());
+
+        // まず通常状態での「回避率」を求める
+        if (hitRate > 100) hitRate = 100;
+        if (hitRate < 20) hitRate = 20;
+
+        int missRate = 100 - hitRate;
+
+        // 対象の回避率バフを反映
+        // 例：回避率2倍なら、通常5%回避 → 10%回避
+        float evasionBonus =
+            target->getEvasionBonus();
+
+        missRate =
+            static_cast<int>(
+                missRate * evasionBonus
+            );
+
+        hitRate = 100 - missRate;
+
+        // 最終的な命中率も20～100%に制限
+        if (hitRate > 100) hitRate = 100;
+        if (hitRate < 20) hitRate = 20;
+
+        // 命中判定
+        if (random(0, 100) >= hitRate) {
+          return 0;
         }
+      }
     }
     if ((target->getWho() == 36 || target->getWho() == 37|| target->getWho() == 75 || target->getWho() == 76) && 
         skill.dependence == Skill::StatDependence::SEN) {
@@ -2987,14 +3144,6 @@ public:
     return damage;
   }
 
-  // ★★★ 3. その他の特殊処理 ★★★
-  void limitBreak() { // ID 86
-      // バフを最大ターン・最大倍率で付与 (簡易実装)
-      atkBuffRate = 3.0; atkBuffTurns = 3;
-      spdBuffRate = 3.0; spdBuffTurns = 3;
-  }
-
-  // ★★★ 修正: 引数に bool &retIsCrit を追加 ★★★
   int calculateHealAmount(Skill& skill, bool &retIsCrit) {
     int base = this->getSense();
     float multiplier = (float)skill.power / 50.0;
@@ -3010,11 +3159,20 @@ public:
     if (retIsCrit) heal = heal * 2.0; // 会心なら1.5倍回復
     // ------------------------
     
-    float variance = (float)random(90, 111) / 100.0;
-    heal = (int)((float)heal * variance);
-    
-    if (heal < 1) heal = 1;
+    float variance =
+        (float)random(90, 111) / 100.0;
+
+    heal =
+        (int)((float)heal * variance);
+
+    // ゲームバランス用の最終補正
     heal /= 4;
+
+    // 最終結果として最低1は回復する
+    if (heal < 1) {
+      heal = 1;
+    }
+
     return heal;
   }
 
@@ -3080,84 +3238,52 @@ public:
     }
   }
   void UpdateTurn() {
-    // バフ
+    // -------------------------
+    // 通常バフ
+    // -------------------------
     if (atkBuffTurns > 0) atkBuffTurns--;
     if (defBuffTurns > 0) defBuffTurns--;
     if (spdBuffTurns > 0) spdBuffTurns--;
     if (senBuffTurns > 0) senBuffTurns--;
     if (lckBuffTurns > 0) lckBuffTurns--;
     if (evaBuffTurns > 0) evaBuffTurns--;
+
     if (hpRegenTurns > 0) hpRegenTurns--;
     if (tpRegenTurns > 0) tpRegenTurns--;
+
+    // -------------------------
+    // 特殊なターン制バフ
+    // -------------------------
+    if (coverTurns > 0) coverTurns--;
+    if (tauntTurns > 0) tauntTurns--;
+    if (untargetableTurns > 0) untargetableTurns--;
+    if (counterTurns > 0) counterTurns--;
+    if (physDamageOneTurns > 0) physDamageOneTurns--;
+    if (attributeResistTurns > 0) attributeResistTurns--;
+
     if (invalidDamageTurns > 0) invalidDamageTurns--;
-    if (reflectPhysicalTurns > 0) reflectPhysicalTurns--;
+
+    // 反射系は現状の仕様を維持。
+    // 次のコミットで「ターン制 / 回数制」を整理する。
+
+    // キングス・シールド：ターン制
+    if (reflectAllTurns > 0) reflectAllTurns--;
+
+    // 旋律反射：ターン制
     if (reflectMagicTurns > 0) reflectMagicTurns--;
 
+    // -------------------------
     // デバフ
+    // -------------------------
     if (atkDebuffTurns > 0) atkDebuffTurns--;
     if (defDebuffTurns > 0) defDebuffTurns--;
     if (spdDebuffTurns > 0) spdDebuffTurns--;
     if (senDebuffTurns > 0) senDebuffTurns--;
     if (lckDebuffTurns > 0) lckDebuffTurns--;
-  }
 
-  int ApplyTurnEffects() {
-    int value = 0; // このターンで発生したダメージ/回復
-
-    // --- 1. 継続効果の発動 (毒・リジェネなど) ---
-    if (hpRegenTurns > 0) {
-        int heal = getMaxHp() * 0.1; // (例: 最大HPの10%回復)
-        if (heal < 1) heal = 1;
-        ReceiveHeal(heal);
-        value = -heal; // 回復は負数
-    }
-    if (tpRegenTurns > 0) {
-        // (例: 最大TPの5%回復)
-        ReceiveTP(getMaxTp() * 0.05); 
-    }
-    // ★ 毒の処理 (isPoisoned -> poisonTurns > 0)
-    if (poisonTurns > 0) {
-        // 通常毒: 最大HPの10%
-        // 猛毒:   最大HPの20%
-        int poisonRate = (poisonLevel >= 2) ? 20 : 10;
-        int poisonDmg = getMaxHp() * poisonRate / 100;
-
-        if (poisonDmg < 1) poisonDmg = 1;
-
-        if (attributeResistTurns > 0) {
-            poisonDmg /= 2;
-            if (poisonDmg < 1) poisonDmg = 1;
-        }
-
-        takedamage(poisonDmg);
-        value = poisonDmg;
-    }
-    // --- 2. 状態異常による行動不能判定 ---
-    // (麻痺・混乱などは ApplyTurnEffects の責務ではないので Battle 側で処理)
-
-    // --- 3. バフ/デバフの持続ターンを1減らす ---
-    // バフ
-    if (atkBuffTurns > 0) atkBuffTurns--;
-    if (defBuffTurns > 0) defBuffTurns--;
-    if (spdBuffTurns > 0) spdBuffTurns--;
-    if (senBuffTurns > 0) senBuffTurns--;
-    if (lckBuffTurns > 0) lckBuffTurns--;
-    if (evaBuffTurns > 0) evaBuffTurns--;
-    if (hpRegenTurns > 0) hpRegenTurns--;
-    if (tpRegenTurns > 0) tpRegenTurns--;
-    if (invalidDamageTurns > 0) invalidDamageTurns--;
-    if (reflectPhysicalTurns > 0) reflectPhysicalTurns--;
-    if (reflectMagicTurns > 0) reflectMagicTurns--;
-    // (その他特殊効果のターンもここで減らす)
-
-    // デバフ
-    if (atkDebuffTurns > 0) atkDebuffTurns--;
-    if (defDebuffTurns > 0) defDebuffTurns--;
-    if (spdDebuffTurns > 0) spdDebuffTurns--;
-    if (senDebuffTurns > 0) senDebuffTurns--;
-    if (lckDebuffTurns > 0) lckDebuffTurns--;
-    
-    // 状態異常 (ターンで解除されるもの)
+    // -------------------------
+    // 状態異常
+    // -------------------------
     if (poisonTurns > 0) {
       poisonTurns--;
 
@@ -3165,13 +3291,43 @@ public:
         poisonLevel = 0;
       }
     }
+
     if (paralyzedTurns > 0) paralyzedTurns--;
     if (silencedTurns > 0) silencedTurns--;
     if (confusedTurns > 0) confusedTurns--;
-    // (例: isSilencedTurns > 0 なら isSilencedTurns-- など)
+  }
 
+  int ApplyTurnEffects() {
+    int value = 0;
+
+    if (hpRegenTurns > 0) {
+      int heal = getMaxHp() * 0.1;
+      if (heal < 1) heal = 1;
+      ReceiveHeal(heal);
+      value = -heal;
+    }
+
+    if (tpRegenTurns > 0) {
+      ReceiveTP(getMaxTp() * 0.05);
+    }
+
+    if (poisonTurns > 0) {
+      int poisonRate = (poisonLevel >= 2) ? 20 : 10;
+      int poisonDmg = getMaxHp() * poisonRate / 100;
+
+      if (poisonDmg < 1) poisonDmg = 1;
+
+      if (attributeResistTurns > 0) {
+        poisonDmg /= 2;
+        if (poisonDmg < 1) poisonDmg = 1;
+      }
+
+      value =
+        takedamage(poisonDmg);
+    }
     return value;
   }
+
   void saveTo(FsFile& file) {
     file.println(who);
     file.println(Level);
@@ -3189,28 +3345,58 @@ public:
   }
 
   void loadFrom(FsFile& file) {
-    // 読み込み (改行まで読んで数値に変換)
-    // ParseInt的な機能がない場合があるので、Stringで読んで変換が確実
+    // -------------------------
+    // 保存値を読み込む
+    // -------------------------
     who = file.readStringUntil('\n').toInt();
     Level = file.readStringUntil('\n').toInt();
     currentXP = file.readStringUntil('\n').toInt();
-    HP = file.readStringUntil('\n').toInt();
-    TP = file.readStringUntil('\n').toInt();
+
+    // HP / TP は再計算で上書きされるので、一旦退避する
+    int savedHP = file.readStringUntil('\n').toInt();
+    int savedTP = file.readStringUntil('\n').toInt();
+
     equipWeaponId = file.readStringUntil('\n').toInt();
     equipArmorId = file.readStringUntil('\n').toInt();
     equipAccId = file.readStringUntil('\n').toInt();
-    // 名前や最大HPなどを再計算
+
+    // -------------------------
+    // レベル・種類に応じた基礎値を再構築
+    // -------------------------
     updateName();
+
+    // ロードしたLevelに合わせて次の必要XPも更新
+    nextLevelXP = calculateNextXP(Level);
+
     recalculateStats();
 
-    // スキル復元
+    // -------------------------
+    // 保存時の現在HP / TPを復元
+    // -------------------------
+    HP = savedHP;
+    TP = savedTP;
+
+    // 壊れた/古いセーブデータ対策
+    if (HP < 0) HP = 0;
+    if (HP > MaxHP) HP = MaxHP;
+
+    if (TP < 0) TP = 0;
+    if (TP > MaxTP) TP = MaxTP;
+
+    // -------------------------
+    // 習得済みスキル復元
+    // -------------------------
     learnedSkills.clear();
+
     int skillCount = file.readStringUntil('\n').toInt();
+
     for (int i = 0; i < skillCount; i++) {
       int skillId = file.readStringUntil('\n').toInt();
       learnedSkills.push_back(Skill(skillId));
     }
-    // ★★★ 追加: 覚え漏れがないか再チェックして補完する ★★★
+
+    // レベル上は覚えているはずなのに、
+    // 古いセーブに存在しないスキルがあれば補完
     checkLevelUpSkills(0, Level);
   }
 
@@ -3273,7 +3459,7 @@ const Status::EvolutionRule Status::evolutionTable[] = {
   { 60, Status::TRIGGER_ITEM,  18, 74 }, // 72 + アイテム18 -> 74 (Bルート)
 
   //特殊
-  { 75, Status::TRIGGER_ITEM,  19, 76 }
+  { 75, Status::TRIGGER_ITEM,   4, 76 } // 金の歯車で進化
 };
 // サイズも同様に定義
 const int Status::evolutionRuleCount = sizeof(Status::evolutionTable) / sizeof(Status::EvolutionRule);
@@ -3437,25 +3623,24 @@ const int Status::skillLearningRuleCount = sizeof(Status::skillLearningTable) / 
 class Automaton {
 public:
   Status* status;
-  const char* name;
-  int who; // 仲間の種類 (5体のうちのどれか、またはその進化形)
 
   /**
    * @brief 仲間（オートマタ）を生成
    * @param level 初期レベル
-   * @param w 仲間の種類ID (who)
+   * @param w 仲間の種類ID
    */
   Automaton(int level, int w) {
-    who = w;
-    status = new Status(level, who);
-    
-    name = status->getname();
+    status = new Status(level, w);
   }
-  const char* getname(){
-    name = status->getname();
-    return name;
+
+  const char* getname() {
+    return status->getname();
   }
-  // (デストラクタ：Statusも削除)
+
+  int getWho() {
+    return status->getWho();
+  }
+
   ~Automaton() {
     delete status;
     status = nullptr;
@@ -3657,7 +3842,7 @@ public:
         break;
 
       // --- 4. 3段階目進化 (Lv 30-32) ---
-      // ※ ここから「進化の歯車」を落とすように設定
+      // 進化の歯車をドロップする設定
       
       case 15: // ヴァンガード (攻撃の歯車)
         name = "ヴァンガード"; status = new Status(level, who); dropItemId = 10; dropRatePercent = 20; xpYield = 150; break;
@@ -3677,7 +3862,7 @@ public:
       // --- 5. 4段階目（最終）進化 (Lv 40-42) ---
       // ※ さらに上位の歯車や、レアアイテムを落とす
       
-      case 22: // オーバーロード (紅の歯車)
+      case 22: // オーバーロード (赤の歯車)
         name = "オーバーロード"; dropItemId = 11; status = new Status(level, who); dropRatePercent = 15; xpYield = 400; break;
       case 23: // デストロイヤー (紅の歯車)
         name = "デストロイヤー"; dropItemId = 12; status = new Status(level, who); dropRatePercent = 15; xpYield = 400; break;
@@ -3686,7 +3871,7 @@ public:
       case 25: // ヴォイド・ストーカー (紅の歯車)
         name = "ヴォイド・ストーカー"; dropItemId = 12; status = new Status(level, who); dropRatePercent = 15; xpYield = 400; break;
         
-      case 26: // アダマンタイト (蒼の歯車)
+      case 26: // アダマンタイト (青の歯車)
         name = "アダマンタイト"; dropItemId = 14; status = new Status(level, who); dropRatePercent = 15; xpYield = 420; break;
       case 27: // インヴィンシブル (蒼の歯車)
         name = "インヴィンシブル"; dropItemId = 15; status = new Status(level, who);dropRatePercent = 15; xpYield = 450; break;
@@ -3695,17 +3880,17 @@ public:
       case 29: // リジェネレーター (蒼の歯車)
         name = "リジェネレーター"; dropItemId = 15; status = new Status(level, who); dropRatePercent = 15; xpYield = 430; break;
 
-      case 30: // シルフィード (銀の歯車: 換金)
+      case 30: // シルフィード (速度の歯車)
         name = "シルフィード"; dropItemId = 16; status = new Status(level, who); dropRatePercent = 20; xpYield = 390; break;
       case 31: // アクセラレーター (銀の歯車)
         name = "アクセラレーター"; dropItemId = 3; status = new Status(level, who); dropRatePercent = 20; xpYield = 390; break;
         
-      case 32: // アーク・ハーモニスト (リペアキット大)
+      case 32: // アーク・ハーモニスト (回復の歯車)
         name = "アーク・ハーモニスト"; dropItemId = 17; status = new Status(level, who);dropRatePercent = 20; xpYield = 410; break;
       case 33: // シンフォニア (リペアキット大)
         name = "シンフォニア"; dropItemId = 102; status = new Status(level, who); dropRatePercent = 20; xpYield = 410; break;
         
-      case 34: // パンデモニウム (謎のパーツ: 換金)
+      case 34: // パンデモニウム (感応の歯車)
         name = "パンデモニウム"; dropItemId =18; status = new Status(level, who);dropRatePercent = 30; xpYield = 400; break;
       case 35: // ジョーカー (謎のパーツ)
         name = "ジョーカー"; dropItemId = 5; status = new Status(level, who); dropRatePercent = 30; xpYield = 400; break;
@@ -3714,7 +3899,7 @@ public:
       case 36: // はぐれノイズ (XP特化)
         name = "はぐれノイズ";
         status = new Status(5, who);
-        dropItemId = 19; // 金の歯車 (500G)
+        dropItemId = 4; // 金の歯車
         dropRatePercent = 100; // 確定ドロップ
         xpYield = 10000; 
         break;
@@ -3734,7 +3919,7 @@ public:
         status->forceLearnSkill(21);
         status->forceLearnSkill(106);
         status->forceLearnSkill(47);
-        dropItemId = 3; // パワーリング
+        dropItemId = 500; // パワーリング
         dropRatePercent = 100; 
         xpYield = 500;
         break;
@@ -3747,7 +3932,7 @@ public:
         status->forceLearnSkill(52);
         status->forceLearnSkill(34);
         status->forceLearnSkill(87);
-        dropItemId = 4; // ガードリング
+        dropItemId = 501; // ガードリング
         dropRatePercent = 100;
         xpYield = 1500;
         break;
@@ -3763,7 +3948,7 @@ public:
         status->forceLearnSkill(113); // カオスフィールド (混乱)
         // 攻撃スキル
         status->forceLearnSkill(42);  // アサシネイト (確率で即死級ダメージ)
-        dropItemId = 5; // トリニティ・コア(激レア)
+        dropItemId = 599; // トリニティ・コア
         dropRatePercent = 100; // 50%
         xpYield = 4000;
         break;
@@ -3779,7 +3964,7 @@ public:
         status->forceLearnSkill(25);  // ソードダンス (攻撃・素早さUP)
         status->forceLearnSkill(123); // ファントムラッシュ (ランダム2~5回攻撃)
         status->forceLearnSkill(80);  // インビジブルエッジ (回避無視の必中攻撃)
-        dropItemId = 504; // 創世のタクト
+        dropItemId = 399; // 創世のタクト
         dropRatePercent = 100;
         xpYield = 10000;
         break;
@@ -3829,7 +4014,6 @@ public:
   bool moved = false;
   int MOVE_SPEED = 8;
   Status* status;
-  // ★★★ 修正後のコンストラクタ ★★★
   // Mapオブジェクトを受け取り、安全なスタート地点を探す
   Caractor(Map& map, int level, int who) {
     status = new Status(level, who);
@@ -3837,7 +4021,7 @@ public:
     // 最初の草タイル(TILE_GRASS)を探す
     for (int y = 1; y < map.getMAP_HEIGHT() - 1; y++) {
       for (int x = 1; x < map.getMAP_WIDTH() - 1; x++) {
-        if (map.mapData[y * map.getMAP_WIDTH() + x] == Map::TILE_GRASS) {
+        if (map.getTile(x, y) == Map::TILE_GRASS) {
           // 見つけたら、そこをピクセル座標のスタート地点に
           X = x * Map::TILE_SIZE;
           Y = y * Map::TILE_SIZE;
@@ -3858,11 +4042,12 @@ public:
   }
   
   void reset(Map& map) {
-    // 以前の検索ループ処理は全て削除してください
+    // Mapが決めた開始位置を使用
+    Map::ObjectPos startPos =
+        map.getPlayerStartPos();
 
-    // Mapクラスの方で既にランダムに決められている座標(playerStartPos)をそのまま使う
-    X = map.playerStartPos.x * Map::TILE_SIZE;
-    Y = map.playerStartPos.y * Map::TILE_SIZE;
+    X = startPos.x * Map::TILE_SIZE;
+    Y = startPos.y * Map::TILE_SIZE;
 
     oldX = X;
     oldY = Y;
@@ -3897,6 +4082,7 @@ public:
   // 前フレームのヒーロー矩形（画面座標）
   int prevHeroScreenX = -1;
   int prevHeroScreenY = -1;
+  Caractor::Direction prevHeroDirection = Caractor::DIR_DOWN;
   
   // 強制再描画フラグ
   int startTileX = -1; 
@@ -4009,7 +4195,7 @@ public:
               continue;
             }
 
-            int tileType = map.mapData[ty * map.getMAP_WIDTH() + tx];
+            int tileType = map.getTile(tx, ty);
             int drawX = tx * Map::TILE_SIZE - cameraX;
             int drawY_local = ty * Map::TILE_SIZE - worldY_Start; // スプライト内での相対Y座標
 
@@ -4021,6 +4207,26 @@ public:
               lineSprite.pushImage(drawX, drawY_local, Map::TILE_SIZE, Map::TILE_SIZE, bmp, H_TRANSPARENT);
             }
           }
+        }
+        // マップが画面幅より小さい場合だけ、
+        // 右側のマップ外領域を黒で消す。
+        // ラインスプライト全体はクリアしない。
+        int mapRight =
+            map.getMAP_WIDTH() * Map::TILE_SIZE
+            - cameraX;
+
+        if (mapRight < SCREEN_WIDTH) {
+          if (mapRight < 0) {
+            mapRight = 0;
+          }
+
+          lineSprite.fillRect(
+              mapRight,
+              0,
+              SCREEN_WIDTH - mapRight,
+              BLOCK_HEIGHT,
+              TFT_BLACK
+          );
         }
 
         // 4. この帯にヒーローが居るか？ (重なり判定)
@@ -4035,7 +4241,6 @@ public:
           // 重なっているので描画する
           int heroLocalY = heroScreenY - drawY; // スプライト内Y
           const uint16_t* heroBmp = getHeroImage(hero.direction);
-          //lineSprite.pushImage(heroScreenX, heroLocalY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)hero_dots, H_TRANSPARENT);
           lineSprite.pushImage(heroScreenX, heroLocalY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)heroBmp, H_TRANSPARENT);
         }
 
@@ -4043,11 +4248,13 @@ public:
         lineSprite.pushSprite(0, drawY);
     }
 
-    // 前回の位置を更新
+    // 前回の位置・向きを更新
     int hx = hero.X - cameraX;
     int hy = hero.Y - cameraY;
+
     prevHeroScreenX = hx;
     prevHeroScreenY = hy;
+    prevHeroDirection = hero.direction;
     
     // 再描画完了フラグ
     startTileX = 0; // -1 以外なら何でもOK
@@ -4072,7 +4279,7 @@ public:
             
             int screenX = tx * Map::TILE_SIZE - cameraX;
             int screenY = ty * Map::TILE_SIZE - cameraY;
-            int tileType = map.mapData[ty * map.getMAP_WIDTH() + tx];
+            int tileType = map.getTile(tx, ty);
 
             // 背景を復元 (直接描画)
             const uint16_t* currentGrassBmp = tileBitmapFor(Map::TILE_GRASS);
@@ -4110,8 +4317,13 @@ public:
     int heroScreenX = hero.X - cameraX;
     int heroScreenY = hero.Y - cameraY;
 
-    // ヒーローが動いていなければ何もしない
-    if (prevHeroScreenX == heroScreenX && prevHeroScreenY == heroScreenY) return;
+    // 位置も向きも変わっていなければ何もしない
+    if (prevHeroScreenX == heroScreenX &&
+        prevHeroScreenY == heroScreenY &&
+        prevHeroDirection == hero.direction)
+    {
+      return;
+    }
 
     // ★ ヒーローの「移動前」と「移動後」の領域だけを復元・描画する
     // 1. 古い場所を背景で塗りつぶす (LCD直接)
@@ -4124,6 +4336,7 @@ public:
     lcd.pushImage(heroScreenX, heroScreenY, Map::TILE_SIZE, Map::TILE_SIZE, (uint16_t*)heroBmp, H_TRANSPARENT);
     prevHeroScreenX = heroScreenX;
     prevHeroScreenY = heroScreenY;
+    prevHeroDirection = hero.direction;
   }
 
   // 外部から強制再描画を要求するときに呼ぶ
@@ -4150,7 +4363,7 @@ public:
     for (int i = 0; i < 8; ++i) {
       pinMode(btnPins[i], INPUT_PULLUP);
       lastPressTime[i] = 0;
-      // ← ここを修正：prevState は「押されているか（LOW）」の boolean として保存する
+      // 押下状態（LOW）をboolで保持
       prevState[i] = (digitalRead(btnPins[i]) == LOW);
     }
   }
@@ -4190,26 +4403,79 @@ public:
   }
 
   // --- 壁判定 ---
-  void check_wall(Caractor &hero, Map & map){
+  void check_wall(Caractor &hero, Map &map) {
     int hitbox_offset = 1;
-    int centerX = hero.X + Map::TILE_SIZE/2;
-    int centerY = hero.Y + Map::TILE_SIZE/2;
-    int left = centerX - hitbox_offset, right = centerX + hitbox_offset;
-    int top = centerY - hitbox_offset, bottom = centerY + hitbox_offset;
-    if (map.mapData[top/Map::TILE_SIZE * map.getMAP_WIDTH() + left/Map::TILE_SIZE] == Map::TILE_WALL ||
-        map.mapData[top/Map::TILE_SIZE * map.getMAP_WIDTH() + right/Map::TILE_SIZE] == Map::TILE_WALL ||
-        map.mapData[bottom/Map::TILE_SIZE * map.getMAP_WIDTH() + left/Map::TILE_SIZE] == Map::TILE_WALL ||
-        map.mapData[bottom/Map::TILE_SIZE * map.getMAP_WIDTH() + right/Map::TILE_SIZE] == Map::TILE_WALL) {
-      hero.X = hero.oldX; hero.Y = hero.oldY; hero.moved = false;
+
+    int centerX =
+        hero.X + Map::TILE_SIZE / 2;
+
+    int centerY =
+        hero.Y + Map::TILE_SIZE / 2;
+
+    int left   = centerX - hitbox_offset;
+    int right  = centerX + hitbox_offset;
+    int top    = centerY - hitbox_offset;
+    int bottom = centerY + hitbox_offset;
+
+    const int mapPixelWidth =
+        map.getMAP_WIDTH() * Map::TILE_SIZE;
+
+    const int mapPixelHeight =
+        map.getMAP_HEIGHT() * Map::TILE_SIZE;
+
+    // マップ外は壁として扱う
+    auto isWallOrOutOfBounds =
+        [&](int px, int py) -> bool
+    {
+      if (px < 0 ||
+          py < 0 ||
+          px >= mapPixelWidth ||
+          py >= mapPixelHeight)
+      {
+        return true;
+      }
+
+      int tileX =
+          px / Map::TILE_SIZE;
+
+      int tileY =
+          py / Map::TILE_SIZE;
+
+      return map.getTile(tileX, tileY) == Map::TILE_WALL;
+    };
+
+    if (isWallOrOutOfBounds(left,  top) ||
+        isWallOrOutOfBounds(right, top) ||
+        isWallOrOutOfBounds(left,  bottom) ||
+        isWallOrOutOfBounds(right, bottom))
+    {
+      hero.X = hero.oldX;
+      hero.Y = hero.oldY;
+      hero.moved = false;
     }
   }
 
   bool check_event(Caractor &hero, Map &map, GameState &state, EventType &currentEvent) {
     // 1. プレイヤーの現在タイル座標を取得
-    int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-    int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
+    int heroTileX =
+        (hero.X + Map::TILE_SIZE / 2) /
+        Map::TILE_SIZE;
+
+    int heroTileY =
+        (hero.Y + Map::TILE_SIZE / 2) /
+        Map::TILE_SIZE;
+
+    // 万一マップ外ならイベント判定をしない
+    if (heroTileX < 0 ||
+        heroTileY < 0 ||
+        heroTileX >= map.getMAP_WIDTH() ||
+        heroTileY >= map.getMAP_HEIGHT())
+    {
+      return false;
+    }
+
     // 2. その場所のタイルタイプを取得
-    uint8_t tileType = map.mapData[heroTileY * map.getMAP_WIDTH() + heroTileX];
+    uint8_t tileType = map.getTile(heroTileX, heroTileY);
 
     // 3. タイルタイプに応じて分岐
     switch (tileType) {
@@ -4283,171 +4549,6 @@ public:
 };
 
 // -------------------------
-// うまくいってるやつ
-// -------------------------
-/*class Menu {
-public:
-  // ★ メニューの状態を定義
-  enum MenuState {
-    STATE_MAIN,     // 道具、技、進化... を選ぶ
-    STATE_EVOLVE    // ★ 「進化」画面
-  };
-  MenuState currentMenuState;
-
-  // メインメニュー
-  static const int MAIN_ITEM_COUNT = 4;
-  // ★ "機構カスタマイズ" を "進化" に変更
-  const char* mainItems[MAIN_ITEM_COUNT] = {"道具", "旋律", "進化", "設定"};
-  int mainSelected = 0;
-
-  // 進化画面
-  int customizeSelected = 0; // 仲間リストのカーソル
-
-  bool active = false;
-
-  Menu() {
-    currentMenuState = STATE_MAIN; // 初期状態
-  }
-
-  void toggle() { 
-    active = !active; 
-    currentMenuState = STATE_MAIN; // メニューを開くときは必ずメインから
-    mainSelected = 0;
-    customizeSelected = 0;
-  }
-
-  void update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party& party) {
-    if (!active) return; // メニューが非表示なら何もしない
-
-    // --- Bボタン（キャンセル）処理 ---
-    if (ctrl.pressedDebounced(ctrl.BTN_B)) {
-      if (currentMenuState == STATE_MAIN) {
-        // メインメニューでBを押したらメニューを閉じる
-        active = false;
-      } else if (currentMenuState == STATE_EVOLVE) {
-        // 進化画面でBを押したらメインに戻る
-        currentMenuState = STATE_MAIN;
-      }
-      return; // Bボタンが押されたフレームは他の操作を無視
-    }
-
-    // --- 状態別 Aボタン（決定）とカーソル移動 ---
-    if (currentMenuState == STATE_MAIN) {
-      // --- メインメニューの操作 ---
-      
-      // ★★★ バグ修正 ★★★
-      // ゼロ除算 (% mainSelected) を修正
-      if (ctrl.pressedDebounced(ctrl.BTN_UP))   mainSelected = (mainSelected - 1 + MAIN_ITEM_COUNT) % MAIN_ITEM_COUNT;
-      if (ctrl.pressedDebounced(ctrl.BTN_DOWN)) mainSelected = (mainSelected + 1) % MAIN_ITEM_COUNT;
-      // ★★★ 修正ここまで ★★★
-
-      if (ctrl.pressedDebounced(ctrl.BTN_A)) {
-        if (mainSelected == 2) { // 「進化」が選ばれた
-          currentMenuState = STATE_EVOLVE;
-          customizeSelected = 0; // カーソルをリセット
-        }
-        // (他の「道具(0)」や「旋律(1)」も将来ここで分岐)
-      }
-
-    } else if (currentMenuState == STATE_EVOLVE) {
-      // --- 進化画面（仲間選択）の操作 ---
-      int memberCount = party.members.size();
-      if (memberCount > 0) { // 仲間が1人以上いる
-        
-        // 仲間リストのカーソル移動
-        if (ctrl.pressedDebounced(ctrl.BTN_UP))   customizeSelected = (customizeSelected - 1 + memberCount) % memberCount;
-        if (ctrl.pressedDebounced(ctrl.BTN_DOWN)) customizeSelected = (customizeSelected + 1) % memberCount;
-
-        // Aボタン（決定）
-        if (ctrl.pressedDebounced(ctrl.BTN_A)) {
-          // ★ 選択した仲間を取得
-          Automaton* selectedAlly = party.members[customizeSelected];
-          
-          // (今は仮に、アイテムID=1を持っているかチェック)
-          bool hasEvoItem = false;
-          int itemIndex = -1;
-          for(int i=0; i < inventory.items.size(); i++) {
-            if (inventory.items[i].id == 1) { // ID=1 (進化の歯車)
-              hasEvoItem = true;
-              itemIndex = i;
-              break;
-            }
-          }
-
-          // ★ もしアイテムを持っていて、進化可能なら
-          if (hasEvoItem) {
-            // (例) 仲間(who=39) を (who=40) に進化させる
-            if (selectedAlly->who == 39) { 
-              selectedAlly->status->evolve(40); // (Statusクラスのwho=40の定義が必要)
-              // アイテムを消費
-              inventory.items.erase(inventory.items.begin() + itemIndex);
-            }
-            // (ここに他の進化ルールを追加...)
-          }
-        } 
-      }
-    } 
-  }
-
-  void draw(LGFX_Sprite &sp, Inventory& inventory, Caractor& hero, Party& party) {
-    if (!active) return;
-    sp.fillScreen(TFT_BLACK);
-
-    if (currentMenuState == STATE_MAIN) {
-      // --- メインメニューの描画 ---
-      int x = 60, y = 40, w = 200, h = 140;
-      sp.fillRect(x, y, w, h, TFT_DARKGREY);
-      sp.drawRect(x, y, w, h, TFT_WHITE);
-      sp.setTextSize(2);
-      for (int i = 0; i < MAIN_ITEM_COUNT; i++) {
-        uint16_t color = (i == mainSelected) ? TFT_YELLOW : TFT_WHITE;
-        sp.setTextColor(color);
-        sp.setCursor(x + 20, y + 20 + i * 28);
-        sp.print(mainItems[i]);
-      }
-
-    } else if (currentMenuState == STATE_EVOLVE) {
-      // --- 進化画面の描画 ---
-      int x = 10, y = 40, w = 300, h = 190;
-      sp.fillRect(x, y, w, h, TFT_DARKGREY);
-      sp.drawRect(x, y, w, h, TFT_WHITE);
-      sp.setTextSize(2);
-      
-      sp.setTextColor(TFT_WHITE);
-      sp.setCursor(x + 20, y + 15);
-      sp.print("進化 (誰を？)");
-      sp.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-      // --- 仲間リストの描画 ---
-      int memberCount = party.members.size();
-      if (memberCount == 0) {
-        sp.setCursor(x + 20, y + 55);
-        sp.print("仲間がいません");
-      } else {
-        for (int i = 0; i < memberCount; i++) {
-          Automaton* ally = party.members[i];
-          uint16_t color = (i == customizeSelected) ? TFT_YELLOW : TFT_WHITE;
-          sp.setTextColor(color);
-          sp.setCursor(x + 20, y + 55 + i * 28);
-          sp.printf("%s Lv%d HP%d/%d", 
-            ally->name.c_str(), 
-            ally->status->getLevel(), 
-            ally->status->getHp(), 
-            ally->status->getMaxHp()
-          );
-        }
-      }
-      
-      // --- 所持アイテム表示 (例) ---
-      sp.drawLine(x, y + 140, x + w, y + 140, TFT_WHITE);
-      sp.setTextColor(TFT_WHITE);
-      sp.setCursor(x + 20, y + 155);
-      sp.print("必要なアイテム: 進化の歯車");
-    }
-  }
-};*/
-
-// -------------------------
 // AUDIO / SD (core1 に限定)
 // -------------------------
 bool audio_timer_callback(struct repeating_timer *t);
@@ -4471,7 +4572,7 @@ public:
 
   volatile bool needs_refill = true;
   volatile bool paused = false;
-  // ★★★ 修正: SE用バッファを全削除し、シンセ用変数を追加 ★★★
+  // SEシンセ用の状態
   
   // 波形タイプ
   enum WaveType { OFF, SQUARE, NOISE };
@@ -4483,7 +4584,6 @@ public:
   volatile float seVol = 0;       // 音量
   volatile float seVolDecay = 0;  // 音量の減衰量 (フェードアウト)
   volatile int targetSeVol = 10;
-  // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
   float bgmVolume = 1.0;
   int masterSeVol = 10;
   void setSeVolume(int vol) {
@@ -4498,22 +4598,18 @@ public:
     pinMode(DAC_MOSI_PIN, OUTPUT);
     digitalWrite(DAC_CS_PIN, HIGH);
     // SE変数の初期化
-    // ★★★ 修正: シンセサイザー変数の初期化 ★★★
-    // (古いループ処理は削除して、以下に置き換える)
     seType = OFF;
     sePhase = 0;
     seFreq = 0;
     seFreqSlide = 0;
     seVol = 0;
     seVolDecay = 0;
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★
   }
   // MUSIC クラス内
   
   void playSE(int id) {
       sePhase = 0;
-      
-      // ★修正: 設定値(0-10)を反映させる
+      // 設定値(0-10)を反映
       // masterSeVol が 10 なら 5000.0、5 なら 2500.0、0 なら 0.0
       float baseVol = 5000.0f * ((float)masterSeVol / 10.0f);
       seVol = baseVol;
@@ -4623,7 +4719,6 @@ public:
   int pendingTrack = -1;
   size_t refillOffset = 0;
   SdFat sdfat;
-  absolute_time_t refill_block_until = 0;
   Sd() {
     pinMode(SD_CS_PIN, OUTPUT);
     digitalWrite(SD_CS_PIN, HIGH);
@@ -4728,50 +4823,70 @@ public:
   }
 
   void refile(MUSIC &music) {
-    // only refill when requested
-    if (!music.needs_refill) return;
-    // --- safety guard ---
-    if (music.paused || refillOffset == 0 && music.sampleIndex == 0 && music.playBytes == MUSIC::BUF_SIZE)
-      return;
-
-    // If we just switched tracks and refillOffset==0 and playBytes>0 and sampleIndex==0,
-    // then we've already prefilled buffers in performPendingSwitch — don't refile immediately.
-    if (refillOffset == 0 && music.sampleIndex == 0 && music.playBytes > 0) {
-      // keep needs_refill false until playback advances a bit
-      // but being defensive: only delay for one buffer consumption threshold
+    // 補充要求がないなら何もしない
+    if (!music.needs_refill) {
       return;
     }
 
-    FsFile& file = music.musicFiles[music.currentTrack];
-    if (!file.isOpen()) return;
+    // 曲切り替え中などはSD読み込みしない
+    if (music.paused) {
+      return;
+    }
+
+    FsFile& file =
+        music.musicFiles[music.currentTrack];
+
+    if (!file.isOpen()) {
+      return;
+    }
 
     critical_section_enter_blocking(&sdLock);
+
+    // 一度に長時間SDを占有しないよう、
+    // 2048 byteずつ裏バッファへ補充する
     const size_t CHUNK = 2048;
-    bool eofReached = false;
 
     if (refillOffset < MUSIC::BUF_SIZE) {
-      size_t toRead = min(CHUNK, MUSIC::BUF_SIZE - refillOffset);
-      size_t n = file.read((void*)(music.fillBuf + refillOffset), toRead);
 
-      if (n == 0 && refillOffset == 0) {
-        memset((void*)(music.fillBuf + refillOffset), 0, MUSIC::BUF_SIZE - refillOffset);
-        eofReached = true;
-      } else if (n == 0) {
-        // loop file
+      size_t remaining =
+          MUSIC::BUF_SIZE - refillOffset;
+
+      size_t toRead =
+          min(CHUNK, remaining);
+
+      size_t n =
+          file.read(
+              (void*)(music.fillBuf + refillOffset),
+              toRead
+          );
+
+      refillOffset += n;
+
+      // 要求量より少なくしか読めなかった場合は
+      // 曲末尾に到達したとみなし、次回は先頭から続ける。
+      //
+      // 途中まで読めたデータは捨てず、
+      // fillBuf内にそのまま残しておく。
+      if (n < toRead) {
         file.seek(0);
-        refillOffset = 0;
-        eofReached = true;
-      } else {
-        refillOffset += n;
       }
     }
+
     critical_section_exit(&sdLock);
 
-    if (refillOffset >= MUSIC::BUF_SIZE || eofReached) {
+    // 裏バッファ1個分が完成したら再生側へ公開
+    if (refillOffset >= MUSIC::BUF_SIZE) {
+
       noInterrupts();
-      music.fillBytes = refillOffset;
-      music.needs_refill = false;
+
+      music.fillBytes =
+          MUSIC::BUF_SIZE;
+
+      music.needs_refill =
+          false;
+
       interrupts();
+
       refillOffset = 0;
     }
   }
@@ -4824,114 +4939,426 @@ public:
 class SaveManager {
 public:
   const char* SAVE_FILENAME = "/save.dat";
+  const char* SAVE_MAGIC = "PGSAVE2";
 
   // ★ セーブ実行
-  bool saveGame(Sd& sd, MUSIC& music, Map& map, Caractor& hero, Party& party, Inventory& inventory, bool* bossFlags) {
-    music.paused = true; 
+  bool saveGame(
+      Sd& sd,
+      MUSIC& music,
+      Map& map,
+      Caractor& hero,
+      Party& party,
+      Inventory& inventory,
+      bool* bossFlags
+  ) {
+    music.paused = true;
     critical_section_enter_blocking(&sdLock);
 
-    FsFile file = sd.sdfat.open(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
+    FsFile file =
+        sd.sdfat.open(
+            SAVE_FILENAME,
+            O_WRITE | O_CREAT | O_TRUNC
+        );
+
     if (!file) {
       critical_section_exit(&sdLock);
       music.paused = false;
-      return false; 
+      return false;
     }
 
-    // --- 1. マップ情報 ---
-    file.println(map.currentFloor);    // 階層
-    file.println((int)map.currentType); // ★ マップタイプ(TOWN/DUNGEON)を保存
-    
-    // --- 2. 主人公 ---
+    // -------------------------------------------------
+    // セーブ形式
+    // -------------------------------------------------
+    file.println(SAVE_MAGIC);
+
+    // -------------------------------------------------
+    // 1. 現在のマップ状態
+    // -------------------------------------------------
+    file.println(map.getFloor());
+    file.println((int)map.getType());
+
+    file.println(map.getMAP_WIDTH());
+    file.println(map.getMAP_HEIGHT());
+
+    // マップ上の未回収オートマタの種類
+    file.println(map.getAutomatonWhoId());
+
+    // 主人公の現在位置・向き
+    file.println(hero.X);
+    file.println(hero.Y);
+    file.println((int)hero.direction);
+
+    // マップそのもの
+    file.println(
+        map.getMAP_WIDTH() *
+        map.getMAP_HEIGHT()
+    );
+
+    for (int y = 0; y < map.getMAP_HEIGHT(); y++) {
+      for (int x = 0; x < map.getMAP_WIDTH(); x++) {
+        file.println((int)map.getTile(x, y));
+      }
+    }
+
+    // -------------------------------------------------
+    // 2. 主人公
+    // -------------------------------------------------
     hero.status->saveTo(file);
 
-    // --- 3. インベントリ ---
+    // -------------------------------------------------
+    // 3. インベントリ
+    // -------------------------------------------------
     inventory.saveTo(file);
 
-    // --- 4. パーティー ---
+    // -------------------------------------------------
+    // 4. パーティー
+    // -------------------------------------------------
     file.println(party.members.size());
+
     for (auto* member : party.members) {
       member->status->saveTo(file);
     }
 
-    // --- 5. 預かり所 (★ここもしっかり保存されます) ---
+    // -------------------------------------------------
+    // 5. 預かり所
+    // -------------------------------------------------
     file.println(party.storage.size());
+
     for (auto* member : party.storage) {
       member->status->saveTo(file);
     }
 
+    // -------------------------------------------------
+    // 6. ボス撃破状態
+    // -------------------------------------------------
     for (int i = 0; i < 5; i++) {
-      file.println(bossFlags[i]); 
+      file.println(bossFlags[i]);
     }
 
     file.close();
+
     critical_section_exit(&sdLock);
     music.paused = false;
+
     return true;
   }
 
   // ★ ロード実行
-  bool loadGame(Sd& sd, MUSIC& music, Map& map, Caractor& hero, Party& party, Inventory& inventory, bool* bossFlags) {
-    // (※ setupで呼ぶ場合はmusicはまだ動いていないが、ロックしても無害)
-    music.paused = true; 
+  bool loadGame(
+      Sd& sd,
+      MUSIC& music,
+      Map& map,
+      Caractor& hero,
+      Party& party,
+      Inventory& inventory,
+      bool* bossFlags
+  ) {
+    music.paused = true;
     critical_section_enter_blocking(&sdLock);
 
-    FsFile file = sd.sdfat.open(SAVE_FILENAME, O_READ);
+    FsFile file =
+        sd.sdfat.open(
+            SAVE_FILENAME,
+            O_READ
+        );
+
     if (!file) {
       critical_section_exit(&sdLock);
       music.paused = false;
-      return false; // ファイルがない
+      return false;
     }
 
-    // 1. マップ情報復元
-    map.currentFloor = file.readStringUntil('\n').toInt();
-    int typeVal = file.readStringUntil('\n').toInt();
-    
-    // ★ 保存された階層とタイプでマップを再生成
-    Map::MapType loadedType = (Map::MapType)typeVal;
-    map.regenerate(20, 20, loadedType);
-    
-    // (集落フラグも合わせる)
-    map.isTown = (loadedType == Map::TYPE_TOWN);
+    // ロード失敗時の共通終了処理
+    auto failLoad = [&]() -> bool {
+      file.close();
+      critical_section_exit(&sdLock);
+      music.paused = false;
+      return false;
+    };
 
-    // 2. 主人公復元
+    // -------------------------------------------------
+    // セーブ形式判定
+    // -------------------------------------------------
+    String firstLine =
+        file.readStringUntil('\n');
+
+    firstLine.trim();
+
+    bool isNewFormat =
+        (firstLine == SAVE_MAGIC);
+
+    Map::MapType loadedType =
+        Map::TYPE_DUNGEON;
+
+    int savedHeroX = 0;
+    int savedHeroY = 0;
+    int savedDirection =
+        (int)Caractor::DIR_DOWN;
+
+    if (isNewFormat) {
+      // -------------------------------------------------
+      // PGSAVE2
+      // -------------------------------------------------
+      map.restoreFloor(
+          file.readStringUntil('\n').toInt()
+      );
+
+      int typeVal =
+          file.readStringUntil('\n').toInt();
+
+      if (typeVal < (int)Map::TYPE_MAZE ||
+          typeVal > (int)Map::TYPE_BOSS_ROOM)
+      {
+        return failLoad();
+      }
+
+      loadedType =
+          static_cast<Map::MapType>(
+              typeVal
+          );
+
+      int savedWidth =
+          file.readStringUntil('\n').toInt();
+
+      int savedHeight =
+          file.readStringUntil('\n').toInt();
+
+      // 異常なセーブデータで巨大なvectorを確保しないための保護
+      if (savedWidth <= 0 ||
+          savedHeight <= 0 ||
+          savedWidth > 64 ||
+          savedHeight > 64)
+      {
+        return failLoad();
+      }
+
+      map.restoreAutomatonWhoId(
+          file.readStringUntil('\n').toInt()
+      );
+
+      savedHeroX =
+          file.readStringUntil('\n').toInt();
+
+      savedHeroY =
+          file.readStringUntil('\n').toInt();
+
+      savedDirection =
+          file.readStringUntil('\n').toInt();
+
+      if (savedDirection < (int)Caractor::DIR_DOWN ||
+          savedDirection > (int)Caractor::DIR_RIGHT)
+      {
+        return failLoad();
+      }
+
+      int mapDataCount =
+          file.readStringUntil('\n').toInt();
+
+      if (mapDataCount !=
+          savedWidth * savedHeight)
+      {
+        return failLoad();
+      }
+
+      if (savedHeroX < 0 ||
+          savedHeroY < 0 ||
+          savedHeroX >= savedWidth * Map::TILE_SIZE ||
+          savedHeroY >= savedHeight * Map::TILE_SIZE)
+      {
+        return failLoad();
+      }
+
+      map.beginRestoreFromSave(
+          loadedType,
+          savedWidth,
+          savedHeight
+      );
+
+      for (int i = 0;
+          i < mapDataCount;
+          i++)
+      {
+        int tile =
+            file.readStringUntil('\n').toInt();
+
+        if (tile < 0 || tile > 255) {
+          return failLoad();
+        }
+
+        int x = i % savedWidth;
+        int y = i / savedWidth;
+
+        map.setTile(
+            x,
+            y,
+            (uint8_t)tile
+        );
+      }
+    }
+    else {
+      // -------------------------------------------------
+      // 旧形式
+      //
+      // 旧セーブにはマップ本体がないため、
+      // 従来どおり階層とMapTypeだけ読み、
+      // 最後にマップを再生成する。
+      // -------------------------------------------------
+      map.restoreFloor(
+          firstLine.toInt()
+      );
+
+      int typeVal =
+          file.readStringUntil('\n').toInt();
+
+      if (typeVal < (int)Map::TYPE_MAZE ||
+          typeVal > (int)Map::TYPE_BOSS_ROOM)
+      {
+        return failLoad();
+      }
+
+      loadedType =
+          static_cast<Map::MapType>(
+              typeVal
+          );
+    }
+
+    // -------------------------------------------------
+    // 主人公
+    // -------------------------------------------------
     hero.status->loadFrom(file);
-    // ★ マップが変わったので、主人公を安全な位置(スタート地点)に移動させる
-    hero.reset(map);
-    
-    // 3. インベントリ復元
+
+    // -------------------------------------------------
+    // インベントリ
+    // -------------------------------------------------
     inventory.loadFrom(file);
 
-    // 4. パーティー復元
-    for(auto* m : party.members) delete m;
+    // -------------------------------------------------
+    // パーティー
+    // -------------------------------------------------
+    for (auto* member : party.members) {
+      delete member;
+    }
+
     party.members.clear();
-    int memberCount = file.readStringUntil('\n').toInt();
-    for(int i=0; i<memberCount; i++) {
-       Automaton* ally = new Automaton(1, 0); 
-       ally->status->loadFrom(file);
-       ally->who = ally->status->getWho(); 
-       ally->name = ally->status->getname();
-       party.members.push_back(ally);
+
+    int memberCount =
+        file.readStringUntil('\n').toInt();
+
+    for (int i = 0;
+        i < memberCount;
+        i++)
+    {
+      Automaton* ally =
+          new Automaton(1, 0);
+
+      ally->status->loadFrom(file);
+
+      party.members.push_back(ally);
     }
 
-    // 5. 預かり所復元
-    for(auto* m : party.storage) delete m;
+    // -------------------------------------------------
+    // 預かり所
+    // -------------------------------------------------
+    for (auto* member : party.storage) {
+      delete member;
+    }
+
     party.storage.clear();
-    int storageCount = file.readStringUntil('\n').toInt();
-    for(int i=0; i<storageCount; i++) {
-       Automaton* ally = new Automaton(1, 0); 
-       ally->status->loadFrom(file);
-       ally->who = ally->status->getWho();
-       ally->name = ally->status->getname();
-       party.storage.push_back(ally);
+
+    int storageCount =
+        file.readStringUntil('\n').toInt();
+
+    for (int i = 0;
+        i < storageCount;
+        i++)
+    {
+      Automaton* ally =
+          new Automaton(1, 0);
+
+      ally->status->loadFrom(file);
+
+      party.storage.push_back(ally);
     }
 
+    // -------------------------------------------------
+    // ボス撃破状態
+    // -------------------------------------------------
     for (int i = 0; i < 5; i++) {
-      bossFlags[i] = (file.readStringUntil('\n').toInt() != 0);
+      bossFlags[i] =
+          (
+            file.readStringUntil('\n').toInt()
+            != 0
+          );
     }
+
+    // -------------------------------------------------
+    // マップ・主人公位置の復元
+    // -------------------------------------------------
+    if (isNewFormat) {
+      // 新形式は保存したマップをそのまま使用する。
+      // regenerate() は絶対に呼ばない。
+
+      hero.X =
+          savedHeroX;
+
+      hero.Y =
+          savedHeroY;
+
+      hero.oldX =
+          savedHeroX;
+
+      hero.oldY =
+          savedHeroY;
+
+      hero.direction =
+          (Caractor::Direction)
+              savedDirection;
+
+      hero.moved = false;
+    }
+    else {
+      // 旧形式はマップ本体を持っていないので
+      // 従来どおり再生成する。
+
+      Map::MapType finalType =
+          loadedType;
+
+      // ボス階ではbossFlagsを優先
+      if (map.getFloor() >= 10 &&
+          map.getFloor() <= 50 &&
+          map.getFloor() % 10 == 0)
+      {
+        int bossIndex =
+            (map.getFloor() / 10) - 1;
+
+        if (bossIndex >= 0 &&
+            bossIndex < 5)
+        {
+          if (bossFlags[bossIndex]) {
+            finalType =
+                Map::TYPE_TOWN;
+          }
+          else {
+            finalType =
+                Map::TYPE_BOSS_ROOM;
+          }
+        }
+      }
+
+      map.regenerate(
+          20,
+          20,
+          finalType
+      );
+
+      hero.reset(map);
+    }
+
     file.close();
+
     critical_section_exit(&sdLock);
     music.paused = false;
-    
+
     return true;
   }
   
@@ -4962,13 +5389,12 @@ public:
     // --- 装備用 ---
     STATE_EQUIP_SLOT,   // どの部位？ (武器/防具/装飾)
     STATE_EQUIP_LIST,     // 何を装備する？
-    // ★★★ 追加: ショップと宿屋 ★★★
+    // ショップ・宿屋
     STATE_INN,          // 宿屋 (泊まりますか？)
     STATE_SHOP_CHOICE,  // 店 (買う/売る/出る)
     STATE_SHOP_BUY,     // 買う画面
     STATE_SHOP_SELL,     // 売る画面
     STATE_CONFIG
-    // ★★★★★★★★★★★★★★★★★★★
   };
   MenuState currentMenuState;
 
@@ -4980,6 +5406,7 @@ public:
   // 進化画面
   int listCursor = 0;
   bool active = false;
+  bool saveSucceeded = false;
   std::vector<int> shopItemList;
   int selectedItemIndex = -1; // 選択中の道具のインデックス保存用
   int storageMode = 0; // 0:メニュー選択, 1:引き出す, 2:預ける
@@ -5196,7 +5623,11 @@ public:
               for(int i = startIdx; i < endIdx; i++) {
                   g->lineSprite.setCursor(30, 60 + (i - startIdx) * 25 - drawY);
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
-                  g->lineSprite.printf("%s Lv%d", party.storage[i]->name, party.storage[i]->status->getLevel());
+                  g->lineSprite.printf(
+                      "%s Lv%d",
+                      party.storage[i]->status->getname(),
+                      party.storage[i]->status->getLevel()
+                  );
               }
           }
           else if (storageMode == 2) {
@@ -5206,7 +5637,11 @@ public:
               for(int i=0; i<count; i++) {
                   g->lineSprite.setCursor(30, 60 + i*25 - drawY);
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
-                  g->lineSprite.printf("%s Lv%d", party.members[i]->name, party.members[i]->status->getLevel());
+                  g->lineSprite.printf(
+                      "%s Lv%d",
+                      party.members[i]->status->getname(),
+                      party.members[i]->status->getLevel()
+                  );
               }
           }
       } else if (currentMenuState == STATE_SAVE_RESULT) {
@@ -5220,7 +5655,12 @@ public:
         g->lineSprite.setTextSize(2);
         g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setCursor(x + 30, y + 20);
-        g->lineSprite.print("記録しました");
+        if (saveSucceeded) {
+          g->lineSprite.print("記録しました");
+        }
+        else {
+          g->lineSprite.print("記録に失敗しました");
+        }
       }else if (currentMenuState == STATE_EQUIP_SLOT) {
         int x = 10, y = 40 + yOffset;
         int w = 300, h = 190;
@@ -5499,14 +5939,17 @@ private:
     if (originalTarget == nullptr) return nullptr; // 安全対策
     if (originalTarget->getHp() <= 0) return originalTarget;
     
-    // 自分、全体、ランダム対象の技は対象変更しない
-    if (skill.scope == Skill::TargetScope::SELF || 
-        skill.scope == Skill::TargetScope::ALL_ENEMIES || 
-        skill.scope == Skill::TargetScope::ALL_ALLIES || 
-        skill.scope == Skill::TargetScope::RANDOM_ENEMY ||
-        skill.type == Skill::EffectType::HEAL || 
+    // 自分・全体・味方への補助技は対象変更しない。
+    // RANDOM_ENEMY は各ヒットごとに resolveTarget() を通す。
+    if (skill.scope == Skill::TargetScope::SELF ||
+        skill.scope == Skill::TargetScope::ALL_ENEMIES ||
+        skill.scope == Skill::TargetScope::ALL_ALLIES ||
+        skill.type == Skill::EffectType::HEAL ||
         skill.type == Skill::EffectType::REVIVE ||
-        skill.type == Skill::EffectType::BUFF) return originalTarget;
+        skill.type == Skill::EffectType::BUFF)
+    {
+      return originalTarget;
+    }
     // --- 1. 挑発 (Taunt) ---
     Status* tauntTarget = nullptr;
     if (originalTarget->isPlayer()) { // 敵→味方
@@ -5528,10 +5971,6 @@ private:
          if (!taunters.empty()) tauntTarget = taunters[random(0, taunters.size())];
     }
     if (tauntTarget != nullptr) return tauntTarget;
-    
-    // 挑発者がいればそちらに変更
-    if (tauntTarget != nullptr) return tauntTarget;
-
 
     // --- 2. ステルス (Untargetable) ---
     // 狙われた人がステルス中なら、別の生存者に逸らす
@@ -5569,6 +6008,133 @@ private:
     return originalTarget;
   }
 
+  bool executeHostileSkillOnTarget(
+      Skill& skill,
+      Status* attacker,
+      Status* originalTarget,
+      MUSIC& music,
+      bool allowTargetRedirect)
+  {
+    if (attacker == nullptr ||
+        originalTarget == nullptr ||
+        originalTarget->getHp() <= 0)
+    {
+      return false;
+    }
+
+    // 単体攻撃・ランダム攻撃では
+    // 挑発・ステルス・かばうによる対象変更を行う。
+    // 全体攻撃では行わない。
+    Status* defender = originalTarget;
+
+    if (allowTargetRedirect) {
+      defender = resolveTarget(originalTarget, skill);
+    }
+
+    if (defender == nullptr ||
+        defender->getHp() <= 0)
+    {
+      return false;
+    }
+
+    // 反射は「攻撃」にだけ適用する。
+    // 純粋なデバフなど OTHER カテゴリは反射しない。
+    bool isOffensive =
+        skill.category == Skill::Category::PHYSICAL ||
+        skill.category == Skill::Category::MELODY;
+
+    bool isReflected = false;
+
+    if (isOffensive) {
+      // キングス・シールド：
+      // 有効ターン中は物理・旋律を何度でも反射する
+      if (defender->reflectAllTurns > 0) {
+        isReflected = true;
+      }
+
+      // リフレクト：
+      // 物理攻撃を1回だけ反射して、その場で消費する
+      else if (defender->reflectPhysicalTurns > 0 &&
+              skill.category == Skill::Category::PHYSICAL)
+      {
+        isReflected = true;
+        defender->reflectPhysicalTurns = 0;
+      }
+
+      // 旋律反射：
+      // 有効ターン中は旋律攻撃を反射する
+      // 反射した回数ではなくUpdateTurn()で寿命を減らす
+      else if (defender->reflectMagicTurns > 0 &&
+              skill.category == Skill::Category::MELODY)
+      {
+        isReflected = true;
+      }
+    }
+
+    if (isReflected) {
+      music.playSE(7);
+
+      message +=
+          "\n" +
+          String(defender->getname()) +
+          " は跳ね返した！";
+
+      // 反射された場合は使用者自身へ実行
+      ExecuteSkill(
+          skill,
+          attacker,
+          attacker,
+          music
+      );
+
+      return false;
+    }
+
+    // カウンター判定のため、攻撃前HPを覚えておく
+    int hpBefore = defender->getHp();
+
+    ExecuteSkill(
+        skill,
+        attacker,
+        defender,
+        music
+    );
+
+    bool tookDamage =
+        defender->getHp() < hpBefore;
+
+    // 実際に物理ダメージを受けたときだけ反撃
+    if (tookDamage &&
+        defender->getHp() > 0 &&
+        defender->counterTurns > 0 &&
+        skill.category == Skill::Category::PHYSICAL &&
+        defender != attacker)
+    {
+      message +=
+          "\n" +
+          String(defender->getname()) +
+          " の反撃！";
+
+      music.playSE(3);
+
+      int counterDamage =
+          defender->getAttack();
+
+      counterDamage =
+          attacker->takedamage(
+              counterDamage,
+              Skill::Category::PHYSICAL
+          );
+
+      attacker->addPopup(
+          counterDamage,
+          false
+      );
+    }
+
+    return defender->getHp() <= 0;
+  }
+
 public:
   enum BattleState{
     STATE_TURN_START,     // 0. ターン開始
@@ -5578,29 +6144,83 @@ public:
     STATE_TARGET_SELECT_ENEMY, // 4. ターゲット選択 (敵)
     STATE_TARGET_SELECT_ALLY,  // 5. ターゲット選択 (味方)
     
-    // ★★★ 6. (新規) 行動前・継続効果処理 ★★★
+    // 6. 行動前・継続効果処理
     STATE_PRE_ACTION_EFFECTS, 
     
     STATE_ENEMY_AI,         // 7. 敵のAI実行
-    STATE_ACTION_CALC,      // 8. 行動実行（計算）
-    STATE_ACTION_MSG,       // 9. 行動結果のメッセージ
-    STATE_CHECK_VICTORY,    // 10. 勝利判定
-    STATE_CHECK_DEFEAT,     // 11. 敗北判定
-    STATE_SHOW_XP_GAIN,     // 12. XP獲得表示
+    STATE_ACTION_READY,     // 8. 行動内容をBattleActionとして確定
+    STATE_EXECUTE_NEXT_ACTION, // 9. 
+    STATE_ACTION_CALC,      // 10. 行動実行（計算）
+    STATE_ACTION_MSG,       // 11. 行動結果のメッセージ
+    STATE_CHECK_BATTLE_RESULT, // 12. 勝敗だけ確認
+    STATE_END_ACTOR_TURN,      // 13. 現在の行動者のターン終了処理
+    STATE_SHOW_XP_GAIN,     // 14. XP獲得表示
     STATE_BATTLE_END,       // 15. 戦闘終了
     STATE_CHECK_STATUS,      // 16. Yボタンステータス
-    STATE_SHOW_RESULT_MESSAGE
+    STATE_SHOW_RESULT_MESSAGE // 17. メッセージ表示
   };
   BattleState currentBattleState;
   static const int CMD_COUNT = 4;
   const char* commands[CMD_COUNT] = {"たたかう", "にげる", "せんりつ", "ぼうぎょ"};
-  int selected = 0;
+
+  // UIカーソルは用途ごとに分離
+  int commandSelected = 0;
+  int skillSelected = 0;
+
+  enum class BattleEndReason {
+    NONE,
+    VICTORY,
+    DEFEAT,
+    ESCAPE
+  };
+
+  BattleEndReason battleEndReason = BattleEndReason::NONE;
+
+  enum class BattlePhase {
+    PLANNING,   // 行動を決めている段階
+    EXECUTING   // 決めた行動を実行している段階
+  };
+
+  BattlePhase battlePhase = BattlePhase::PLANNING;
+
   bool inBattle = false;
   bool heroLeveledUp = false;
-  bool isBossBattleMode = false; // 今回の戦闘はボス戦か？
-  bool battleWon = false;        // 勝ったか？ (逃げた場合は false)
+  bool isBossBattleMode = false;
 
-  int pendingAction = 0;   // 実行待機中の行動 (0=たたかう, 100+=旋律ID)
+  enum class ActionType {
+    NONE,
+    ATTACK,
+    SKILL,
+    DEFEND,
+    FLEE
+  };
+
+  enum class ActionPriority {
+    NORMAL = 0,
+    FIRST_STRIKE = 1
+  };
+
+  struct BattleAction {
+    Status* actor = nullptr;          // 行動するキャラ
+    ActionType type = ActionType::NONE;
+    int skillIndex = -1;             // SKILLの場合のみ使用
+    Status* target = nullptr;         // 単体対象。全体技などではnullptr可
+
+    ActionPriority priority = ActionPriority::NORMAL;
+    int speedSnapshot = 0;           // 行動決定時点のSPD
+  };
+
+  enum class MessageFlow {
+    ACTION_COMPLETE, // 実際の行動が終わった
+    CONTINUE_TURN,   // 毒・回復等の表示後、まだ行動する
+    END_TURN         // 死亡・麻痺等でこの人の行動を終了
+  };
+
+  ActionType pendingActionType = ActionType::NONE;
+  int pendingSkillIndex = -1;
+
+  MessageFlow messageFlow = MessageFlow::ACTION_COMPLETE;
+
   int enemyTargetIndex = 0;   // 敵リスト(activeEnemies)のカーソル (targetIndexから変更)
   int allyTargetIndex = 0;    // 味方リストのカーソル (新規)
   Status* currentTarget = nullptr; // ターゲットのStatus
@@ -5619,6 +6239,10 @@ public:
   std::vector<Status*> actorList; // 戦闘参加者 (Speed順)
   int currentActorIndex = 0;        // 現在行動中のキャラのインデックス
   Status* currentActor = nullptr; // 現在行動中のキャラのStatus
+  // 1ターン分の行動予定
+  std::vector<BattleAction> plannedActions;
+  BattleAction currentBattleAction;
+  int currentPlannedActionIndex = 0;
   int lastDamage = 0;             // 直前のダメージ計算結果
   String lastActionMessage = "";
   int lastGainedXP = 0;
@@ -5630,9 +6254,53 @@ public:
   uint16_t* activeImages[8];
   std::vector<String> resultMessages;
   int resultMessageIndex = 0;
+
+  BattleAction createBattleAction(
+      Status* actor,
+      ActionType type,
+      int skillIndex = -1,
+      Status* target = nullptr)
+  {
+    BattleAction action;
+
+    action.actor = actor;
+    action.type = type;
+    action.skillIndex = skillIndex;
+    action.target = target;
+
+    if (actor != nullptr) {
+      action.speedSnapshot = actor->getSpeed();
+    }
+
+    // 先制技判定
+    if (type == ActionType::SKILL && actor != nullptr) {
+      std::vector<Skill>& skills = actor->getLearnedSkills();
+
+      if (skillIndex >= 0 &&
+          skillIndex < static_cast<int>(skills.size()))
+      {
+        int skillId = skills[skillIndex].id;
+
+        // 必ず先制
+        if (skillId == 38 ||   // ソニックブレイド
+            skillId == 84 ||   // マッハブレイド
+            skillId == 121)    // ソニックダガー
+        {
+          action.priority = ActionPriority::FIRST_STRIKE;
+        }
+      }
+    }
+
+    return action;
+  }
+
   Battle() {
-    activeEnemies.reserve(4); // 敵は最大4体まで
-    for(int i=0; i<8; i++) activeImages[i] = nullptr;
+    activeEnemies.reserve(4);
+    plannedActions.reserve(8);
+
+    for(int i=0; i<8; i++) {
+      activeImages[i] = nullptr;
+    }
   }
 
   void start(MUSIC &music, Sd &sd, Caractor& hero, Party& party, int floor, ImageManager &imgMgr, Map& map) {
@@ -5640,12 +6308,15 @@ public:
     inBattle = true;
     message = "敵が現れた！";
     isBossBattleMode = false; 
-    battleWon = false;
-    selected = 0;
-    turnCount = 1; // ターンを1にリセット
+    battleEndReason = BattleEndReason::NONE;
+    commandSelected = 0;
+    skillSelected = 0;
+    turnCount = 1;
     heroLeveledUp = false;
     // ★★★ 変数の完全リセット (重要) ★★★
-    pendingAction = 0;
+    pendingActionType = ActionType::NONE;
+    pendingSkillIndex = -1;
+    messageFlow = MessageFlow::ACTION_COMPLETE;
     currentTarget = nullptr;
     currentActor = nullptr;
     currentActorIndex = 0;
@@ -5653,17 +6324,24 @@ public:
     lastActionMessage = "";
     enemyTargetIndex = 0;
     allyTargetIndex = 0;
+    plannedActions.clear();
+    currentBattleAction = BattleAction();
+    battlePhase = BattlePhase::PLANNING;
+    currentPlannedActionIndex = 0;
 
     // 参加メンバーへの参照を保存
     heroRef = &hero;
     partyRef = &party;
-    // ★★★★★★★★★★★★★★★★★★★★★
     for (auto enemy : activeEnemies) {
       if (enemy) delete enemy;
     }
     activeEnemies.clear();
     activeEnemies.reserve(4);
-    if (floor % 10 == 0 && !map.isTown){
+    if (floor >= 10 &&
+        floor <= 50 &&
+        floor % 10 == 0 &&
+        !map.isTown())
+    {
       isBossBattleMode = true;
       int bossId = 0;
       if (floor == 10) bossId = 80;
@@ -5830,60 +6508,120 @@ public:
     // --- メインの戦闘ステートマシン ---
     switch(currentBattleState){
 
-      // ★★★ 0. ターン開始処理 ★★★ (変更なし)
+      // 0. ターン開始処理
       case STATE_TURN_START:
         message = "ターン " + String(turnCount);
-        if(aPressed){
-          // Speed順にソート
-          std::sort(actorList.begin(), actorList.end(), [](Status* a, Status* b) {
-            return a->getSpeed() > b->getSpeed();
-          });
-          currentActorIndex = 0; 
-          turnCount++;
+
+        if (aPressed) {
+
+          // -------------------------
+          // 新しいターンの行動予約を開始
+          // -------------------------
+          battlePhase = BattlePhase::PLANNING;
+
+          plannedActions.clear();
+          currentPlannedActionIndex = 0;
+
+          currentActorIndex = 0;
+          currentActor = nullptr;
+          currentBattleAction = BattleAction();
+
+          pendingActionType = ActionType::NONE;
+          pendingSkillIndex = -1;
+          currentTarget = nullptr;
+
           currentBattleState = STATE_ACTOR_SELECT;
         }
-        break; 
+        break;
 
-      // ★★★ 1. 行動者を決定する (変更なし)
-      case STATE_ACTOR_SELECT:
+      // 1. 行動者を決定する
+      case STATE_ACTOR_SELECT: {
+        // -------------------------
+        // 全員分の行動予約が完了した
+        // -------------------------
         if (currentActorIndex >= actorList.size()) {
-          currentBattleState = STATE_TURN_START;
+
+          // 先制技を最優先、その中ではSPD順
+          std::stable_sort(
+            plannedActions.begin(),
+            plannedActions.end(),
+            [](const BattleAction& a, const BattleAction& b) {
+
+              if (a.priority != b.priority) {
+                return static_cast<int>(a.priority) >
+                      static_cast<int>(b.priority);
+              }
+
+              return a.speedSnapshot > b.speedSnapshot;
+            }
+          );
+
+          battlePhase = BattlePhase::EXECUTING;
+          currentPlannedActionIndex = 0;
+
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
           break;
         }
-        
-        currentActor = actorList[currentActorIndex]; 
-        currentActor->isDefending = false;
+
+        // -------------------------
+        // 次に行動を決めるキャラ
+        // -------------------------
+        currentActor = actorList[currentActorIndex];
+
+        if (currentActor == nullptr) {
+          currentActorIndex++;
+          currentBattleState = STATE_ACTOR_SELECT;
+          break;
+        }
+
+        // 死亡中なら行動予約しない
         if (currentActor->getHp() <= 0) {
           currentActorIndex++;
-          currentBattleState = STATE_ACTOR_SELECT; 
+          currentBattleState = STATE_ACTOR_SELECT;
+          break;
+        }
+
+        // 前のキャラの行動内容を残さない
+        pendingActionType = ActionType::NONE;
+        pendingSkillIndex = -1;
+        currentTarget = nullptr;
+
+        // ★ここでは状態異常処理をしない
+        // 実際に行動する直前に PRE_ACTION_EFFECTS を通す
+
+        if (currentActor->isPlayer()) {
+          currentBattleState = STATE_COMMAND_SELECT;
         }
         else {
-          // ★ 遷移先を「継続効果処理」に変更
-          currentBattleState = STATE_PRE_ACTION_EFFECTS;
+          currentBattleState = STATE_ENEMY_AI;
         }
+
         break;
+      }
 
       // 2. 味方のコマンド入力
       case STATE_COMMAND_SELECT: 
         message = String(currentActor->getname()) + "：コマンドを選ぼう！";
-        if (leftPressed) {selected = (selected - 1 + CMD_COUNT) % CMD_COUNT;music.playSE(2);}
-        if (upPressed)   {selected = (selected - 2 + CMD_COUNT) % CMD_COUNT;music.playSE(2);}
-        if (rightPressed){selected = (selected + 1) % CMD_COUNT;music.playSE(2);}
-        if (downPressed) {selected = (selected + 2) % CMD_COUNT;music.playSE(2);}
+        if (leftPressed) {commandSelected = (commandSelected - 1 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
+        if (upPressed)   {commandSelected = (commandSelected - 2 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
+        if (rightPressed){commandSelected = (commandSelected + 1) % CMD_COUNT; music.playSE(2);}
+        if (downPressed) {commandSelected = (commandSelected + 2) % CMD_COUNT; music.playSE(2);}
 
         if (aPressed) {
-          if (selected == 0) { // たたかう
+          if (commandSelected == 0) { // たたかう
             music.playSE(0);
-            pendingAction = 0; // 0 = たたかう
+            pendingActionType = ActionType::ATTACK;
+            pendingSkillIndex = -1;
             enemyTargetIndex = 0;   // ★ 敵カーソルをリセット
             currentBattleState = STATE_TARGET_SELECT_ENEMY; // ★ 敵選択へ
           } 
-          else if (selected == 1) { // にげる
+          else if (commandSelected == 1) { // にげる
             music.playSE(0);
             message = "逃げ出した！";
+            battleEndReason = BattleEndReason::ESCAPE;
             currentBattleState = STATE_BATTLE_END;
           } 
-          else if (selected == 2) { // せんりつ
+          else if (commandSelected == 2) { // せんりつ
             if (currentActor->getSilencedTurns() > 0) {
               music.playSE(1);
               message = String(currentActor->getname()) + " は沈黙している！";
@@ -5891,21 +6629,23 @@ public:
               if(ctrl.pressed(ctrl.BTN_A)) delay(200);
             } else {
               music.playSE(0);
-              selected = 0; 
+              skillSelected = 0;
               currentBattleState = STATE_SKILL_SELECT;
             }
           }
-          else if (selected == 3) {
-            music.playSE(0); // 決定音
-            pendingAction = 200; // ★ 防御を表す特殊コード (200とする)
+          else if (commandSelected == 3) {
+            music.playSE(0);
+            pendingActionType = ActionType::DEFEND;
+            pendingSkillIndex = -1;
             
-            // ターゲット選択は不要なので、直接計算フェーズへ
-            currentTarget = currentActor; // 対象は自分
-            currentBattleState = STATE_ACTION_CALC;
+            // ターゲット選択は不要なので、行動確定へ
+            currentTarget = currentActor;
+            currentBattleState = STATE_ACTION_READY;
           }
         }
         break;
 
+      
       // 3. 旋律（せんりつ）選択
       case STATE_SKILL_SELECT: {
         int skillCount = currentActor->getLearnedSkills().size();
@@ -5916,21 +6656,29 @@ public:
         }
         
         message = "どの旋律を使う？";
-        if (upPressed)   {selected = (selected - 1 + skillCount) % skillCount;music.playSE(2);}
-        if (downPressed) {selected = (selected + 1) % skillCount;music.playSE(2);}
+        if (upPressed) {
+          skillSelected = (skillSelected - 1 + skillCount) % skillCount;
+          music.playSE(2);
+        }
+        if (downPressed) {
+          skillSelected = (skillSelected + 1) % skillCount;
+          music.playSE(2);
+        }
 
         if (aPressed) {
-          Skill& skill = currentActor->getLearnedSkills()[selected];
+          Skill& skill = currentActor->getLearnedSkills()[skillSelected];
           
-          if (currentActor->useTP(skill.tpCost)) {
+          if (currentActor->getTp() >= skill.tpCost) {
             music.playSE(0);
-            pendingAction = 100 + selected; // 旋律行動をマーク
+
+            pendingActionType = ActionType::SKILL;
+            pendingSkillIndex = skillSelected;
             
             // ★★★ スキルの対象範囲(scope)によって分岐 ★★★
             switch (skill.scope) {
               case Skill::TargetScope::SELF:
-                currentTarget = currentActor; // 自分自身が対象
-                currentBattleState = STATE_ACTION_CALC;
+                currentTarget = currentActor;
+                currentBattleState = STATE_ACTION_READY;
                 break;
               case Skill::TargetScope::SINGLE_ENEMY:
                 enemyTargetIndex = 0; // 敵カーソルをリセット
@@ -5943,8 +6691,8 @@ public:
               case Skill::TargetScope::ALL_ENEMIES:
               case Skill::TargetScope::ALL_ALLIES:
               case Skill::TargetScope::RANDOM_ENEMY:
-                currentTarget = nullptr; // 対象が複数
-                currentBattleState = STATE_ACTION_CALC;
+                currentTarget = nullptr;
+                currentBattleState = STATE_ACTION_READY;
                 break;
             }
           } else {
@@ -5987,24 +6735,48 @@ public:
         if (aPressed) {
           music.playSE(0);
           currentTarget = activeEnemies[enemyTargetIndex]->status;
-          currentBattleState = STATE_ACTION_CALC;
+          currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンでキャンセル
         if (bPressed) {
           music.playSE(1);
-          if (pendingAction >= 100) currentBattleState = STATE_SKILL_SELECT; // 旋律選択に戻る
-          else currentBattleState = STATE_COMMAND_SELECT; // コマンド選択に戻る
+          if (pendingActionType == ActionType::SKILL) {
+            currentBattleState = STATE_SKILL_SELECT;
+          } else {
+            currentBattleState = STATE_COMMAND_SELECT;
+          }
         }
         break;
       }
       
-      // ★★★ 5. ターゲット選択 (味方) (新規) ★★★
+      // 5. ターゲット選択 (味方)
       case STATE_TARGET_SELECT_ALLY: {
         message = "誰にかける？";
-        std::vector<Status*> allies = getAliveAllies();
-        if (allies.empty()) { // (万が一)
-            currentBattleState = STATE_SKILL_SELECT;
-            break;
+
+        bool isReviveSkill = false;
+
+        if (pendingActionType == ActionType::SKILL) {
+          std::vector<Skill>& skills = currentActor->getLearnedSkills();
+
+          if (pendingSkillIndex >= 0 &&
+              pendingSkillIndex < static_cast<int>(skills.size())) {
+            isReviveSkill =
+                (skills[pendingSkillIndex].type ==
+                Skill::EffectType::REVIVE);
+          }
+        }
+
+        std::vector<Status*> allies =
+            isReviveSkill ? getDeadAllies()
+                          : getAliveAllies();
+
+        if (allies.empty()) {
+          if (isReviveSkill) {
+            message = "倒れている味方がいない！";
+          }
+
+          currentBattleState = STATE_SKILL_SELECT;
+          break;
         }
 
         if (upPressed) {
@@ -6019,7 +6791,7 @@ public:
         if (aPressed) {
           music.playSE(0);
           currentTarget = allies[allyTargetIndex];
-          currentBattleState = STATE_ACTION_CALC;
+          currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンで旋律選択に戻る
         if (bPressed) {
@@ -6029,7 +6801,7 @@ public:
         break;
       }
 
-      // ★★★ 6. (新規) 行動前・継続効果処理 ★★★
+      // 6. 行動前・継続効果処理
       case STATE_PRE_ACTION_EFFECTS: {
         message = "";
         lastDamage = 0;
@@ -6045,7 +6817,7 @@ public:
           message = String(currentActor->getname()) + " は回復:" + String(-lastDamage) + " 回復！";
         }
         if (currentActor->getHp() <= 0) {
-          // ★★★ オートリバイブ判定 (追加) ★★★
+          // オートリバイブ判定
           if (currentActor->autoReviveTurns > 0) {
             currentActor->autoReviveTurns = 0; // 効果消費
             currentActor->Revive(50); // HP半分で復活
@@ -6053,29 +6825,46 @@ public:
             message += "\n" + String(currentActor->getname()) + " は自動蘇生した！";
           }else{
             message = String(currentActor->getname()) + " は力尽きた…";
-            pendingAction = -1; // 行動不能フラグ
-            currentBattleState = STATE_ACTION_MSG; 
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
             break;
           }
         }
 
-        // 3. 麻痺(Paralyzed)チェック (isParalyzed -> getParalyzedTurns)
+        // 3. 強制行動不能チェック
+        if (currentActor->cantMoveTurns > 0) {
+          if (message != "") {
+            message += "\n";
+          }
+
+          message += String(currentActor->getname()) + " は動けない！";
+
+          currentActor->cantMoveTurns--;
+
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
+        }
+
+        // 4. 麻痺(Paralyzed)チェック (isParalyzed -> getParalyzedTurns)
         if (currentActor->getParalyzedTurns() > 0) {
           if (random(100) < 50) { // (例: 50%で行動不能)
             message = String(currentActor->getname()) + " は痺れて動けない！";
-            pendingAction = -1; // 行動不能フラグ
-            currentBattleState = STATE_ACTION_MSG; 
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
             break;
           }
         }
         
-        // ★ 4. 混乱(Confused)チェック ★
+        // 5. 混乱(Confused)チェック
         if (currentActor->getConfusedTurns() > 0) {
           message = String(currentActor->getname()) + " は混乱している！";
           // (例: 50%で暴走)
           if (random(100) < 50) {
               message += "\nわけがわからず攻撃！";
-              pendingAction = 0; // 「たたかう」に強制
+              // pendingAction = 0;
+              pendingActionType = ActionType::ATTACK;
+              pendingSkillIndex = -1;
               
               // ターゲットを敵味方全員からランダムで選択
               std::vector<Status*> allTargets = getAliveAllies(); // 味方リスト
@@ -6084,27 +6873,34 @@ public:
               }
               
               if (allTargets.empty()) {
-                  currentTarget = nullptr; // 対象がいない
+                currentTarget = nullptr;
               } else {
-                  currentTarget = allTargets[random(0, allTargets.size())];
+                currentTarget = allTargets[random(0, allTargets.size())];
               }
-              
-              currentBattleState = STATE_ACTION_CALC; // 計算へ
-              break; 
+
+              currentBattleState = STATE_ACTION_READY;
+              break;
           }
           // (暴走しなかった場合は、メッセージ表示(Aボタン待ち)へ)
         }
 
-        // 5. メッセージがあるか？
+        // 6. メッセージがあるか？
         if (message != "") { // 毒/回復/混乱(不発)のメッセージがあった
-          pendingAction = -2; // 継続効果メッセージフラグ
-          currentBattleState = STATE_ACTION_MSG; // 結果表示(Aボタン待ち)へ
+          messageFlow = MessageFlow::CONTINUE_TURN;
+          currentBattleState = STATE_ACTION_MSG;
         } else {
           // 継続効果が何もなければ、通常の行動へ
-          if (currentActor->isPlayer()) {
-            currentBattleState = STATE_COMMAND_SELECT;
-          } else {
-            currentBattleState = STATE_ENEMY_AI;
+          if (battlePhase == BattlePhase::EXECUTING) {
+            // すでに行動内容は決まっているので、そのまま実行
+            currentBattleState = STATE_ACTION_CALC;
+          }
+          else {
+            // まだ行動を決める段階
+            if (currentActor->isPlayer()) {
+              currentBattleState = STATE_COMMAND_SELECT;
+            } else {
+              currentBattleState = STATE_ENEMY_AI;
+            }
           }
         }
         break;
@@ -6114,7 +6910,10 @@ public:
       case STATE_ENEMY_AI: {
         String enemyName = currentActor->getname();
         message = enemyName + " の攻撃!";
-        pendingAction = 0; // デフォルトは通常攻撃
+        // pendingAction = 0; // デフォルトは通常攻撃
+        pendingActionType = ActionType::ATTACK;
+        pendingSkillIndex = -1;
+        
         bool willFlee = false;
         // はぐれノイズ(36): 50%で逃げる
         int who = currentActor->getWho();
@@ -6123,10 +6922,11 @@ public:
         // ノイズ・キング(37): 70%で逃げる (より逃げやすい)
         if (who == 37 && random(100) < 40) willFlee = true;
         if (willFlee) {
-          pendingAction = 255; // ★ "255" を「逃げる」という特殊コードにする
+          pendingActionType = ActionType::FLEE;
+          pendingSkillIndex = -1;
           message = enemyName + " は逃げ出した！";
-          currentBattleState = STATE_ACTION_CALC;
-          break; // 以下の攻撃ロジックをスキップして計算へ
+          currentBattleState = STATE_ACTION_READY;
+          break;
         }
         // 1. デフォルトターゲット (プレイヤー側からランダム)
         std::vector<Status*> playerSide = getAliveAllies();
@@ -6136,140 +6936,254 @@ public:
         // 2. スキル選択ロジック
         std::vector<Skill>& skills = currentActor->getLearnedSkills();
         
-        if (!skills.empty()) {
-            int who = currentActor->getWho();
-            int curTP = currentActor->getTp();
-            int curHP = currentActor->getHp();
-            int maxHP = currentActor->getMaxHp();
-            int selectedSkillIndex = -1; 
+        if (!skills.empty() && currentActor->getSilencedTurns() <= 0) {
+          int who = currentActor->getWho();
+          int curTP = currentActor->getTp();
+          int curHP = currentActor->getHp();
+          int maxHP = currentActor->getMaxHp();
+          int selectedSkillIndex = -1; 
 
-            // [ヘルパー] IDでスキルを探す
-            auto findSkillIndex = [&](int id) -> int {
-                for(int i=0; i<skills.size(); i++) {
-                    if(skills[i].id == id && skills[i].tpCost <= curTP) return i;
-                }
-                return -1;
-            };
+          // [ヘルパー] IDでスキルを探す
+          auto findSkillIndex = [&](int id) -> int {
+            for(int i=0; i<skills.size(); i++) {
+              if(skills[i].id == id && skills[i].tpCost <= curTP) return i;
+            }
+            return -1;
+          };
 
-            // --- 特殊AI ---
-            if (who == 80) { // スプラウト・ギア
-                if (curHP < maxHP / 2 && random(100) < 50) selectedSkillIndex = findSkillIndex(47); 
-                else if (random(100) < 30) selectedSkillIndex = findSkillIndex(21); 
+          // --- 特殊AI ---
+          if (who == 80) { // スプラウト・ギア
+            if (curHP < maxHP / 2 && random(100) < 50) selectedSkillIndex = findSkillIndex(47); 
+            else if (random(100) < 30) selectedSkillIndex = findSkillIndex(21); 
+          }
+          else if (who == 81) { // ソレイユ
+            if (curHP < maxHP / 2) { 
+              if (random(100) < 60) selectedSkillIndex = findSkillIndex(34); 
+              else if (random(100) < 40) selectedSkillIndex = findSkillIndex(87); 
+            } else { 
+              if (random(100) < 50) selectedSkillIndex = findSkillIndex(52); 
             }
-            else if (who == 81) { // ソレイユ
-                if (curHP < maxHP / 2) { 
-                     if (random(100) < 60) selectedSkillIndex = findSkillIndex(34); 
-                     else if (random(100) < 40) selectedSkillIndex = findSkillIndex(87); 
-                } else { 
-                     if (random(100) < 50) selectedSkillIndex = findSkillIndex(52); 
-                }
+          }
+          else if (who == 82) { // ハーベスト・スティンガー
+            if (currentTarget && currentTarget->poisonTurns > 0) selectedSkillIndex = findSkillIndex(42);
+            else if (random(100) < 70) {
+              int r = random(3);
+              if (r==0) selectedSkillIndex = findSkillIndex(105); 
+              else if(r==1) selectedSkillIndex = findSkillIndex(45); 
+              else selectedSkillIndex = findSkillIndex(113); 
             }
-            else if (who == 82) { // ハーベスト・スティンガー
-                 if (currentTarget && currentTarget->poisonTurns > 0) selectedSkillIndex = findSkillIndex(42);
-                 else if (random(100) < 70) {
-                     int r = random(3);
-                     if (r==0) selectedSkillIndex = findSkillIndex(105); 
-                     else if(r==1) selectedSkillIndex = findSkillIndex(45); 
-                     else selectedSkillIndex = findSkillIndex(113); 
-                 }
-            }
-            else if (who == 83) { // 雪影
-                 if (curHP < maxHP / 3) selectedSkillIndex = findSkillIndex(123); 
-                 else if (turnCount % 3 == 0) selectedSkillIndex = findSkillIndex(random(100)<50 ? 39 : 73);
-            }
-            else if (who == 84) { // ラスボス
-                 if (curHP < maxHP / 4) selectedSkillIndex = findSkillIndex(127); 
-                 else if (turnCount % 4 == 0) selectedSkillIndex = findSkillIndex(114); 
-                 else if (random(100) < 30) selectedSkillIndex = findSkillIndex(86);
-            }
-            // ★★★ 修正: 回復役 (仲間も回復するAI) ★★★
-            else if (who == 3 || who == 8 || who == 13 || who == 20 || who == 32) {
-                 // 1. まず回復スキルがあるか確認
-                 int healIdx = findSkillIndex(100);
-                 if (healIdx == -1) healIdx = findSkillIndex(101); // 上位回復
+          }
+          else if (who == 83) { // 雪影
+            if (curHP < maxHP / 3) selectedSkillIndex = findSkillIndex(123); 
+            else if (turnCount % 3 == 0) selectedSkillIndex = findSkillIndex(random(100)<50 ? 39 : 73);
+          }
+          else if (who == 84) { // ラスボス
+            if (curHP < maxHP / 4) selectedSkillIndex = findSkillIndex(127); 
+            else if (turnCount % 4 == 0) selectedSkillIndex = findSkillIndex(114); 
+            else if (random(100) < 30) selectedSkillIndex = findSkillIndex(86);
+          }
+          // --- 回復役AI ---
+          else if (who == 3 ||
+                  who == 8 ||
+                  who == 13 ||
+                  who == 20 ||
+                  who == 32)
+          {
+            // HPが半分未満の生存中の味方を探す
+            Status* injuredTarget = nullptr;
 
-                 if (healIdx != -1) {
-                     // 2. 傷ついた仲間（自分含む）を探す
-                     Status* injuredTarget = nullptr;
-                     
-                     // 敵全員をチェック
-                     for (auto e : activeEnemies) {
-                         if (e->status->getHp() > 0 && e->status->getHp() < e->status->getMaxHp() / 2) {
-                             injuredTarget = e->status;
-                             break; // 最初に見つけた瀕死の仲間を助ける
-                         }
-                     }
-
-                     // 3. 見つかったら回復実行
-                     if (injuredTarget != nullptr) {
-                         selectedSkillIndex = healIdx;
-                         currentTarget = injuredTarget; // ★ターゲットをその仲間に変更
-                     }
-                 }
-            }
-
-            // --- 汎用AI ---
-            if (selectedSkillIndex == -1 && random(100) < 30) {
-              std::vector<int> usableIndices;
-              for(int i=0; i<skills.size(); i++) {
-                if (skills[i].tpCost <= curTP) usableIndices.push_back(i);
-              }
-              if (!usableIndices.empty()) {
-                selectedSkillIndex = usableIndices[random(0, usableIndices.size())];
+            for (auto e : activeEnemies) {
+              if (e != nullptr &&
+                  e->status != nullptr &&
+                  e->status->getHp() > 0 &&
+                  e->status->getHp() < e->status->getMaxHp() / 2)
+              {
+                injuredTarget = e->status;
+                break;
               }
             }
 
-            // --- 行動確定後のターゲット調整 ---
-            if (selectedSkillIndex != -1) {
-                pendingAction = 100 + selectedSkillIndex; 
-                Skill& s = skills[selectedSkillIndex];
-                message = enemyName + " の " + s.name + "!";
-                
-                // ★★★ 重要: スキル範囲によるターゲットの強制変更 ★★★
-                
-                // 自分のみ
-                if (s.scope == Skill::TargetScope::SELF) {
-                    currentTarget = currentActor;
+            // 回復が必要な味方がいる場合だけ回復技を探す
+            if (injuredTarget != nullptr) {
+
+              int healIdx = -1;
+              int bestHealPower = -1;
+
+              for (int i = 0;
+                  i < static_cast<int>(skills.size());
+                  i++)
+              {
+                const Skill& skill = skills[i];
+
+                // 使用可能な回復スキルだけを対象にする
+                if (skill.type == Skill::EffectType::HEAL &&
+                    skill.tpCost <= curTP)
+                {
+                  // 複数ある場合は威力が高いものを使う
+                  if (skill.power > bestHealPower) {
+                    bestHealPower = skill.power;
+                    healIdx = i;
+                  }
                 }
-                // 味方単体（敵から見た味方＝他の敵）
-                else if (s.scope == Skill::TargetScope::SINGLE_ALLY) {
-                    // もしターゲットが「プレイヤー側」になっていたら、「敵側」に切り替える
-                    if (currentTarget == nullptr || currentTarget->isPlayer()) {
-                        // 生きている敵リストを作成
-                        std::vector<Status*> livingEnemies;
-                        for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
-                        
-                        if (!livingEnemies.empty()) {
-                            // ランダムな仲間にかける（回復AIですでに決まっている場合は上書きしないよう注意が必要だが、
-                            // ここでは「回復AI以外で選ばれた補助魔法」を想定してランダムにする）
-                            // ※回復AIでcurrentTargetを変えた場合、isPlayer()はfalseなのでここには入らない。完璧。
-                            currentTarget = livingEnemies[random(0, livingEnemies.size())];
-                        } else {
-                            currentTarget = currentActor; // 誰もいなければ自分
-                        }
-                    }
-                }
-                // (全体攻撃やランダム攻撃の場合、STATE_ACTION_CALC でループ処理されるので currentTarget は無視でOK)
+              }
+
+              if (healIdx != -1) {
+                selectedSkillIndex = healIdx;
+                currentTarget = injuredTarget;
+              }
             }
+          }
+
+          // --- 汎用AI ---
+          if (selectedSkillIndex == -1 && random(100) < 30) {
+            std::vector<int> usableIndices;
+            for(int i=0; i<skills.size(); i++) {
+              if (skills[i].tpCost <= curTP) usableIndices.push_back(i);
+            }
+            if (!usableIndices.empty()) {
+              selectedSkillIndex = usableIndices[random(0, usableIndices.size())];
+            }
+          }
+
+          // --- 行動確定後のターゲット調整 ---
+          if (selectedSkillIndex != -1) {
+            pendingActionType = ActionType::SKILL;
+            pendingSkillIndex = selectedSkillIndex;
+            Skill& s = skills[selectedSkillIndex];
+            message = enemyName + " の " + s.name + "!";
+            
+            // ★★★ 重要: スキル範囲によるターゲットの強制変更 ★★★
+            
+            // 自分のみ
+            if (s.scope == Skill::TargetScope::SELF) {
+              currentTarget = currentActor;
+            }
+            // 味方単体（敵から見た味方＝他の敵）
+            else if (s.scope == Skill::TargetScope::SINGLE_ALLY) {
+              // もしターゲットが「プレイヤー側」になっていたら、「敵側」に切り替える
+              if (currentTarget == nullptr || currentTarget->isPlayer()) {
+                // 生きている敵リストを作成
+                std::vector<Status*> livingEnemies;
+                for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
+                
+                if (!livingEnemies.empty()) {
+                  // ランダムな仲間にかける（回復AIですでに決まっている場合は上書きしないよう注意が必要だが、
+                  // ここでは「回復AI以外で選ばれた補助魔法」を想定してランダムにする）
+                  // ※回復AIでcurrentTargetを変えた場合、isPlayer()はfalseなのでここには入らない。完璧。
+                  currentTarget = livingEnemies[random(0, livingEnemies.size())];
+                } else {
+                  currentTarget = currentActor; // 誰もいなければ自分
+                }
+              }
+            }
+            // (全体攻撃やランダム攻撃の場合、STATE_ACTION_CALC でループ処理されるので currentTarget は無視でOK)
+          }
         }
         
-        currentBattleState = STATE_ACTION_CALC; 
+        currentBattleState = STATE_ACTION_READY;
         break;
       }
 
-      // 8. 行動の実行（計算）
+      // 8. 
+      case STATE_ACTION_READY: {
+        currentBattleAction = createBattleAction(
+            currentActor,
+            pendingActionType,
+            pendingSkillIndex,
+            currentTarget
+        );
+
+        // -------------------------
+        // 行動予約フェーズ
+        // -------------------------
+        if (battlePhase == BattlePhase::PLANNING) {
+
+          plannedActions.push_back(currentBattleAction);
+
+          // 次のキャラへ
+          currentActorIndex++;
+
+          // 前の行動情報をクリア
+          pendingActionType = ActionType::NONE;
+          pendingSkillIndex = -1;
+          currentTarget = nullptr;
+          currentBattleAction = BattleAction();
+
+          currentBattleState = STATE_ACTOR_SELECT;
+          break;
+        }
+
+        // -------------------------
+        // 実行フェーズ
+        // -------------------------
+        // 混乱などによって実行直前に行動内容が変更された場合は
+        // 新たに予約せず、そのまま実行する。
+        currentBattleState = STATE_ACTION_CALC;
+
+        break;
+      }
+
+      // 9. 
+      case STATE_EXECUTE_NEXT_ACTION: {
+        // 全ての予約行動を実行し終えた
+        if (currentPlannedActionIndex >= plannedActions.size()) {
+          // 今のターンの全行動が終了したので、
+          // 次のターン番号へ進める
+          turnCount++;
+
+          battlePhase = BattlePhase::PLANNING;
+          currentBattleState = STATE_TURN_START;
+          break;
+        }
+
+        currentBattleAction =
+            plannedActions[currentPlannedActionIndex];
+
+        currentActor = currentBattleAction.actor;
+
+        // nullptrならスキップ
+        if (currentActor == nullptr) {
+          currentPlannedActionIndex++;
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
+          break;
+        }
+
+        // ★このキャラの実際の行動順が来たので、
+        // 前回の「ぼうぎょ」をここで解除する
+        currentActor->isDefending = false;
+
+        // 行動前に倒されていたキャラはスキップ
+        if (currentActor->getHp() <= 0) {
+          currentPlannedActionIndex++;
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
+          break;
+        }
+
+        // 予約していた行動を既存実行系へ戻す
+        pendingActionType = currentBattleAction.type;
+        pendingSkillIndex = currentBattleAction.skillIndex;
+        currentTarget = currentBattleAction.target;
+
+        // 毒・麻痺・混乱などの状態異常を処理
+        currentBattleState = STATE_PRE_ACTION_EFFECTS;
+
+        break;
+      }
+
+      // 10. 行動の実行（計算）
       case STATE_ACTION_CALC: {
         lastDamage = 0;
         lastActionMessage = "";
-        
-        // ★★★ 修正A: フリーズ防止 (ポインタチェックを追加) ★★★
+
+        messageFlow = MessageFlow::ACTION_COMPLETE;
+        // ポップアップを安全にクリア
         if (heroRef && heroRef->status) heroRef->status->clearPopups();
         if (partyRef) {
             for(auto m : partyRef->members) if(m && m->status) m->status->clearPopups();
         }
         for(auto e : activeEnemies) if(e && e->status) e->status->clearPopups();
 
-        if (pendingAction == 255) {
+        if (pendingActionType == ActionType::FLEE) {
           // 1. 経験値とドロップを0にする (倒した扱いにはしない)
           // (StatusからはEnemyオブジェクトに辿れないので、リストから探す)
           for (auto e : activeEnemies) {
@@ -6288,10 +7202,11 @@ public:
           music.playSE(3); // シュッという音など
 
           // 4. メッセージ表示へ
+          messageFlow = MessageFlow::ACTION_COMPLETE;
           currentBattleState = STATE_ACTION_MSG;
           break; 
         }
-        if (pendingAction == 200) { // 防御
+        if (pendingActionType == ActionType::DEFEND) { // 防御
           // 1. 防御フラグを立てる
           currentActor->isDefending = true;
 
@@ -6300,143 +7215,374 @@ public:
           message = String(currentActor->getname()) + " は身を守っている！";
           
           // 3. メッセージ表示ステートへ
+          messageFlow = MessageFlow::ACTION_COMPLETE;
           currentBattleState = STATE_ACTION_MSG;
           break; 
         }
         // 行動者がいない場合はスキップ
         if (!currentActor) {
-            currentBattleState = STATE_ACTION_MSG;
-            break;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
         }
 
         // スキル情報取得
-        Skill currentSkill(0); 
-        if (pendingAction == 0) { 
-            // ★★★ 修正B: 「たたかう」の設定を完全にする ★★★
-            currentSkill = Skill(0); // ID 0 で初期化
-            currentSkill.name = "攻撃"; 
-            currentSkill.power = 50; 
-            currentSkill.type = Skill::EffectType::DAMAGE;
-            currentSkill.scope = Skill::TargetScope::SINGLE_ENEMY;
-            
-            // 重要: 物理攻撃であることを明示 (これが無いと判定が狂う)
-            currentSkill.dependence = Skill::StatDependence::ATK;
-            currentSkill.category = Skill::Category::PHYSICAL; 
+        Skill currentSkill(0);
 
-            message = String(currentActor->getname()) + " の攻撃！";
-        } else {
-            currentSkill = currentActor->getLearnedSkills()[pendingAction - 100];
-            message = String(currentActor->getname()) + " の " + currentSkill.name + "！";
-        }
+        // 実行時に予約対象を変更したか
+        bool targetChanged = false;
 
-        // 行動不能チェック
-        if (currentActor->cantMoveTurns > 0) {
-            message = String(currentActor->getname()) + " は動けない！";
-            currentActor->cantMoveTurns--;
-            currentBattleState = STATE_ACTION_MSG; 
-            break; 
-        }
-
-        // --- ターゲット解決 ---
-        // (単体対象の場合のみ、挑発やかばうを考慮してターゲットを変える)
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
-            currentSkill.scope == Skill::TargetScope::SINGLE_ALLY) 
+        // 行動予約後に沈黙を受けている可能性があるため、
+        // 実行時にもスキル使用可否を確認する
+        if (pendingActionType == ActionType::SKILL &&
+            currentActor->getSilencedTurns() > 0)
         {
-          currentTarget = resolveTarget(currentTarget, currentSkill);
+          message =
+              String(currentActor->getname()) +
+              " は沈黙していて旋律を使えない！";
+
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
+        }
+
+        if (pendingActionType == ActionType::ATTACK) {
+          currentSkill = Skill(0);
+          currentSkill.name = "攻撃";
+          currentSkill.power = 50;
+          currentSkill.type = Skill::EffectType::DAMAGE;
+          currentSkill.scope = Skill::TargetScope::SINGLE_ENEMY;
+          currentSkill.dependence = Skill::StatDependence::ATK;
+          currentSkill.category = Skill::Category::PHYSICAL;
+
+          // 予約していた攻撃対象がすでに倒れていた場合
+          if (currentTarget == nullptr ||
+              currentTarget->getHp() <= 0)
+          {
+            std::vector<Status*> candidates =
+                currentActor->isPlayer()
+                    ? getAliveEnemies()
+                    : getAliveAllies();
+
+            if (candidates.empty()) {
+              message =
+                  String(currentActor->getname()) +
+                  " の攻撃！\n対象がいない！";
+
+              messageFlow = MessageFlow::END_TURN;
+              currentBattleState = STATE_ACTION_MSG;
+              break;
+            }
+
+            currentTarget =
+                candidates[random((int)candidates.size())];
+
+            targetChanged = true;
+          }
+
+          message = String(currentActor->getname()) + " の攻撃！";
+
+          if (targetChanged) {
+            message += "\n対象を変更した！";
+          }
+        }
+        else if (pendingActionType == ActionType::SKILL) {
+          std::vector<Skill>& skills = currentActor->getLearnedSkills();
+
+          if (pendingSkillIndex < 0 ||
+            pendingSkillIndex >= skills.size()) {
+
+            message = "スキル指定エラー";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
+          currentSkill = skills[pendingSkillIndex];
+
+          // --- 実行時ターゲット再確認 ---
+
+          // 単体の敵対象技で、予約していた相手がすでに倒れていた場合
+          if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
+              (currentTarget == nullptr || currentTarget->getHp() <= 0))
+          {
+            // 使用者から見た「敵」の生存者を取得
+            std::vector<Status*> candidates =
+                currentActor->isPlayer()
+                    ? getAliveEnemies()
+                    : getAliveAllies();
+
+            if (candidates.empty()) {
+              message += "\n対象がいない！";
+              messageFlow = MessageFlow::END_TURN;
+              currentBattleState = STATE_ACTION_MSG;
+              break;
+            }
+
+            // 生存している敵からランダムで新しい対象を選ぶ
+            currentTarget =
+                candidates[random((int)candidates.size())];
+
+            targetChanged = true;
+          }
+
+          // 単体蘇生の対象が、実行前に別の蘇生で既に復活していた場合
+          if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
+              currentSkill.type == Skill::EffectType::REVIVE &&
+              (currentTarget == nullptr || currentTarget->getHp() > 0))
+          {
+            message += "\n対象はすでに復活している！";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
+          // 単体回復・単体バフの予約対象が倒れていた場合
+          if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
+              (currentSkill.type == Skill::EffectType::HEAL ||
+              currentSkill.type == Skill::EffectType::BUFF) &&
+              (currentTarget == nullptr || currentTarget->getHp() <= 0))
+          {
+            // 使用者から見た生存中の味方
+            std::vector<Status*> candidates =
+                currentActor->isPlayer()
+                    ? getAliveAllies()
+                    : getAliveEnemies();
+
+            if (candidates.empty()) {
+              message =
+                  String(currentActor->getname()) +
+                  " の " +
+                  currentSkill.name +
+                  "！\n対象がいない！";
+
+              messageFlow = MessageFlow::END_TURN;
+              currentBattleState = STATE_ACTION_MSG;
+              break;
+            }
+
+            currentTarget =
+                candidates[random((int)candidates.size())];
+
+            targetChanged = true;
+          }
+
+          // TP消費をここに集約
+          if (!currentActor->useTP(currentSkill.tpCost)) {
+            message = String(currentActor->getname()) + " はTPが足りない！";
+            messageFlow = MessageFlow::END_TURN;
+            currentBattleState = STATE_ACTION_MSG;
+            break;
+          }
+
+          message =
+            String(currentActor->getname()) +
+            " の " +
+            currentSkill.name +
+            "！";
+
+          if (targetChanged) {
+            message += "\n対象を変更した！";
+          }
+        }
+        else {
+          message = "行動指定エラー";
+          messageFlow = MessageFlow::END_TURN;
+          currentBattleState = STATE_ACTION_MSG;
+          break;
         }
 
         // --- 実行ロジック ---
-        
-        // A. 単体・自分対象 (反射・カウンター判定あり)
-        if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY || 
-            currentSkill.scope == Skill::TargetScope::SINGLE_ALLY ||
-            currentSkill.scope == Skill::TargetScope::SELF) 
+        // A. 敵単体
+        if (currentSkill.scope ==
+            Skill::TargetScope::SINGLE_ENEMY)
         {
-            // ターゲットが存在し、生きているかチェック
-            if (currentTarget != nullptr && currentTarget->getHp() > 0) {
-                
-                // 1. 反射判定
-                bool isReflected = false;
-                if (currentSkill.type != Skill::EffectType::HEAL) {
-                    if (currentTarget->reflectAllTurns > 0) isReflected = true;
-                    else if (currentTarget->reflectPhysicalTurns > 0 && currentSkill.category == Skill::Category::PHYSICAL) {
-                        isReflected = true; currentTarget->reflectPhysicalTurns--;
-                    }
-                    else if (currentTarget->reflectMagicTurns > 0 && currentSkill.category == Skill::Category::MELODY) {
-                        isReflected = true; currentTarget->reflectMagicTurns--;
-                    }
-                }
-
-                if (isReflected) {
-                    music.playSE(7);
-                    message += "\n" + String(currentTarget->getname()) + " は跳ね返した！";
-                    currentTarget = currentActor; // ターゲットを自分に変更
-                }
-
-                // 2. スキル実行
-                ExecuteSkill(currentSkill, currentActor, currentTarget, music);
-                
-                // 3. カウンター判定
-                // 条件: 反射されていない & ターゲットが生きてる & カウンター持ち & 物理攻撃 & ★自分への攻撃ではない
-                if (!isReflected && currentTarget->getHp() > 0 && 
-                    currentTarget->counterTurns > 0 && 
-                    currentSkill.category == Skill::Category::PHYSICAL &&
-                    currentTarget != currentActor)
-                {
-                    message += "\n" + String(currentTarget->getname()) + " の反撃！";
-                    music.playSE(3);
-                    int cntDmg = currentTarget->getAttack(); 
-                    currentActor->takedamage(cntDmg);
-                    currentActor->addPopup(cntDmg, false);
-                }
-            }
+          if (currentTarget != nullptr &&
+              currentTarget->getHp() > 0)
+          {
+            executeHostileSkillOnTarget(
+                currentSkill,
+                currentActor,
+                currentTarget,
+                music,
+                true   // 挑発・ステルス・かばうあり
+            );
+          }
         }
-        // B. 全体・ランダム対象 (反射・カウンターなし)
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ENEMIES) {
-            bool anyDefeated = false;
-            for (auto enemy : activeEnemies) {
-                if (enemy && enemy->status && enemy->status->getHp() > 0) {
-                    ExecuteSkill(currentSkill, currentActor, enemy->status, music);
-                    if (enemy->status->getHp() <= 0) anyDefeated = true;
-                }
-            }
-            if (anyDefeated) message += "\n敵を一掃した！";
-        } 
-        else if (currentSkill.scope == Skill::TargetScope::ALL_ALLIES) {
-            for (auto ally : getAliveAllies()) {
-                ExecuteSkill(currentSkill, currentActor, ally, music);
-            }
-        } 
-        else if (currentSkill.scope == Skill::TargetScope::RANDOM_ENEMY) {
-             int hits = 1;
-             if (currentSkill.id == 123) hits = random(2, 5);
-             if (currentSkill.id == 127) hits = random(1, 8);
-             
-             std::vector<Status*> livingEnemies;
-             for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
-             
-             if (!livingEnemies.empty()) {
-                 bool anyDefeated = false;
-                 for (int i = 0; i < hits; i++) {
-                     // 攻撃のたびに生きている敵を再取得 (途中で倒すかもしれないので)
-                     std::vector<Status*> live;
-                     for(auto t : livingEnemies) if(t->getHp() > 0) live.push_back(t);
-                     if(live.empty()) break;
 
-                     Status* t = live[random(0, live.size())];
-                     ExecuteSkill(currentSkill, currentActor, t, music);
-                     if (t->getHp() <= 0) anyDefeated = true;
-                 }
-                 if (anyDefeated) message += "\n敵を倒した！";
-             }
+        // B. 味方単体・自分
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::SINGLE_ALLY ||
+            currentSkill.scope ==
+                Skill::TargetScope::SELF)
+        {
+          bool targetCanReceiveSkill =
+              currentTarget != nullptr &&
+              (
+                currentTarget->getHp() > 0 ||
+                currentSkill.type ==
+                    Skill::EffectType::REVIVE
+              );
+
+          if (targetCanReceiveSkill) {
+            ExecuteSkill(
+                currentSkill,
+                currentActor,
+                currentTarget,
+                music
+            );
+          }
+        }
+
+        // C. 敵全体
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::ALL_ENEMIES)
+        {
+          bool anyDefeated = false;
+
+          std::vector<Status*> targets =
+              currentActor->isPlayer()
+                  ? getAliveEnemies()
+                  : getAliveAllies();
+
+          for (auto target : targets) {
+
+            bool defeated =
+                executeHostileSkillOnTarget(
+                    currentSkill,
+                    currentActor,
+                    target,
+                    music,
+                    false  // 全体攻撃なので対象変更なし
+                );
+
+            if (defeated) {
+              anyDefeated = true;
+            }
+          }
+
+          if (anyDefeated) {
+            if (currentActor->isPlayer()) {
+              message += "\n敵を倒した！";
+            }
+            else {
+              message += "\n味方が倒れた！";
+            }
+          }
+        }
+
+        // D. 味方全体
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::ALL_ALLIES)
+        {
+          std::vector<Status*> targets;
+
+          if (currentActor->isPlayer()) {
+
+            if (currentSkill.type ==
+                Skill::EffectType::REVIVE)
+            {
+              // 全体蘇生は死亡者も含める
+              targets = getAllAllies();
+            }
+            else {
+              targets = getAliveAllies();
+            }
+          }
+          else {
+            // 敵側
+            targets = getAliveEnemies();
+          }
+
+          for (auto target : targets) {
+            ExecuteSkill(
+                currentSkill,
+                currentActor,
+                target,
+                music
+            );
+          }
+        }
+
+        // E. ランダム敵
+        else if (
+            currentSkill.scope ==
+                Skill::TargetScope::RANDOM_ENEMY)
+        {
+          int hits = 1;
+
+          if (currentSkill.id == 123) {
+            hits = random(2, 5);
+          }
+
+          if (currentSkill.id == 127) {
+            hits = random(1, 8);
+          }
+
+          std::vector<Status*> targets =
+              currentActor->isPlayer()
+                  ? getAliveEnemies()
+                  : getAliveAllies();
+
+          if (!targets.empty()) {
+
+            bool anyDefeated = false;
+
+            for (int i = 0; i < hits; i++) {
+
+              // 前のヒットで倒れている可能性があるので
+              // 毎回生存者だけを作り直す
+              std::vector<Status*> live;
+
+              for (auto target : targets) {
+                if (target != nullptr &&
+                    target->getHp() > 0)
+                {
+                  live.push_back(target);
+                }
+              }
+
+              if (live.empty()) {
+                break;
+              }
+
+              Status* target =
+                  live[random(0, live.size())];
+
+              bool defeated =
+                  executeHostileSkillOnTarget(
+                      currentSkill,
+                      currentActor,
+                      target,
+                      music,
+                      true   // 1ヒットごとに対象変更あり
+                  );
+
+              if (defeated) {
+                anyDefeated = true;
+              }
+            }
+
+            if (anyDefeated) {
+              if (currentActor->isPlayer()) {
+                message += "\n敵を倒した！";
+              }
+              else {
+                message += "\n味方が倒れた！";
+              }
+            }
+          }
         }
 
         // 特殊効果メッセージ
         if (lastActionMessage != "") message += "\n" + lastActionMessage;
 
         // 行動後フラグ処理
-        if (currentSkill.id == 86) currentActor->limitBreak(); 
-        if (currentSkill.id == 126) currentActor->cantMoveTurns = 2; 
+        if (currentSkill.id == 126) {
+          currentActor->cantMoveTurns = 1;
+        }
         if (currentSkill.id == 85) currentActor->isDoubleAction = true; 
 
         // 振動処理
@@ -6447,96 +7593,193 @@ public:
             else if (!currentTarget->isPlayer() && lastPopup.value > 0) vibration.trigger(30);
         }
 
-        currentBattleState = STATE_ACTION_MSG; 
+        currentBattleState = STATE_ACTION_MSG;
         break;
       }
       
-      // 9. 行動結果のメッセージ表示 (待機のみ)
+      // 11. 行動結果のメッセージ表示 (待機のみ)
       case STATE_ACTION_MSG:
-        if (aPressed) { 
+        if (aPressed) {
           hero.status->clearPopups();
-          for (auto m : party.members) m->status->clearPopups();
-          for (auto e : activeEnemies) e->status->clearPopups();
-          if (currentActor->isDoubleAction) {
-            currentActor->isDoubleAction = false; // フラグ消費
-            // ターゲット選択などはリセットされるが、同じ人のターンを継続
-            if (currentActor->isPlayer()) {
-              currentBattleState = STATE_COMMAND_SELECT;
-              message = String(currentActor->getname()) + " の再行動！";
-            } else {
-              currentBattleState = STATE_ENEMY_AI;
+
+          for (auto m : party.members) {
+            m->status->clearPopups();
+          }
+
+          for (auto e : activeEnemies) {
+            e->status->clearPopups();
+          }
+
+          if (messageFlow == MessageFlow::CONTINUE_TURN) {
+            if (battlePhase == BattlePhase::EXECUTING) {
+              // 毒やリジェネのメッセージを見終えたので、
+              // 予約済みの行動をそのまま実行する
+              currentBattleState = STATE_ACTION_CALC;
             }
-          }else{
-            if (pendingAction == -1) { 
-              if (currentActor->isPlayer()) currentBattleState = STATE_CHECK_DEFEAT;
-              else currentBattleState = STATE_CHECK_VICTORY;
-            }else if (pendingAction == -2) { 
-              if (currentActor->isPlayer()) currentBattleState = STATE_COMMAND_SELECT;
-              else currentBattleState = STATE_ENEMY_AI;
-            }else { 
-              if (currentActor->isPlayer()) currentBattleState = STATE_CHECK_VICTORY; 
-              else currentBattleState = STATE_CHECK_DEFEAT; 
+            else {
+              // まだ行動決定段階
+              if (currentActor->isPlayer()) {
+                currentBattleState = STATE_COMMAND_SELECT;
+              } else {
+                currentBattleState = STATE_ENEMY_AI;
+              }
             }
+          }
+          else {
+            // ACTION_COMPLETE / END_TURN のどちらでも
+            // まず戦闘が終わったか確認する。
+            currentBattleState = STATE_CHECK_BATTLE_RESULT;
           }
         }
         break;
+      // 12. 勝利判定 (旧 8)
+      case STATE_CHECK_BATTLE_RESULT: {
+        // -------------------------
+        // 1. 敵側が全滅しているか
+        // -------------------------
+        bool allEnemiesDefeated = true;
 
-      // 10. 勝利判定 (旧 8)
-      case STATE_CHECK_VICTORY:
-        {
-          bool allEnemiesDefeated = true;
-          for (auto enemy : activeEnemies) {
-            if (enemy->status->getHp() > 0) {
-              allEnemiesDefeated = false;
-              break;
-            }
-          }
-          
-          if (allEnemiesDefeated) {
-            message = "敵を倒した！";
-            battleWon = true;
-            if(aPressed) currentBattleState = STATE_SHOW_XP_GAIN; // XP獲得へ
-          } else {
-            currentActorIndex++; // 次の行動者へ
-            currentBattleState = STATE_ACTOR_SELECT; 
+        for (auto enemy : activeEnemies) {
+          if (enemy && enemy->status && enemy->status->getHp() > 0) {
+            allEnemiesDefeated = false;
+            break;
           }
         }
-        break;
 
-      // 11. 敗北判定 (旧 9)
-      case STATE_CHECK_DEFEAT: 
-      {
-        // ★★★ 修正: 全滅判定に変更 ★★★
+        // -------------------------
+        // 2. プレイヤー側が全滅しているか
+        // -------------------------
         bool anyoneAlive = false;
 
-        // 主人公は生きているか？
-        if (hero.status->getHp() > 0) anyoneAlive = true;
+        if (hero.status->getHp() > 0) {
+          anyoneAlive = true;
+        }
 
-        // 仲間は生きているか？
         if (!anyoneAlive) {
           for (auto m : party.members) {
-            if (m->status->getHp() > 0) {
+            if (m && m->status && m->status->getHp() > 0) {
               anyoneAlive = true;
               break;
             }
           }
         }
 
+        // -------------------------
+        // 3. 勝敗判定
+        // -------------------------
+
+        // 両陣営が同時に全滅した場合。
+        // 今回は既存挙動をなるべく維持する。
+        if (allEnemiesDefeated && !anyoneAlive) {
+          if (currentActor && currentActor->isPlayer()) {
+            message = "敵を倒した！";
+            battleEndReason = BattleEndReason::VICTORY;
+
+            if (aPressed) {
+              currentBattleState = STATE_SHOW_XP_GAIN;
+            }
+          }
+          else {
+            message = "全滅した…";
+            battleEndReason = BattleEndReason::DEFEAT;
+
+            if (aPressed) {
+              currentBattleState = STATE_BATTLE_END;
+            }
+          }
+
+          break;
+        }
+
+        // 敵全滅
+        if (allEnemiesDefeated) {
+          message = "敵を倒した！";
+          battleEndReason = BattleEndReason::VICTORY;
+
+          if (aPressed) {
+            currentBattleState = STATE_SHOW_XP_GAIN;
+          }
+
+          break;
+        }
+
+        // 味方全滅
         if (!anyoneAlive) {
-          // 全員死んだら敗北確定
           message = "全滅した…";
-          battleWon = false; // 敗北
-          if(aPressed) currentBattleState = STATE_BATTLE_END;
-        } else {
-          // 誰か生きているなら続行（次の人のターンへ）
-          currentActorIndex++; 
+          battleEndReason = BattleEndReason::DEFEAT;
+
+          if (aPressed) {
+            currentBattleState = STATE_BATTLE_END;
+          }
+
+          break;
+        }
+
+        // -------------------------
+        // 4. まだ戦闘継続
+        // -------------------------
+        currentBattleState = STATE_END_ACTOR_TURN;
+        break;
+      }
+      // 13. 
+      case STATE_END_ACTOR_TURN: {
+        // -------------------------
+        // 1. 2回行動
+        // -------------------------
+        // 実際に行動を完了していて、
+        // かつ本人がまだ生きている場合のみ再行動する
+        if (messageFlow == MessageFlow::ACTION_COMPLETE &&
+            currentActor != nullptr &&
+            currentActor->getHp() > 0 &&
+            currentActor->isDoubleAction)
+        {
+          currentActor->isDoubleAction = false;
+
+          // 前の行動情報をクリア
+          pendingActionType = ActionType::NONE;
+          pendingSkillIndex = -1;
+          currentTarget = nullptr;
+          messageFlow = MessageFlow::ACTION_COMPLETE;
+
+          if (currentActor->isPlayer()) {
+            message = String(currentActor->getname()) + " の再行動！";
+            currentBattleState = STATE_COMMAND_SELECT;
+          }
+          else {
+            currentBattleState = STATE_ENEMY_AI;
+          }
+
+          break;
+        }
+
+        // -------------------------
+        // 2. この行動者のターン終了
+        // -------------------------
+        if (currentActor != nullptr) {
+          currentActor->UpdateTurn();
+        }
+
+        // 次の行動に古い情報を持ち越さない
+        pendingActionType = ActionType::NONE;
+        pendingSkillIndex = -1;
+        currentTarget = nullptr;
+        messageFlow = MessageFlow::ACTION_COMPLETE;
+
+        // -------------------------
+        // 3. 次の行動者へ
+        // -------------------------
+        if (battlePhase == BattlePhase::EXECUTING) {
+          currentPlannedActionIndex++;
+          currentBattleState = STATE_EXECUTE_NEXT_ACTION;
+        }
+        else {
+          currentActorIndex++;
           currentBattleState = STATE_ACTOR_SELECT;
         }
-        // ★★★★★★★★★★★★★★★★★★★★
+        break;
       }
-      break;
 
-      // 12. XP獲得 (旧 10)
+      // 14. XP獲得 (旧 10)
       case STATE_SHOW_XP_GAIN:
         {
           // メッセージキューをクリア
@@ -6561,18 +7804,50 @@ public:
             if (ally->status->getHp() > 0) {
               int allyRes = ally->status->gainXP(lastGainedXP);
               if (allyRes >= 1) resultMessages.push_back(String(ally->status->getname()) + "はLv" + String(ally->status->getLevel()) + "になった!");
-              if (allyRes == 2) resultMessages.push_back(String(ally->name) + "は進化した!");
+              if (allyRes == 2) {
+                resultMessages.push_back(
+                    String(ally->status->getname()) +
+                    "は進化した!"
+                );
+              }
             }
           }
           
-          // お金加算
-          inventory.addItem(createItemById(100)); // ドロップ処理(仮)
+          // 4. ドロップ判定
+          // 敵ごとに設定されている dropItemId / dropRatePercent を使う。
+          // 逃走した敵は dropItemId = 0 にされているため対象外。
+          for (auto enemy : activeEnemies) {
+            if (enemy == nullptr) {
+              continue;
+            }
+
+            if (enemy->dropItemId <= 0 ||
+                enemy->dropRatePercent <= 0)
+            {
+              continue;
+            }
+
+            // 0～99 の乱数がドロップ率未満なら入手
+            if (random(0, 100) < enemy->dropRatePercent) {
+              Item droppedItem =
+                  createItemById(enemy->dropItemId);
+
+              inventory.addItem(droppedItem);
+
+              resultMessages.push_back(
+                  String(droppedItem.name) +
+                  "を手に入れた!"
+              );
+            }
+          }
 
           // ★ 最初のメッセージを表示して、順次表示ステートへ
           message = resultMessages[0];
           currentBattleState = STATE_SHOW_RESULT_MESSAGE;
         }
         break;
+      
+      //15. 
       case STATE_SHOW_RESULT_MESSAGE:
         if (aPressed) {
           resultMessageIndex++;
@@ -6584,17 +7859,15 @@ public:
           }
         }
         break;
-      // 15. 戦闘終了 (旧 13)
+      // 16. 戦闘終了 (旧 13)
       case STATE_BATTLE_END:
         if(bPressed || aPressed){
-          bool actualBossDefeated = isBossBattleMode && battleWon;
+          bool actualBossDefeated =
+            isBossBattleMode &&
+            battleEndReason == BattleEndReason::VICTORY;
           inBattle = false;
-          if (!battleWon && selected != 1) { 
-            // 敗北 かつ 逃走でない(selected!=1) 場合
-            state = STATE_GAME_OVER; // ゲームオーバー状態へ遷移
-            
-            // カーソルをリセット (Battleクラスにこの変数を持たせておく)
-            // ゲームオーバーBGMがあるならここで再生
+          if (battleEndReason == BattleEndReason::DEFEAT) {
+            state = STATE_GAME_OVER;
           }
           else{
             state = STATE_GAME;
@@ -6603,7 +7876,7 @@ public:
             }
           }
           
-          // ★★★ 追加: 戦闘終了時にステータスをリセットする ★★★
+          // 戦闘終了時にステータスをリセット
           hero.status->resetBattleStats();
           std::vector<Status::PopupData>().swap(hero.status->popupValues);
           for(auto m : party.members) {
@@ -6614,7 +7887,6 @@ public:
               delete enemy; // Enemyとその中のStatusを削除
           }
           activeEnemies.clear(); // リストを空にする
-          // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
           // ★ ベクタの容量自体を解放するテクニック (Swap idiom)
           std::vector<Enemy*>().swap(activeEnemies);
 
@@ -6627,13 +7899,12 @@ public:
           std::vector<Status*>().swap(actorList);
           if (actualBossDefeated) {
             // 撃破フラグを立てる
-            int bossIndex = (map.currentFloor / 10) - 1;
+            int bossIndex = (map.getFloor() / 10) - 1;
             if (bossIndex >= 0 && bossIndex < 5) {
               bossFlags[bossIndex] = true;
             }
 
             // マップを集落に作り変える
-            map.isTown = true; 
             map.regenerate(20, 20, Map::TYPE_TOWN);
             
             // プレイヤー位置再配置
@@ -6646,12 +7917,12 @@ public:
 
             // BGMを集落用に変更 (ID:0)
             music.switchTrack(0, sd); 
-          } else if(!battleWon && selected != 1){
+          }else if (battleEndReason == BattleEndReason::DEFEAT) {
             music.switchTrack(99, sd);
           }else {
             // 通常戦闘終了後: BGMを戻す
-            if (map.isTown) music.switchTrack(0, sd); // 集落
-            else music.switchTrack(1, sd);            // ダンジョン
+            if (map.isTown()) music.switchTrack(0, sd);
+            else music.switchTrack(1, sd);
           }
         }
         break;
@@ -6807,10 +8078,9 @@ public:
                 g->lineSprite.setCursor(heroX + 10, pY); 
                 g->lineSprite.print("Miss"); 
               }else if (val > 0) {
-                // ★★★ 修正: 会心なら赤、通常なら黄色 ★★★
+                // 会心なら赤、通常なら黄色
                 if (isCrit) g->lineSprite.setTextColor(TFT_RED);
                 else g->lineSprite.setTextColor(TFT_YELLOW);
-                // ★★★★★★★★★★★★★★★★★★★★★★★
                 g->lineSprite.setCursor(heroX + 10, pY); 
                 g->lineSprite.print(val);
               }
@@ -6852,10 +8122,9 @@ public:
                   g->lineSprite.setCursor(allyX[i] + 20, pY);
                   g->lineSprite.print("Miss");
                 }else if (val > 0) {
-                  // ★★★ 修正: 会心なら赤、通常なら黄色 ★★★
+                  // 会心なら赤、通常なら黄色
                   if (isCrit) g->lineSprite.setTextColor(TFT_RED);
                   else g->lineSprite.setTextColor(TFT_YELLOW);
-                  // ★★★★★★★★★★★★★★★★★★★★★★★
                   g->lineSprite.setCursor(allyX[i] + 20, pY); 
                   g->lineSprite.print(val);
                 }
@@ -6873,7 +8142,26 @@ public:
           
         // ターゲットカーソル(味方)
         if (currentBattleState == STATE_TARGET_SELECT_ALLY) {
-          std::vector<Status*> allies = getAliveAllies();
+          bool isReviveSkill = false;
+
+          if (currentActor &&
+              pendingActionType == ActionType::SKILL) {
+
+            std::vector<Skill>& skills =
+                currentActor->getLearnedSkills();
+
+            if (pendingSkillIndex >= 0 &&
+                pendingSkillIndex < static_cast<int>(skills.size())) {
+              isReviveSkill =
+                  (skills[pendingSkillIndex].type ==
+                  Skill::EffectType::REVIVE);
+            }
+          }
+
+          std::vector<Status*> allies =
+              isReviveSkill ? getDeadAllies()
+                            : getAliveAllies();
+
           if (allyTargetIndex < allies.size()) {
             Status* targetedAlly = allies[allyTargetIndex];
             int tx = 0, ty = 0;
@@ -6909,7 +8197,7 @@ public:
           int x_offset = cmdX + 10;
           int y_offset = cmdY + 10;
           for (int i = 0; i < CMD_COUNT; i++) {
-            uint16_t color = (i == selected) ? TFT_YELLOW : TFT_WHITE;
+            uint16_t color = (i == commandSelected) ? TFT_YELLOW : TFT_WHITE;
             g->lineSprite.setTextColor(color);
             g->lineSprite.setCursor(x_offset, y_offset);
             g->lineSprite.print(commands[i]);
@@ -6924,14 +8212,14 @@ public:
             // スクロール計算
             int itemsPerPage = 3;
             int startIdx = 0;
-            if (selected >= itemsPerPage) {
-              startIdx = selected - (itemsPerPage - 1);
+            if (skillSelected >= itemsPerPage) {
+              startIdx = skillSelected - (itemsPerPage - 1);
             }
             int endIdx = startIdx + itemsPerPage;
             if (endIdx > skillCount) endIdx = skillCount;
 
             for (int i = startIdx; i < endIdx; i++) {
-              uint16_t color = (i == selected) ? TFT_YELLOW : TFT_WHITE;
+              uint16_t color = (i == skillSelected) ? TFT_YELLOW : TFT_WHITE;
               g->lineSprite.setTextColor(color);
               int relativeIndex = i - startIdx;
               g->lineSprite.setCursor(cmdX + 10, cmdY + 5 + (relativeIndex * 20)); 
@@ -6941,7 +8229,7 @@ public:
         }
 
         // --- メッセージ (最下部に移動) ---
-        // ★★★ 修正: 座標を 110 -> 220 に変更して、キャラと被らないようにする ★★★
+        // メッセージをキャラと重ならない位置に表示
         g->lineSprite.setTextSize(1);
         g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setCursor(10, 220 - drawY); // ここ！
@@ -6965,12 +8253,12 @@ private:
   void ExecuteSkill(Skill& skill, Status* user, Status* target, MUSIC& music) {
     if (target == nullptr) return;
 
-    int value = 0; 
+    int value = 0;
+    int actualDamage = 0;
     bool isCrit = false;
     switch (skill.type) {
       
       case Skill::EffectType::DAMAGE:
-        // ★★★ ここから修正 ★★★
         // (user->getSense() と target->getSense() でバフ/デバフが反映された値を取得)
         value = user->caclulateSkillDamage(target, skill, isCrit);
         if (isCrit) music.playSE(4); // 会心
@@ -6984,9 +8272,11 @@ private:
             else music.playSE(7); // センス単体
           }
         }
-        target->takedamage(value);
-        target->addPopup(value, isCrit); // ★ 結果をポップアップへ
-        lastDamage += value; 
+        actualDamage =
+            target->takedamage(value, skill.category);
+
+        target->addPopup(actualDamage, isCrit);
+        lastDamage += actualDamage;
         break;
 
       case Skill::EffectType::HEAL:
@@ -7002,9 +8292,7 @@ private:
         {
           int hits = 1;
           if (skill.id == 23 || skill.id == 74 || skill.id == 76) hits = 2; 
-          if (skill.id == 36) hits = 3; 
-          if (skill.id == 123) hits = random(2, 5);
-          if (skill.id == 127) hits = random(1, 8);
+          if (skill.id == 36) hits = 3;
 
           for(int i=0; i<hits; i++) {
             isCrit = false; // 毎回リセット
@@ -7016,9 +8304,11 @@ private:
               if (skill.category == Skill::Category::PHYSICAL) music.playSE(5); 
               else music.playSE(7);
             }
-            target->takedamage(value);
-            target->addPopup(value, isCrit); // ★ 結果をポップアップへ
-            lastDamage += value; 
+            actualDamage =
+                target->takedamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+            lastDamage += actualDamage;
           }
         }
         break;
@@ -7060,16 +8350,29 @@ private:
           if (random(0, 100) < chance) {
             music.playSE(4);
             int dmg = target->getHp();
-            target->takedamage(dmg);
-            target->addPopup(dmg, true); // 赤字
-            lastActionMessage = "急所を突いた! 即死!";
+
+            actualDamage =
+                target->takedamage(dmg, skill.category);
+
+            target->addPopup(actualDamage, true);
+
+            if (target->getHp() <= 0) {
+              lastActionMessage = "急所を突いた! 即死!";
+            }
+            else {
+              // バリア、アダマン・ボディ、ラストスタンドなどで
+              // 即死を防がれた場合
+              lastActionMessage = "急所を突いた!";
+            }
           } else {
             // 失敗時は通常ダメージの半分
             music.playSE(5);
             value = user->caclulateSkillDamage(target, skill, isCrit) / 2;
             if(value<1) value=1;
-            target->takedamage(value);
-            target->addPopup(value, isCrit);
+            actualDamage =
+                target->takedamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
             lastActionMessage = "急所を外した...";
           }
         }
@@ -7078,11 +8381,21 @@ private:
         else if (skill.id == 44 || skill.id == 111) {
           if (skill.id == 44) { // HP吸収
             music.playSE(5);
-            value = user->caclulateSkillDamage(target, skill, isCrit);
-            target->takedamage(value);
-            target->addPopup(value, isCrit);
-            user->ReceiveHeal(value); // 自分回復
-            user->addPopup(-value, false);
+            value =
+                user->caclulateSkillDamage(
+                    target,
+                    skill,
+                    isCrit
+                );
+
+            actualDamage =
+                target->takedamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+
+            // 実際に与えたダメージ分だけ吸収
+            user->ReceiveHeal(actualDamage);
+            user->addPopup(-actualDamage, false);
             lastActionMessage = "体力を奪い取った!";
           } else { // TP吸収
             music.playSE(7);
@@ -7095,30 +8408,52 @@ private:
 
         // 4. 攻撃 + 状態異常 (ポイズン、ヴォイドショック、ディザスターなど)
         // (ID: 105, 45, 110, 114)
-        else if (skill.id == 105 || skill.id == 45 || skill.id == 110 || skill.id == 114) {
-          // まずダメージ
-          value = user->caclulateSkillDamage(target, skill, isCrit);
-          target->takedamage(value);
-          target->addPopup(value, isCrit);
-          
-          // 次にデバフ付与 (AddDebuff内で確率計算などはしていないので必中扱い、またはStatus側で調整)
-          bool success = target->AddDebuff(skill.id, user);
-          
-          if (skill.id == 105 && success){
-            lastActionMessage = "毒を与えた!";
-            music.playSE(7);
+        else if (skill.id == 105 ||
+          skill.id == 45 ||
+          skill.id == 110 ||
+          skill.id == 114 ||
+          skill.id == 122)
+        {
+          // まず攻撃の命中・ダメージ判定
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          // ダメージ計算結果が0なら攻撃自体が失敗したので、
+          // 追加の状態異常も発生させない
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
           }
-          else if (skill.id == 110 && success){
-            lastActionMessage = "猛毒を与えた!";
-            music.playSE(7);
-          }
-          else if (skill.id == 45 && success){
-            lastActionMessage = "麻痺を与えた!";
-            music.playSE(5);
-          }
-          else{
-            if(success){
+          else {
+            bool success =
+                target->AddDebuff(skill.id, user);
+
+            if (skill.id == 105 && success) {
+              lastActionMessage = "毒を与えた!";
+              music.playSE(7);
+            }
+            else if (skill.id == 110 && success) {
+              lastActionMessage = "猛毒を与えた!";
+              music.playSE(7);
+            }
+            else if (skill.id == 45 && success) {
+              lastActionMessage = "麻痺を与えた!";
+              music.playSE(5);
+            }
+            else if (skill.id == 114 && success) {
               lastActionMessage = "厄災を与えた!";
+              music.playSE(7);
+            }
+            else if (skill.id == 122 && success) {
+              lastActionMessage = "敵をかく乱した!";
               music.playSE(7);
             }
           }
@@ -7136,11 +8471,26 @@ private:
         // 6. タービュランス (全体風属性+SPDダウン)
         else if (skill.id == 87) {
           music.playSE(6);
-          value = user->caclulateSkillDamage(target, skill, isCrit);
-          target->takedamage(value);
-          target->addPopup(value, isCrit);
-          target->AddDebuff(skill.id, user); // SPDダウン
-          lastActionMessage = "風が切り刻む!";
+
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
+          }
+          else {
+            target->AddDebuff(skill.id, user);
+            lastActionMessage = "風が切り刻む!";
+          }
         }
 
         else if (skill.id == 32) {
@@ -7151,33 +8501,55 @@ private:
         }
 
         else if (skill.id == 24) {
-          // 1. ダメージ処理
-          // ※ Status::caclulateSkillDamage 内で skill.id == 24 の場合 effectiveDef = 0 (防御無視) になります
-          music.playSE(5); // 物理攻撃音
-          value = user->caclulateSkillDamage(target, skill, isCrit);
-          target->takedamage(value);
-          target->addPopup(value, isCrit);
+          music.playSE(5);
 
-          // 2. デバフ処理 (防御ダウン)
-          // ※ Status::AddDebuff(24) で防御ダウン処理が行われます
-          if (target->AddDebuff(skill.id, user)) {
-            lastActionMessage = "装甲を破壊した！"; // 成功時メッセージ
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
+          }
+          else {
+            if (target->AddDebuff(skill.id, user)) {
+              lastActionMessage = "装甲を破壊した！";
+            }
           }
         }
 
         else if (skill.id == 47) {
-          // 1. ダメージ処理
-          music.playSE(5); // 打撃音
-          value = user->caclulateSkillDamage(target, skill, isCrit);
-          target->takedamage(value);
-          target->addPopup(value, isCrit);
+          music.playSE(5);
 
-          // 2. 状態異常付与 (スタン/麻痺)
-          // ※ Status::AddDebuff(47) で paralyzedTurns = 1 がセットされます
-          if (target->AddDebuff(skill.id, user)) {
-            lastActionMessage = "気絶させた！"; // 成功時メッセージ
+          value =
+              user->caclulateSkillDamage(
+                  target,
+                  skill,
+                  isCrit
+              );
+
+          actualDamage =
+              target->takedamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          if (value <= 0) {
+            lastActionMessage = "ミス！";
+          }
+          else {
+            if (target->AddDebuff(skill.id, user)) {
+              lastActionMessage = "気絶させた！";
+            }
           }
         }
+
         // その他 (未実装)
         else {
           lastActionMessage = "しかし何も起こらなかった。";
@@ -7206,6 +8578,58 @@ private:
     }
     return allies;
   }
+
+  std::vector<Status*> getDeadAllies() {
+    std::vector<Status*> allies;
+
+    // 主人公
+    if (heroRef && heroRef->status &&
+        heroRef->status->getHp() <= 0) {
+      allies.push_back(heroRef->status);
+    }
+
+    // 仲間
+    if (partyRef) {
+      for (auto ally : partyRef->members) {
+        if (ally && ally->status &&
+            ally->status->getHp() <= 0) {
+          allies.push_back(ally->status);
+        }
+      }
+    }
+
+    return allies;
+  }
+
+  std::vector<Status*> getAllAllies() {
+    std::vector<Status*> allies;
+
+    if (heroRef && heroRef->status) {
+      allies.push_back(heroRef->status);
+    }
+
+    if (partyRef) {
+      for (auto ally : partyRef->members) {
+        if (ally && ally->status) {
+          allies.push_back(ally->status);
+        }
+      }
+    }
+
+    return allies;
+  }
+
+  std::vector<Status*> getAliveEnemies() {
+    std::vector<Status*> enemies;
+
+    for (auto enemy : activeEnemies) {
+      if (enemy && enemy->status && enemy->status->getHp() > 0) {
+        enemies.push_back(enemy->status);
+      }
+    }
+
+    return enemies;
+  }
 };
 
 struct GameContext {
@@ -7233,38 +8657,147 @@ struct GameContext {
 
 GameContext* ctx = nullptr;
 
+struct FloorMapConfig {
+  int width;
+  int height;
+  Map::MapType type;
+  int bgmTrack;
+};
+
+FloorMapConfig getFloorMapConfig(
+    int floor,
+    const bool bossDefeated[5]);
+
+void applyFloorMapConfig(GameContext* ctx);
+
+FloorMapConfig getFloorMapConfig(
+    int floor,
+    const bool bossDefeated[5])
+{
+  // 1Fは集落
+  if (floor == 1) {
+    return {
+      0,
+      0,
+      Map::TYPE_TOWN,
+      0
+    };
+  }
+
+  // 10F / 20F / 30F / 40F / 50F
+  if (floor % 10 == 0) {
+    int bossIndex = (floor / 10) - 1;
+
+    if (bossIndex >= 0 && bossIndex < 5) {
+      if (bossDefeated[bossIndex]) {
+        return {
+          5,
+          5,
+          Map::TYPE_TOWN,
+          0
+        };
+      }
+
+      return {
+        5,
+        5,
+        Map::TYPE_BOSS_ROOM,
+        1
+      };
+    }
+  }
+
+  // 通常階
+  return {
+    20,
+    20,
+    Map::TYPE_DUNGEON,
+    1
+  };
+}
+
+void applyFloorMapConfig(GameContext* ctx)
+{
+  FloorMapConfig config =
+      getFloorMapConfig(
+          ctx->map->getFloor(),
+          ctx->bossDefeated
+      );
+
+  ctx->music->switchTrack(
+      config.bgmTrack,
+      *ctx->sd
+  );
+
+  ctx->graphic->setFloor(
+      ctx->map->getFloor()
+  );
+
+  ctx->map->regenerate(
+      config.width,
+      config.height,
+      config.type
+  );
+
+  ctx->hero->reset(*ctx->map);
+}
+
 // タイマー割り込み関数
 
 bool audio_timer_callback(struct repeating_timer *t) {
   MUSIC* music = ctx->music;
   
-  // ★ 修正: BGMが一時停止中でもSEだけは鳴るようにする
-  // if (music->paused) return true; // ← これを削除またはSE用に変更
-
+  // BGM停止中でもSEは鳴らす
   int32_t mixedSample = 0;
 
   // --- 1. BGMの取得 ---
-  if (!music->paused && music->sampleIndex + 1 < music->playBytes) {
-    uint8_t lo = music->playBuf[music->sampleIndex];
-    uint8_t hi = music->playBuf[music->sampleIndex + 1];
-    int16_t bgm = (int16_t)(lo | (hi << 8));
-    bgm = (int16_t)(bgm * music->bgmVolume);
-    mixedSample += bgm;
-    music->sampleIndex += 2;
-  } else {
-    // バッファ切れまたは停止中はBGM音量0
-    // refill要求などはここで行う
-    if (!music->paused && music->fillBytes > 0 && music->sampleIndex >= music->playBytes) {
-      noInterrupts();
-      volatile uint8_t* tmp = music->playBuf;
-      music->playBuf = music->fillBuf;
-      music->fillBuf = (uint8_t*)tmp;
-      music->playBytes = music->fillBytes;
-      music->fillBytes = 0;
-      music->sampleIndex = 0;
-      interrupts();
-    } else if (!music->paused && music->fillBytes == 0) {
-      music->needs_refill = true;
+  if (!music->paused) {
+
+    // 現在の再生バッファを使い切っていたら、
+    // 先に裏バッファへ切り替える
+    if (music->sampleIndex + 1 >= music->playBytes) {
+
+      if (music->fillBytes > 0) {
+
+        // ここはタイマーISR内なので、
+        // noInterrupts()/interrupts() は不要
+        volatile uint8_t* tmp = music->playBuf;
+        music->playBuf = music->fillBuf;
+        music->fillBuf = (uint8_t*)tmp;
+
+        music->playBytes = music->fillBytes;
+        music->fillBytes = 0;
+        music->sampleIndex = 0;
+
+        // 空いた裏バッファの補充をcore1ループへ要求
+        music->needs_refill = true;
+      }
+      else {
+        // 裏バッファの準備が間に合っていない
+        music->needs_refill = true;
+      }
+    }
+
+    // バッファを切り替えた場合も、
+    // 同じタイマー割り込み内でそのまま次の1サンプルを読む。
+    // これによりバッファ境界に無音サンプルを挟まない。
+    if (music->sampleIndex + 1 < music->playBytes) {
+
+      uint8_t lo =
+          music->playBuf[music->sampleIndex];
+
+      uint8_t hi =
+          music->playBuf[music->sampleIndex + 1];
+
+      int16_t bgm =
+          (int16_t)(lo | (hi << 8));
+
+      bgm =
+          (int16_t)(bgm * music->bgmVolume);
+
+      mixedSample += bgm;
+
+      music->sampleIndex += 2;
     }
   }
 
@@ -7319,20 +8852,47 @@ bool audio_timer_callback(struct repeating_timer *t) {
 // core1 のエントリポイント（オーディオ専用）
 // -------------------------
 void core1_main() {
-  ctx->sd->init(*ctx->music);
 
-  static repeating_timer_t timer;
-  add_repeating_timer_us(62, audio_timer_callback, NULL, &timer);
-  int lastTrack = ctx->music->currentTrack;
+  // -------------------------------------------------
+  // 音声専用タイマーをcore1上に作成
+  //
+  // デフォルトalarm poolは使わず、
+  // このcore1上で独自のalarm poolを作ることで、
+  // audio_timer_callbackもcore1側のIRQとして実行する。
+  // -------------------------------------------------
+  static alarm_pool_t* audioAlarmPool =
+      alarm_pool_create_with_unused_hardware_alarm(1);
+
+  static repeating_timer_t audioTimer;
+
+  // 16kHzの理想周期は62.5us。
+  // repeating_timerは整数us指定なので、
+  // 近い63usを使用する。
+  //
+  // 負値にすることで
+  // 「callback終了から63us後」ではなく
+  // 「callback開始から63usごと」に呼ばれる。
+  bool timerStarted =
+      alarm_pool_add_repeating_timer_us(
+          audioAlarmPool,
+          -63,
+          audio_timer_callback,
+          nullptr,
+          &audioTimer
+      );
+
+  // タイマー生成に失敗した場合は、
+  // 不定状態でゲームを続けない。
+  if (!timerStarted) {
+    while (true) {
+      tight_loop_contents();
+    }
+  }
 
   while (true) {
     ctx->sd->performPendingSwitch(*ctx->music);
     ctx->sd->refile(*ctx->music);
-    
-    // ISRが止まっていてrefill完了したら再開
-    if (ctx->music->paused && !ctx->music->needs_refill) {
-      ctx->music->paused = false;
-    }
+
     tight_loop_contents();
   }
 }
@@ -7403,7 +8963,9 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           currentMenuState = STATE_EQUIP_SLOT; 
           listCursor = 0; 
         }else if (mainSelected == 4) { // 「記録」
-          saveMgr.saveGame(sd, music, map, hero, party, inventory, bossFlags);
+          saveSucceeded =
+              saveMgr.saveGame(sd, music, map, hero, party, inventory, bossFlags);
+
           currentMenuState = STATE_SAVE_RESULT;
         }else if (mainSelected == 5) {
           currentMenuState = STATE_CONFIG;
@@ -7413,7 +8975,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
       break;
     }
     case STATE_ITEM: {
-      // ★ 修正：全アイテムを対象にする (フィルタリングしない)
+      // 全アイテムを対象にする
       int itemCount = inventory.items.size();
 
       if (itemCount > 0) {
@@ -7762,11 +9324,11 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           shopItemList.push_back(100); // リペアキット
           shopItemList.push_back(103); // エネルギー缶
           shopItemList.push_back(104); // 万能オイル
-          if (map.currentFloor >= 10) shopItemList.push_back(101); // リペアキット中
+          if (map.getFloor() >= 10) shopItemList.push_back(101); // リペアキット中
 
           // 2. 階層に応じた装備品 (Tier計算)
           // 1-10F: Tier 0, 11-20F: Tier 1, ...
-          int tier = (map.currentFloor) / 10; 
+          int tier = (map.getFloor() - 1) / 10;
           if (tier > 4) tier = 4; // 最大Tier 4 (5段階目)
 
           // 武器: 300 + tier
@@ -8011,12 +9573,18 @@ void setup() {
     if (ctx->inventory) delete ctx->inventory;
     if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
     ctx->map = new Map(20, 20, Map::TYPE_TOWN);
-    ctx->map->currentFloor = 1;
-    ctx->map->isTown = true;
     
-    ctx->hero = new Caractor(*ctx->map, 1, 38); // Lv1
-    ctx->hero->X = ctx->map->playerStartPos.x * Map::TILE_SIZE;
-    ctx->hero->Y = ctx->map->playerStartPos.y * Map::TILE_SIZE;
+    ctx->hero = new Caractor(*ctx->map, 1, 38);
+
+    Map::ObjectPos startPos =
+        ctx->map->getPlayerStartPos();
+
+    ctx->hero->X =
+        startPos.x * Map::TILE_SIZE;
+
+    ctx->hero->Y =
+        startPos.y * Map::TILE_SIZE;
+
     ctx->inventory = new Inventory();
     // 初期アイテム
     ctx->inventory->addItem(createItemById(100)); // リペアキット
@@ -8032,13 +9600,13 @@ void setup() {
   ctx->battle = new Battle();
 
   // Graphicクラスへ階層通知
-  ctx->graphic->setFloor(ctx->map->currentFloor);
+  ctx->graphic->setFloor(ctx->map->getFloor());
 
   // 初回描画 (ここもGraphicクラスに任せるので安全)
   int camX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
   int camY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
   ctx->graphic->drawFullBackground(*ctx->map, *ctx->hero, camX, camY);
-  if (ctx->map->isTown) {
+  if (ctx->map->isTown()) {
     // 集落なら bgm_0.raw
     ctx->music->switchTrack(0, *ctx->sd); 
   } else {
@@ -8046,7 +9614,7 @@ void setup() {
     ctx->music->switchTrack(1, *ctx->sd);
   }
 
-  // ★★★ 追加: ゲーム状態への移行 ★★★
+  // ゲーム状態へ移行
   ctx->state = STATE_GAME;
   // 4. 音楽スレッド起動
 }
@@ -8061,7 +9629,7 @@ void loop() {
     ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
     ctx->hero->reset(*ctx->map);
 
-    ctx->graphic->setFloor(ctx->map->currentFloor);
+    ctx->graphic->setFloor(ctx->map->getFloor());
 
     int cameraX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
     int cameraY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
@@ -8108,11 +9676,12 @@ void loop() {
     // 3. 移動していて、メニューが開いていない場合のみイベントとエンカウントをチェック
     if (moved && !menu.active) {
       // 5. イベントが発生しなかった場合のみ、エンカウントをチェック
-      if (!eventOccurred && !map.isTown) {
-        if (!map.isTown && map.currentType != Map::MapType::TYPE_BOSS_ROOM && encounter.checkEncounter()) {
+      if (!eventOccurred && !map.isTown()) {
+        if (!map.isBossRoom() &&
+            encounter.checkEncounter()) {
           vib.trigger(300);
           state = STATE_BATTLE;
-          ctx->battle->start(music, sd, hero, party, map.currentFloor, imgmgr, map);
+          ctx->battle->start(music, sd, hero, party, map.getFloor(), imgmgr, map);
         }
       }
     }
@@ -8153,7 +9722,7 @@ void loop() {
 
   else if (state == STATE_EVENT) {
     
-    // ★★★ ここから修正 ★★★
+    
     
     // イベントの種類に応じて処理を分岐
     switch (currentEvent) {
@@ -8166,10 +9735,10 @@ void loop() {
         int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
 
         // 2b. マップデータを「開いた」状態に更新
-        map.mapData[heroTileY * map.getMAP_WIDTH() + heroTileX] = Map::TILE_BOX_OPEN;
+        map.setTile(heroTileX, heroTileY, Map::TILE_BOX_OPEN);
           
         // 2. 中身の抽選
-        int floor = map.currentFloor;
+        int floor = map.getFloor();
         int itemId = 0;
         int r = random(100);
 
@@ -8189,9 +9758,15 @@ void loop() {
           itemId = 2; // 銅の歯車
         }
         else if (r < 90) { // レア素材
-          if (floor <= 20) itemId = 1; // 鉄くず(進化素材)
-          else if (floor <= 30) itemId = 10 + random(0, 2); // 銀/金の歯車
-          else itemId = 13; // 謎のパーツ
+          if (floor <= 20) {
+            itemId = 1; // 鉄くず
+          }
+          else if (floor <= 30) {
+            itemId = 3 + random(0, 2); // 銀の歯車 / 金の歯車
+          }
+          else {
+            itemId = 5; // 謎のパーツ
+          }
         }
         else if (r < 93) { // 巻物 (3%)
           int minSkill = 1, maxSkill = 5;
@@ -8234,83 +9809,35 @@ void loop() {
         currentEvent = EVENT_NONE; // イベントタイプをリセット
         break; // EVENT_TREASURE_BOX 終了
       }
+
       case EVENT_STAIR_UP: {
-        map.currentFloor++;
-        int width = 0, height = 0;
-        Map::MapType nextType = Map::MapType::TYPE_DUNGEON;
-        if (map.currentFloor % 10 == 0){
-          int bossIndex = (map.currentFloor / 10) - 1;
-          // ボスを倒しているかチェック
-          width = height = 5;
-          if (ctx->bossDefeated[bossIndex]) {
-            nextType = Map::MapType::TYPE_TOWN; // 倒してれば集落
-            map.isTown = true;
-            music.switchTrack(0, sd);  // 集落BGM
-          } else {
-            map.isTown = false;
-            nextType = Map::MapType::TYPE_BOSS_ROOM; // まだならボス部屋
-            music.switchTrack(1, sd); // ボス部屋BGM (ダンジョンと同じか、無音で緊張感を出す)
-          }
-        }else {
-          // 通常階
-          map.isTown = false;
-          width = height = 20;
-          nextType = Map::MapType::TYPE_DUNGEON;
-          music.switchTrack(1, sd); // ダンジョンBGM
+        if (map.advanceFloor()) {
+          applyFloorMapConfig(ctx);
         }
-        ctx->graphic->setFloor(map.currentFloor);
-        ctx->map->regenerate(width, height, nextType);
-        ctx->hero->reset(*ctx->map);
+
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
         break;
       }
+
       case EVENT_STAIR_DOWN: {
-        if (map.currentFloor > 1) {
-          int width = 0, height = 0;
-          map.currentFloor--;
-          Map::MapType nextType = Map::MapType::TYPE_DUNGEON;
-          if (map.currentFloor == 1) {
-            nextType = Map::MapType::TYPE_TOWN;
-            music.switchTrack(0, sd);
-          }else if (map.currentFloor % 10 == 0) {
-            width = height = 5;
-            int bossIndex = (map.currentFloor / 10) - 1;
-            if (ctx->bossDefeated[bossIndex]) {
-              nextType = Map::MapType::TYPE_TOWN;
-              music.switchTrack(0, sd);
-              map.isTown = true;
-            }else {
-              // (ありえないが) ボス未撃破ならボス部屋
-              nextType = Map::MapType::TYPE_BOSS_ROOM;
-              music.switchTrack(1, sd);
-            }
-          }else {
-            width = height = 20;
-            // 通常階
-            map.isTown = false;
-            nextType = Map::MapType::TYPE_DUNGEON;
-            music.switchTrack(1, sd);
-          }
-          // 3. マップ生成
-          ctx->graphic->setFloor(map.currentFloor);
-          ctx->map->regenerate(width, height, nextType);
-          ctx->hero->reset(*ctx->map);
+        if (map.retreatFloor()) {
+          applyFloorMapConfig(ctx);
         }
+
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
         break;
       }
+
       case EVENT_AUTOMATON: {
         // TODO: 「壊れたオートマタがある。調律しますか？」の
         // メッセージウィンドウを本当は出すべき
 
         // (今はAボタンで即座に仲間になる)
         // (Aボタンは check_event の呼び出し元で押されている)
-
-        // TODO: 今は who=39 (初号機) で固定。
-        // 将来はフロア番号やマップの保持データから who ID を決定する
-        int who_to_add = map.automatonWhoId;
+        int who_to_add =
+            map.getAutomatonWhoId();
         Automaton* newAlly = new Automaton(1, who_to_add); // 主人公と同じレベルで加入
         
         int result = party.addMember(newAlly);
@@ -8324,7 +9851,11 @@ void loop() {
         // タイルを消す
         int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
         int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-        map.mapData[heroTileY * map.getMAP_WIDTH() + heroTileX] = Map::TILE_GRASS;
+        map.setTile(
+            heroTileX,
+            heroTileY,
+            Map::TILE_GRASS
+        );
         
         state = STATE_GAME;
         currentEvent = EVENT_NONE;
@@ -8359,25 +9890,60 @@ void loop() {
         currentEvent = EVENT_NONE;
         break;
       }
+
       case EVENT_BOSS_BATTLE: {
-        vib.trigger(500); // 警告振動
+
+        int bossIndex =
+            (map.getFloor() / 10) - 1;
+
+        // 撃破済みボスのタイルが何らかの理由で残っていた場合
+        if (map.getFloor() >= 10 &&
+            map.getFloor() <= 50 &&
+            map.getFloor() % 10 == 0 &&
+            bossIndex >= 0 &&
+            bossIndex < 5 &&
+            ctx->bossDefeated[bossIndex])
+        {
+          // ボスを復活させず、集落へ補正する
+          map.regenerate(
+              20,
+              20,
+              Map::TYPE_TOWN
+          );
+          hero.reset(map);
+
+          music.switchTrack(0, sd);
+
+          state = STATE_GAME;
+          currentEvent = EVENT_NONE;
+          break;
+        }
+
+        // 未撃破なら通常どおりボス戦
+        vib.trigger(500);
+
         state = STATE_BATTLE;
-        
-        // ボスBGM (階層に応じて変えるならここでID指定)
-        // 10F=ID3, 50F=ID4 など
-        // startの中で判定しているので、ここではそのまま呼ぶ
-        ctx->battle->start(music, sd, hero, party, map.currentFloor, imgmgr, map);
-        
+
+        ctx->battle->start(
+            music,
+            sd,
+            hero,
+            party,
+            map.getFloor(),
+            imgmgr,
+            map
+        );
+
         currentEvent = EVENT_NONE;
         break;
       }
+
       case EVENT_NONE:
       default:
         // 何らかのバグでイベントタイプが未設定の場合
         state = STATE_GAME; // とりあえずゲームに戻る
         break;
     }
-    // ★★★ 修正ここまで ★★★
   }
 
   else if (state == STATE_GAME_OVER) {
