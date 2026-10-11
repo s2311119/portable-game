@@ -17,3 +17,18 @@ struct FieldEvent {
   int tileX;
   int tileY;
 };
+
+enum class FieldEventAction {
+  NONE,
+  RETURN_TO_FIELD,
+  FLOOR_UP,
+  FLOOR_DOWN,
+  OPEN_SHOP,
+  OPEN_INN,
+  OPEN_STORAGE,
+  START_BOSS_BATTLE
+};
+
+struct FieldEventResult {
+  FieldEventAction action;
+};

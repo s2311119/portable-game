@@ -20,6 +20,7 @@
 #include "Controller.h"
 #include "Encounter.h"
 #include "Exploration.h"
+#include "FieldEventHandler.h"
 #include "Vibration.h"
 #include "Skill.h"
 #include "SkillCatalog.h"
@@ -138,22 +139,10 @@ bool pressed(void* context, FieldDirection direction) {
 }
 } // namespace field_input_adapter
 
-namespace temporary_field_bridge {
-EventType toLegacyEventType(FieldEventType type) {
-  switch (type) {
-    case FieldEventType::TREASURE: return EVENT_TREASURE_BOX;
-    case FieldEventType::STAIR_UP: return EVENT_STAIR_UP;
-    case FieldEventType::STAIR_DOWN: return EVENT_STAIR_DOWN;
-    case FieldEventType::AUTOMATON: return EVENT_AUTOMATON;
-    case FieldEventType::INN: return EVENT_INN;
-    case FieldEventType::SHOP: return EVENT_SHOP;
-    case FieldEventType::STORAGE: return EVENT_STORAGE;
-    case FieldEventType::BOSS_BATTLE: return EVENT_BOSS_BATTLE;
-    case FieldEventType::NONE: return EVENT_NONE;
-  }
-  return EVENT_NONE;
-}
-} // namespace temporary_field_bridge
+namespace field_random_adapter {
+long drawMax(void*, long max) { return random(max); }
+long drawRange(void*, long min, long max) { return random(min, max); }
+} // namespace field_random_adapter
 
 // ---------
 // saveクラス
@@ -3364,9 +3353,10 @@ struct GameContext {
   Menu* menu;
   Encounter* encounter;
   Exploration exploration;
+  FieldEventHandler fieldEventHandler;
   FloorManager floorManager;
   GameState state;
-  EventType currentEvent = EVENT_NONE;
+  FieldEvent currentEvent = {FieldEventType::NONE, 0, 0};
   SaveManager* saveManager;
   Battle* battle;
   bool requestRegenerate;
@@ -4325,7 +4315,7 @@ void loop() {
     bool eventOccurred = fieldResult.hasEvent;
     if (eventOccurred) {
       state = STATE_EVENT;
-      currentEvent = temporary_field_bridge::toLegacyEventType(fieldResult.event.type);
+      currentEvent = fieldResult.event;
     }
     // 2. 移動が発生したかチェック
     bool moved = fieldResult.moved;
@@ -4380,190 +4370,64 @@ void loop() {
   }
 
   else if (state == STATE_EVENT) {
-    
-    
-    
-    // イベントの種類に応じて処理を分岐
-    switch (currentEvent) {
-      
-      case EVENT_TREASURE_BOX: {
-        // --- 宝箱イベント ---
-          
-          // 2a. プレイヤーの現在地を取得
-        int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-        int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
+    FieldRandom fieldRandom = {nullptr,
+                               field_random_adapter::drawMax,
+                               field_random_adapter::drawRange};
+    FieldEventResult eventResult = ctx->fieldEventHandler.handle(
+        currentEvent, map, inventory, party, storage,
+        ctx->session->progress().floor(), fieldRandom);
 
-        // 2b. マップデータを「開いた」状態に更新
-        map.setTile(heroTileX, heroTileY, Map::TILE_BOX_OPEN);
-          
-        // 2. 中身の抽選
-        int floor = ctx->session->progress().floor();
-        int itemId = 0;
-        int r = random(100);
-
-        // --- 確率設定 ---
-        // 45%: 消費道具
-        // 30%: 素材
-        // 15%: レア素材
-        // 3%:  旋律の巻物
-        // 7%:  装備品 (武器/防具/アクセ) ★ NEW!
-
-        if (r < 45) { // 消費道具
-          if (floor <= 10) itemId = 100;      // リペアキット
-          else if (floor <= 30) itemId = 103; // エネルギー缶
-          else itemId = 101;                  // リペアキット中
-        } 
-        else if (r < 75) { // 素材
-          itemId = 2; // 銅の歯車
-        }
-        else if (r < 90) { // レア素材
-          if (floor <= 20) {
-            itemId = 1; // 鉄くず
-          }
-          else if (floor <= 30) {
-            itemId = 3 + random(0, 2); // 銀の歯車 / 金の歯車
-          }
-          else {
-            itemId = 5; // 謎のパーツ
-          }
-        }
-        else if (r < 93) { // 巻物 (3%)
-          int minSkill = 1, maxSkill = 5;
-          if (floor > 10) { minSkill=6; maxSkill=11; }
-          if (floor > 30) { minSkill=12; maxSkill=13; }
-          itemId = 200 + random(minSkill, maxSkill + 1);
-        }
-        else { // ★★★ 装備品 (7%) ★★★
-          int tier = (floor - 1) / 10; // 0～4
-          if (tier > 4) tier = 4;
-          
-          // 装備カテゴリ抽選 (0:武器, 1:防具, 2:アクセ)
-          int typeR = random(0, 3); 
-          
-          // ★ 激レア判定 (さらに10%の確率で最強装備)
-          bool isRare = (random(100) < 10);
-
-          if (typeR == 0) { // 武器
-            if (isRare && floor >= 30) itemId = 399; // 創世のタクト
-            else itemId = 300 + tier; // 階層に応じた武器
-          } 
-          else if (typeR == 1) { // 防具
-            if (isRare && floor >= 30) itemId = 499; // イージス・ギア
-            else itemId = 400 + tier; 
-          } 
-          else { // アクセ
-            if (isRare && floor >= 30) itemId = 599; // トリニティ・コア
-            else itemId = 500 + random(0, 5); // 500-504からランダム
-          }
-        }
-
-        // 3. アイテム入手
-        Item foundItem = ItemCatalog::get(itemId);
-        inventory.addItem(foundItem);
-        
-        // (メッセージ表示などは描画システムの都合上省略、あるいはフラグを立てて別途表示)
-          
-        // 2d. 即座にゲームに戻る (待機処理は行わない)
+    switch (eventResult.action) {
+      case FieldEventAction::RETURN_TO_FIELD:
         state = STATE_GAME;
-        currentEvent = EVENT_NONE; // イベントタイプをリセット
-        break; // EVENT_TREASURE_BOX 終了
-      }
+        currentEvent.type = FieldEventType::NONE;
+        break;
 
-      case EVENT_STAIR_UP: {
+      case FieldEventAction::FLOOR_UP:
         if (ctx->floorManager.moveUp(ctx->session->progress())) {
           applyFloorMapConfig(ctx);
         }
-
         state = STATE_GAME;
-        currentEvent = EVENT_NONE;
+        currentEvent.type = FieldEventType::NONE;
         break;
-      }
 
-      case EVENT_STAIR_DOWN: {
+      case FieldEventAction::FLOOR_DOWN:
         if (ctx->floorManager.moveDown(ctx->session->progress())) {
           applyFloorMapConfig(ctx);
         }
-
         state = STATE_GAME;
-        currentEvent = EVENT_NONE;
+        currentEvent.type = FieldEventType::NONE;
         break;
-      }
 
-      case EVENT_AUTOMATON: {
-        // TODO: 「壊れたオートマタがある。調律しますか？」の
-        // メッセージウィンドウを本当は出すべき
-
-        // (今はAボタンで即座に仲間になる)
-        // (Aボタンは check_event の呼び出し元で押されている)
-        int who_to_add =
-            map.getAutomatonWhoId();
-        Automaton* newAlly = new Automaton(1, who_to_add); // 主人公と同じレベルで加入
-        
-        int result = 0;
-        if (party.addMember(std::move(*newAlly))) {
-            delete newAlly;
-            result = 1;
-        } else {
-            storage.store(std::move(*newAlly));
-            delete newAlly;
-            result = 2;
-        }
-        
-        if (result == 1) {
-            // パーティーに入った
-        } else if (result == 2) {
-            // 預かり所へ送られた (自動)
-        }
-        
-        // タイルを消す
-        int heroTileX = (hero.X + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-        int heroTileY = (hero.Y + Map::TILE_SIZE / 2) / Map::TILE_SIZE;
-        map.setTile(
-            heroTileX,
-            heroTileY,
-            Map::TILE_GRASS
-        );
-        
-        state = STATE_GAME;
-        currentEvent = EVENT_NONE;
-        break;
-      }
-      case EVENT_INN: {
+      case FieldEventAction::OPEN_INN:
         ctx->menu->active = true;
         ctx->menu->currentMenuState = Menu::STATE_INN;
-        ctx->menu->listCursor = 0; // 0:はい, 1:いいえ
-        state = STATE_MENU; // ゲーム画面からメニュー画面へ
-        currentEvent = EVENT_NONE; // イベントフラグは解除してOK
+        ctx->menu->listCursor = 0;
+        state = STATE_MENU;
+        currentEvent.type = FieldEventType::NONE;
         break;
-      }
-      // --- 預かり所 ---
-      case EVENT_STORAGE: {
-        // メニューの預かり所モードを起動
+
+      case FieldEventAction::OPEN_STORAGE:
         menu.active = true;
         menu.currentMenuState = Menu::STATE_STORAGE;
         menu.storageMode = 0;
         menu.listCursor = 0;
-        
-        state = STATE_MENU; // メニュー画面へ
-        currentEvent = EVENT_NONE;
+        state = STATE_MENU;
+        currentEvent.type = FieldEventType::NONE;
         break;
-      }
-      // --- ショップ (後回し、とりあえずダミー) ---
-      case EVENT_SHOP: {
+
+      case FieldEventAction::OPEN_SHOP:
         ctx->menu->active = true;
         ctx->menu->currentMenuState = Menu::STATE_SHOP_CHOICE;
-        ctx->menu->listCursor = 0; // 0:買う, 1:売る, 2:出る
-        state = STATE_MENU; 
-        currentEvent = EVENT_NONE;
+        ctx->menu->listCursor = 0;
+        state = STATE_MENU;
+        currentEvent.type = FieldEventType::NONE;
         break;
-      }
 
-      case EVENT_BOSS_BATTLE: {
-
+      case FieldEventAction::START_BOSS_BATTLE: {
         int bossIndex =
             (ctx->session->progress().floor() / 10) - 1;
 
-        // 撃破済みボスのタイルが何らかの理由で残っていた場合
         if (ctx->session->progress().floor() >= 10 &&
             ctx->session->progress().floor() <= 50 &&
             ctx->session->progress().floor() % 10 == 0 &&
@@ -4571,7 +4435,6 @@ void loop() {
             bossIndex < 5 &&
             ctx->session->progress().bosses().isDefeated(bossIndex))
         {
-          // ボスを復活させず、集落へ補正する
           map.regenerate(
               20,
               20,
@@ -4583,11 +4446,10 @@ void loop() {
           music.switchTrack(0, sd);
 
           state = STATE_GAME;
-          currentEvent = EVENT_NONE;
+          currentEvent.type = FieldEventType::NONE;
           break;
         }
 
-        // 未撃破なら通常どおりボス戦
         vib.trigger(500);
 
         state = STATE_BATTLE;
@@ -4602,14 +4464,13 @@ void loop() {
             map
         );
 
-        currentEvent = EVENT_NONE;
+        currentEvent.type = FieldEventType::NONE;
         break;
       }
 
-      case EVENT_NONE:
+      case FieldEventAction::NONE:
       default:
-        // 何らかのバグでイベントタイプが未設定の場合
-        state = STATE_GAME; // とりあえずゲームに戻る
+        state = STATE_GAME;
         break;
     }
   }
