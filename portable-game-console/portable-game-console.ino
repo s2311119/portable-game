@@ -4,6 +4,7 @@
 #include "LGFX_RP2040_ILI9341.hpp"
 #include <LGFX_TFT_eSPI.hpp>  // フォントを使う場合に必要な場合もあります
 #include "bmp.h"
+#include "Item.h"
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -556,32 +557,6 @@ private:
       grassTiles.pop_back();
     }
   }  
-};
-
-class Item {
-public:
-  enum ItemType {
-    ITEM_CONSUMABLE, // 消費アイテム (回復薬など)
-    ITEM_WEAPON,     // 武器
-    ITEM_ARMOR,      // 防具
-    ITEM_ACCESSORY,  // アクセサリー
-    ITEM_MATERIAL,   // 素材 (換金用)
-    ITEM_IMPORTANT   // 大事なもの
-  };
-  ItemType type; // ★ 追加: 種類
-  int value;     // ★ 追加: 威力 (武器ならATK、防具ならDEF、薬なら回復量)
-  int price;     // ★ 追加: 買値 (売値はこの半額にするのが一般的)
-  int id;
-  const char* name;
-
-  // コンストラクタ
-  Item(int _id = 0, const char* _name = "", ItemType _type = ITEM_MATERIAL, int _value = 0, int _price = 0) {
-    id = _id;
-    name = _name;
-    type = _type;
-    value = _value;
-    price = _price;
-  }
 };
 
 class Skill {
