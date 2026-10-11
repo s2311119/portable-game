@@ -23,6 +23,8 @@
 #include "SkillCatalog.h"
 #include "Inventory.h"
 #include "Map.h"
+#include "WorldProgress.h"
+#include "FloorManager.h"
 #include "MemoryMonitor.h"
 #include <utility>
 
@@ -519,6 +521,7 @@ public:
       Sd& sd,
       MUSIC& music,
       Map& map,
+      WorldProgress& progress,
       Player& hero,
       Party& party,
       AutomatonStorage& storage,
@@ -548,7 +551,7 @@ public:
     // -------------------------------------------------
     // 1. 現在のマップ状態
     // -------------------------------------------------
-    file.println(map.getFloor());
+    file.println(progress.floor());
     file.println((int)map.getType());
 
     file.println(map.getMAP_WIDTH());
@@ -622,6 +625,7 @@ public:
       Sd& sd,
       MUSIC& music,
       Map& map,
+      WorldProgress& progress,
       Player& hero,
       Party& party,
       AutomatonStorage& storage,
@@ -674,7 +678,7 @@ public:
       // -------------------------------------------------
       // PGSAVE2
       // -------------------------------------------------
-      map.restoreFloor(
+      progress.restoreFloor(
           file.readStringUntil('\n').toInt()
       );
 
@@ -778,7 +782,7 @@ public:
       // 従来どおり階層とMapTypeだけ読み、
       // 最後にマップを再生成する。
       // -------------------------------------------------
-      map.restoreFloor(
+      progress.restoreFloor(
           firstLine.toInt()
       );
 
@@ -885,12 +889,12 @@ public:
           loadedType;
 
       // ボス階ではbossFlagsを優先
-      if (map.getFloor() >= 10 &&
-          map.getFloor() <= 50 &&
-          map.getFloor() % 10 == 0)
+      if (progress.floor() >= 10 &&
+          progress.floor() <= 50 &&
+          progress.floor() % 10 == 0)
       {
         int bossIndex =
-            (map.getFloor() / 10) - 1;
+            (progress.floor() / 10) - 1;
 
         if (bossIndex >= 0 &&
             bossIndex < 5)
@@ -909,7 +913,8 @@ public:
       map.regenerate(
           20,
           20,
-          finalType
+          finalType,
+          progress.floor()
       );
 
       hero.reset(map);
@@ -984,7 +989,7 @@ public:
     listCursor = 0;
   }
 
-  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags);
+  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags);
   
   void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Config& config) {
     if (!active) return;
@@ -2024,7 +2029,7 @@ public:
     currentBattleState = STATE_TURN_START;
   }
 
-  void update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, Graphic &g, bool* bossFlags) {
+  void update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g, bool* bossFlags) {
     if (!inBattle) return;
     Party& party = *partyRef; 
 
@@ -3448,13 +3453,13 @@ public:
           std::vector<CharacterState*>().swap(actorList);
           if (actualBossDefeated) {
             // 撃破フラグを立てる
-            int bossIndex = (map.getFloor() / 10) - 1;
+            int bossIndex = (progress.floor() / 10) - 1;
             if (bossIndex >= 0 && bossIndex < 5) {
               bossFlags[bossIndex] = true;
             }
 
             // マップを集落に作り変える
-            map.regenerate(20, 20, Map::TYPE_TOWN);
+            map.regenerate(20, 20, Map::TYPE_TOWN, progress.floor());
             
             // プレイヤー位置再配置
             hero.reset(map); 
@@ -4180,6 +4185,8 @@ struct GameContext {
   Inventory* inventory;
   Party* party;
   AutomatonStorage storage;
+  WorldProgress progress;
+  FloorManager floorManager;
   GameState state;
   EventType currentEvent = EVENT_NONE;
   SaveManager* saveManager;
@@ -4257,7 +4264,7 @@ void applyFloorMapConfig(GameContext* ctx)
 {
   FloorMapConfig config =
       getFloorMapConfig(
-          ctx->map->getFloor(),
+          ctx->progress.floor(),
           ctx->bossDefeated
       );
 
@@ -4267,13 +4274,14 @@ void applyFloorMapConfig(GameContext* ctx)
   );
 
   ctx->graphic->setFloor(
-      ctx->map->getFloor()
+      ctx->progress.floor()
   );
 
   ctx->map->regenerate(
       config.width,
       config.height,
-      config.type
+      config.type,
+      ctx->progress.floor()
   );
 
   ctx->hero->reset(*ctx->map);
@@ -4434,7 +4442,7 @@ void core1_main() {
   }
 }
 
-void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags) {
+void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags) {
   if (!active) return; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
@@ -4501,7 +4509,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           listCursor = 0; 
         }else if (mainSelected == 4) { // 「記録」
           saveSucceeded =
-              saveMgr.saveGame(sd, music, map, hero, party, storage, inventory, bossFlags);
+              saveMgr.saveGame(sd, music, map, progress, hero, party, storage, inventory, bossFlags);
 
           currentMenuState = STATE_SAVE_RESULT;
         }else if (mainSelected == 5) {
@@ -4830,11 +4838,11 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           shopItemList.push_back(100); // リペアキット
           shopItemList.push_back(103); // エネルギー缶
           shopItemList.push_back(104); // 万能オイル
-          if (map.getFloor() >= 10) shopItemList.push_back(101); // リペアキット中
+          if (progress.floor() >= 10) shopItemList.push_back(101); // リペアキット中
 
           // 2. 階層に応じた装備品 (Tier計算)
           // 1-10F: Tier 0, 11-20F: Tier 1, ...
-          int tier = (map.getFloor() - 1) / 10;
+          int tier = (progress.floor() - 1) / 10;
           if (tier > 4) tier = 4; // 最大Tier 4 (5段階目)
 
           // 武器: 300 + tier
@@ -5026,12 +5034,12 @@ void setup() {
         ctx->vibration->setEnabled(ctx->config.vibration);
       } else {
         // ロード用の仮オブジェクト生成
-        ctx->map = new Map(20, 20, Map::TYPE_TOWN); 
+        ctx->map = new Map(20, 20, Map::TYPE_TOWN, ctx->progress.floor());
         ctx->hero = new Player(*ctx->map, 1, 38); 
         ctx->inventory = new Inventory();
         ctx->party = new Party();
         
-        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music, *ctx->map, *ctx->hero, *ctx->party, ctx->storage, *ctx->inventory, ctx->bossDefeated)) {
+        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music, *ctx->map, ctx->progress, *ctx->hero, *ctx->party, ctx->storage, *ctx->inventory, ctx->bossDefeated)) {
           loadSuccess = true;
           ctx->vibration->setEnabled(ctx->config.vibration);
         } else {
@@ -5074,12 +5082,13 @@ void setup() {
   // 3. ゲーム開始準備
   if (startNewGame) {
     // 新規作成
+    ctx->progress = WorldProgress();
     if (ctx->map) delete ctx->map;
     if (ctx->hero) delete ctx->hero;
     if (ctx->inventory) delete ctx->inventory;
     if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
     ctx->storage.clearForRestore();
-    ctx->map = new Map(20, 20, Map::TYPE_TOWN);
+    ctx->map = new Map(20, 20, Map::TYPE_TOWN, ctx->progress.floor());
     
     ctx->hero = new Player(*ctx->map, 1, 38);
 
@@ -5108,7 +5117,7 @@ void setup() {
   ctx->battle = new Battle();
 
   // Graphicクラスへ階層通知
-  ctx->graphic->setFloor(ctx->map->getFloor());
+  ctx->graphic->setFloor(ctx->progress.floor());
 
   // 初回描画 (ここもGraphicクラスに任せるので安全)
   int camX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
@@ -5134,10 +5143,10 @@ void loop() {
 
     // MapとHeroの内容だけ再初期化（new/deleteなし）
     noInterrupts();
-    ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON);
+    ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON, ctx->progress.floor());
     ctx->hero->reset(*ctx->map);
 
-    ctx->graphic->setFloor(ctx->map->getFloor());
+    ctx->graphic->setFloor(ctx->progress.floor());
 
     int cameraX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
     int cameraY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
@@ -5190,7 +5199,7 @@ void loop() {
             encounter.checkEncounter()) {
           vib.trigger(300);
           state = STATE_BATTLE;
-          ctx->battle->start(music, sd, hero, party, map.getFloor(), imgmgr, map);
+          ctx->battle->start(music, sd, hero, party, ctx->progress.floor(), imgmgr, map);
         }
       }
     }
@@ -5210,7 +5219,7 @@ void loop() {
 
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
-    menu.update(ctrl, inventory, hero, party, storage, map, music, sd, save, conf, vib, ctx->bossDefeated);
+    menu.update(ctrl, inventory, hero, party, storage, map, ctx->progress, music, sd, save, conf, vib, ctx->bossDefeated);
     //g.screenSprite.fillScreen(TFT_BLACK);
     menu.draw(&g, inventory, hero, party, storage, conf);
     //g.screenSprite.pushSprite(0,0);
@@ -5224,7 +5233,7 @@ void loop() {
 
   else if (state == STATE_BATTLE) {
     auto &battle = *ctx->battle;
-    battle.update(ctrl, state, music, sd, hero, inventory, vib, map, g, ctx->bossDefeated);
+    battle.update(ctrl, state, music, sd, hero, inventory, vib, map, ctx->progress, g, ctx->bossDefeated);
     battle.draw(&g);
     //g.screenSprite.pushSprite(0, 0);
   }
@@ -5247,7 +5256,7 @@ void loop() {
         map.setTile(heroTileX, heroTileY, Map::TILE_BOX_OPEN);
           
         // 2. 中身の抽選
-        int floor = map.getFloor();
+        int floor = ctx->progress.floor();
         int itemId = 0;
         int r = random(100);
 
@@ -5320,7 +5329,7 @@ void loop() {
       }
 
       case EVENT_STAIR_UP: {
-        if (map.advanceFloor()) {
+        if (ctx->floorManager.moveUp(ctx->progress)) {
           applyFloorMapConfig(ctx);
         }
 
@@ -5330,7 +5339,7 @@ void loop() {
       }
 
       case EVENT_STAIR_DOWN: {
-        if (map.retreatFloor()) {
+        if (ctx->floorManager.moveDown(ctx->progress)) {
           applyFloorMapConfig(ctx);
         }
 
@@ -5411,12 +5420,12 @@ void loop() {
       case EVENT_BOSS_BATTLE: {
 
         int bossIndex =
-            (map.getFloor() / 10) - 1;
+            (ctx->progress.floor() / 10) - 1;
 
         // 撃破済みボスのタイルが何らかの理由で残っていた場合
-        if (map.getFloor() >= 10 &&
-            map.getFloor() <= 50 &&
-            map.getFloor() % 10 == 0 &&
+        if (ctx->progress.floor() >= 10 &&
+            ctx->progress.floor() <= 50 &&
+            ctx->progress.floor() % 10 == 0 &&
             bossIndex >= 0 &&
             bossIndex < 5 &&
             ctx->bossDefeated[bossIndex])
@@ -5425,7 +5434,8 @@ void loop() {
           map.regenerate(
               20,
               20,
-              Map::TYPE_TOWN
+              Map::TYPE_TOWN,
+              ctx->progress.floor()
           );
           hero.reset(map);
 
@@ -5446,7 +5456,7 @@ void loop() {
             sd,
             hero,
             party,
-            map.getFloor(),
+            ctx->progress.floor(),
             imgmgr,
             map
         );

@@ -35,7 +35,7 @@ public:
     int x, y;
   };
 
-  Map(int max_w, int max_h, MapType type);
+  Map(int max_w, int max_h, MapType type, int floor);
 
   int getMAP_WIDTH();
   int getMAP_HEIGHT();
@@ -61,18 +61,11 @@ public:
 
   void restoreAutomatonWhoId(int whoId);
 
-  int getFloor() const;
-
-  void restoreFloor(int floor);
-
-  bool advanceFloor();
-
-  bool retreatFloor();
-
   void regenerate(
       int max_w,
       int max_h,
-      MapType type);
+      MapType type,
+      int floor);
 private:
   MapType currentType;
 
@@ -85,9 +78,7 @@ private:
   ObjectPos stairDownPos = {-1, -1};
   ObjectPos playerStartPos;
   int automatonWhoId = -1;
-  int currentFloor = 1;
-
-  void generateMapContent(MapType type);
+  void generateMapContent(MapType type, int floor);
 
   void setMapDimensions(int max_w, int max_h, MapType type);
 
@@ -97,10 +88,10 @@ private:
   std::vector<int> dirs;
   std::vector<Room> placedRooms;
   std::vector<ObjectPos> grassTiles;
-  void generateMazeAndRooms(MapType type);
+  void generateMazeAndRooms(MapType type, int floor);
 
   // (generateDungeon のヘルパー関数) 部屋を掘る
   void carveRoom(int x1, int y1, int x2, int y2);
 
-  void placeObjects();  
+  void placeObjects(int floor);
 };

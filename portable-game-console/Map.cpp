@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <algorithm>
 
-Map::Map(int max_w, int max_h, MapType type)
+Map::Map(int max_w, int max_h, MapType type, int floor)
   {
     currentType = type;
 
@@ -13,7 +13,7 @@ Map::Map(int max_w, int max_h, MapType type)
         type
     );
 
-    generateMapContent(type);
+    generateMapContent(type, floor);
   }
 
 int Map::getMAP_WIDTH(){
@@ -71,36 +71,11 @@ void Map::restoreAutomatonWhoId(int whoId) {
     automatonWhoId = whoId;
   }
 
-int Map::getFloor() const {
-    return currentFloor;
-  }
-
-void Map::restoreFloor(int floor) {
-    currentFloor = floor;
-  }
-
-bool Map::advanceFloor() {
-    if (currentFloor >= 50) {
-      return false;
-    }
-
-    currentFloor++;
-    return true;
-  }
-
-bool Map::retreatFloor() {
-    if (currentFloor <= 1) {
-      return false;
-    }
-
-    currentFloor--;
-    return true;
-  }
-
 void Map::regenerate(
       int max_w,
       int max_h,
-      MapType type)
+      MapType type,
+      int floor)
   {
     currentType = type;
 
@@ -110,10 +85,10 @@ void Map::regenerate(
         type
     );
 
-    generateMapContent(type);
+    generateMapContent(type, floor);
   }
 
-void Map::generateMapContent(MapType type) {
+void Map::generateMapContent(MapType type, int floor) {
     mapData.assign(
         MAP_WIDTH * MAP_HEIGHT,
         TILE_WALL
@@ -124,8 +99,8 @@ void Map::generateMapContent(MapType type) {
       return;
     }
 
-    generateMazeAndRooms(type);
-    placeObjects();
+    generateMazeAndRooms(type, floor);
+    placeObjects(floor);
   }
 
 void Map::setMapDimensions(int max_w, int max_h, MapType type) {
@@ -208,7 +183,7 @@ void Map::generateBossRoom() {
         TILE_BOSS;
   }
 
-void Map::generateMazeAndRooms(MapType type) {
+void Map::generateMazeAndRooms(MapType type, int floor) {
     if (type == TYPE_TOWN) {
 
       // 2. 中央に大きな広場(草)を作る
@@ -224,7 +199,7 @@ void Map::generateMazeAndRooms(MapType type) {
       // 集落生成はこれで終わり（階段などは placeObjects で）
       return; 
     }
-    if (currentFloor >= 21 && random(100) < 5) { // 例: 5%の確率
+    if (floor >= 21 && random(100) < 5) { // 例: 5%の確率
       automatonWhoId = 75;
     } 
     else {
@@ -315,7 +290,7 @@ void Map::carveRoom(int x1, int y1, int x2, int y2) {
     }
   }
 
-void Map::placeObjects() {
+void Map::placeObjects(int floor) {
     boxPositions.clear();
     stairUpPos = {-1, -1};
     stairDownPos = {-1, -1};
@@ -339,13 +314,13 @@ void Map::placeObjects() {
       grassTiles[idx] = grassTiles.back(); grassTiles.pop_back();
 
       // 2. 下り階段 (1階以外)
-      if (currentFloor > 1 && !grassTiles.empty()) {
+      if (floor > 1 && !grassTiles.empty()) {
         idx = random((int)grassTiles.size());
         stairDownPos = grassTiles[idx];
         mapData[stairDownPos.y * MAP_WIDTH + stairDownPos.x] = TILE_STAIR_DOWN;
         grassTiles[idx] = grassTiles.back(); grassTiles.pop_back();
       }
-      if (currentFloor > 1){
+      if (floor > 1){
         playerStartPos = stairDownPos;
       }else{
         playerStartPos = grassTiles[random((int)grassTiles.size())];
