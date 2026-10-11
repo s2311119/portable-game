@@ -8,6 +8,7 @@
 #include "ItemCatalog.h"
 #include "CharacterState.h"
 #include "CombatCalculator.h"
+#include "SkillEffectSystem.h"
 #include "Automaton.h"
 #include "Party.h"
 #include "Enemy.h"
@@ -3889,12 +3890,12 @@ private:
         break;
 
       case Skill::EffectType::BUFF:
-        target->AddBuff(skill.id);
+        SkillEffectSystem::applyBuff(skill.id, *target);
         music.playSE(7);
         lastActionMessage = "能力UP!"; // 短く
         break;
       case Skill::EffectType::DEBUFF:
-        if(target->AddDebuff(skill.id, user)){
+        if(SkillEffectSystem::applyDebuff(skill.id, *target, user)){
           music.playSE(7);
           lastActionMessage = "能力DOWN!";
         }else {
@@ -4005,7 +4006,7 @@ private:
           }
           else {
             bool success =
-                target->AddDebuff(skill.id, user);
+                SkillEffectSystem::applyDebuff(skill.id, *target, user);
 
             if (skill.id == 105 && success) {
               lastActionMessage = "毒を与えた!";
@@ -4032,7 +4033,7 @@ private:
 
         // 5. かばう / カウンター / 挑発 (自分にバフ)
         else if (skill.id == 27 || skill.id == 53 || skill.id == 49) {
-          target->AddBuff(skill.id);
+          SkillEffectSystem::applyBuff(skill.id, *target);
           music.playSE(5);
           if (skill.id == 27) lastActionMessage = "身代わりの構え!";
           else if (skill.id == 53) lastActionMessage = "反撃の構え!";
@@ -4056,14 +4057,14 @@ private:
             lastActionMessage = "ミス！";
           }
           else {
-            target->AddDebuff(skill.id, user);
+            SkillEffectSystem::applyDebuff(skill.id, *target, user);
             lastActionMessage = "風が切り刻む!";
           }
         }
 
         else if (skill.id == 32) {
           // Status::AddBuff(32) で reflectAllTurns = 1 がセットされます
-          target->AddBuff(skill.id); 
+          SkillEffectSystem::applyBuff(skill.id, *target); 
           music.playSE(7); // バフ音
           lastActionMessage = "物理と旋律を跳ね返す！";
         }
@@ -4084,7 +4085,7 @@ private:
             lastActionMessage = "ミス！";
           }
           else {
-            if (target->AddDebuff(skill.id, user)) {
+            if (SkillEffectSystem::applyDebuff(skill.id, *target, user)) {
               lastActionMessage = "装甲を破壊した！";
             }
           }
@@ -4106,7 +4107,7 @@ private:
             lastActionMessage = "ミス！";
           }
           else {
-            if (target->AddDebuff(skill.id, user)) {
+            if (SkillEffectSystem::applyDebuff(skill.id, *target, user)) {
               lastActionMessage = "気絶させた！";
             }
           }

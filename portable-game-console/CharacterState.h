@@ -100,8 +100,7 @@ public:
   CharacterState(int level, int w);
 
   void clearBattleEffects();
-  // ★ MaxHP増加処理 (ID 62)
-  void boostMaxHP();
+  void applyMaxHpIncrease(int increasedMaxHp, int increasedHp);
 
   int takeDamage(
       int damage,
@@ -116,9 +115,6 @@ public:
 
   void restoreTP(int amount);
 
-  void AddBuff(int skillId);
-  bool checkDebuffHit(int baseChance, CharacterState* user);
-  bool AddDebuff(int skillId, CharacterState* user = nullptr);
 
 
   void recalculateStats();
