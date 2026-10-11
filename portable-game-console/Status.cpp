@@ -79,11 +79,11 @@ int Status::getLuck() {
     return (int)finalValue;
   }
 
-int Status::getLevel(){return Level;}
+int Status::getLevel(){return progression.level();}
 
-int Status::getXP(){ return currentXP; }
+int Status::getXP(){ return progression.xp(); }
 
-int Status::getNextXP(){ return nextLevelXP; }
+int Status::getNextXP(){ return progression.nextLevelXp(); }
 
 int Status::getWho(){ return who; }
 
@@ -119,13 +119,11 @@ void Status::forceLearnSkill(int skillId) {
   }
 
 Status::Status(int level, int w){
-    Level = level;
+    progression.initialize(level);
     who = w;
     const CoreStatsData initialStats =
         CharacterCatalog::initialStatsFor(w, level);
     coreStats.initialize(initialStats);
-    currentXP = 0;
-    nextLevelXP = calculateNextXP(Level);
     learnedSkills.reserve(10);
     updateName();
     unequip(EquipmentSlot::Weapon);
@@ -133,7 +131,7 @@ Status::Status(int level, int w){
     unequip(EquipmentSlot::Accessory);
     statusEffects.initialize();
     // 初期技をテーブルから習得
-    checkLevelUpSkills(0, Level); // 0レベルから現在のレベルまで
+    checkLevelUpSkills(0, progression.level()); // 0レベルから現在のレベルまで
   }
 
 void Status::resetBattleStats() {
@@ -527,12 +525,12 @@ bool Status::AddDebuff(int skillId, Status* user) {
   }
 
 int Status::calculateNextXP(int level) {
-    return 10 + (level * level * 5);
+    return Progression::nextLevelXpFor(level);
   }
 
 void Status::recalculateStats() {
     const CoreStatsData stats =
-        CharacterCatalog::statsFor(who, Level);
+        CharacterCatalog::statsFor(who, progression.level());
     coreStats.applyRecalculatedStats(stats);
 }
 
@@ -541,27 +539,22 @@ bool Status::useTP(int cost) {
 }
 
 int Status::gainXP(int amount) {
-    if (Level >= 99) {
+    if (progression.level() >= 99) {
       return 0;
     }
 
-    currentXP += amount;
+    progression.addXP(amount);
 
     bool leveledUp = false;
     bool evolvedDuringGain = false;
 
     // 一度に複数レベル上がる場合でも、
     // 1レベルずつ処理して、その都度進化判定を行う。
-    while (currentXP >= nextLevelXP &&
-          Level < 99)
+    while (progression.canLevelUp())
     {
-      int previousLevel = Level;
+      int previousLevel = progression.level();
 
-      currentXP -= nextLevelXP;
-      Level++;
-
-      nextLevelXP =
-          calculateNextXP(Level);
+      progression.levelUpOnce();
 
       leveledUp = true;
 
@@ -582,7 +575,7 @@ int Status::gainXP(int amount) {
 
           if (rule.before_who_id == this->who &&
               rule.trigger_type == TRIGGER_LEVEL &&
-              this->Level >= rule.trigger_value)
+              progression.level() >= rule.trigger_value)
           {
             evolve(rule.after_who_id);
 
@@ -609,7 +602,7 @@ int Status::gainXP(int amount) {
 
         checkLevelUpSkills(
             previousLevel,
-            Level
+            progression.level()
         );
       }
     }
@@ -847,7 +840,7 @@ void Status::learnSkill(const Skill& newSkill) {
 
 void Status::evolve(int newWhoId) {
     // 1. 自分のIDを進化先のものに変更
-    int oldLevel = Level;
+    int oldLevel = progression.level();
     this->who = newWhoId;
     updateName();
     // 2. 既存のステータス再計算関数を呼び出す
@@ -918,8 +911,8 @@ int Status::ApplyTurnEffects() {
 
 void Status::saveTo(FsFile& file) {
     file.println(who);
-    file.println(Level);
-    file.println(currentXP);
+    file.println(progression.level());
+    file.println(progression.xp());
     file.println(coreStats.getHp());
     file.println(coreStats.getTp());
     file.println(weaponId()); // ★ 追加
@@ -937,8 +930,9 @@ void Status::loadFrom(FsFile& file) {
     // 保存値を読み込む
     // -------------------------
     who = file.readStringUntil('\n').toInt();
-    Level = file.readStringUntil('\n').toInt();
-    currentXP = file.readStringUntil('\n').toInt();
+    int savedLevel = file.readStringUntil('\n').toInt();
+    int savedXP = file.readStringUntil('\n').toInt();
+    progression.restore(savedLevel, savedXP);
 
     // HP / TP は再計算で上書きされるので、一旦退避する
     int savedHP = file.readStringUntil('\n').toInt();
@@ -953,8 +947,7 @@ void Status::loadFrom(FsFile& file) {
     // -------------------------
     updateName();
 
-    // ロードしたLevelに合わせて次の必要XPも更新
-    nextLevelXP = calculateNextXP(Level);
+    // restore() でロードしたLevelに合わせて次の必要XPを更新済み
 
     recalculateStats();
 
@@ -977,7 +970,7 @@ void Status::loadFrom(FsFile& file) {
 
     // レベル上は覚えているはずなのに、
     // 古いセーブに存在しないスキルがあれば補完
-    checkLevelUpSkills(0, Level);
+    checkLevelUpSkills(0, progression.level());
   }
 
 void Status::addPopup(int value, bool isCrit) {

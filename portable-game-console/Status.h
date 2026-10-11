@@ -2,6 +2,7 @@
 #include "CoreStats.h"
 #include "Equipment.h"
 #include "StatusEffects.h"
+#include "Progression.h"
 #include "EvolutionCatalog.h"
 
 #include "Skill.h"
@@ -14,11 +15,9 @@ private:
   CoreStats coreStats;
   Equipment equipment;
   StatusEffects statusEffects;
-  int Level;
+  Progression progression;
   int who;
   const char* name;
-  int currentXP;
-  int nextLevelXP;
   std::vector<Skill> learnedSkills; // 習得済みの旋律リスト
   int getPreEvolution(int currentId);
 public:
