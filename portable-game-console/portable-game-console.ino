@@ -7,6 +7,7 @@
 #include "Item.h"
 #include "Status.h"
 #include "Automaton.h"
+#include "Party.h"
 #include "Skill.h"
 #include "Inventory.h"
 #include "Map.h"
@@ -189,70 +190,6 @@ const int learnableSkillCount = sizeof(learnableSkillIDs) / sizeof(int);
 
 
 
-class Party {
-public:
-  // 仲間のポインタを保持するリスト
-  std::vector<Automaton*> members;
-  std::vector<Automaton*> storage;
-  static const int MAX_MEMBERS = 3; // (例: 主人公を除き3体まで)
-
-  Party() {
-    members.reserve(MAX_MEMBERS); // メモリ予約
-    storage.reserve(20);
-  }
-
-  // ★ 仲間を追加する関数
-  int addMember(Automaton* newMember) {
-    if (members.size() < MAX_MEMBERS) {
-      members.push_back(newMember);
-      return 1; // パーティー加入
-    } else {
-      storage.push_back(newMember);
-      return 2; // 預かり所送還
-    }
-  }
-
-  bool swapMember(int memberIdx, int storageIdx) {
-    if (memberIdx < 0 || memberIdx >= members.size()) return false;
-    if (storageIdx < 0 || storageIdx >= storage.size()) return false;
-
-    // ポインタを入れ替え
-    Automaton* temp = members[memberIdx];
-    members[memberIdx] = storage[storageIdx];
-    storage[storageIdx] = temp;
-    return true;
-  }
-
-  // ★★★ 預ける (Deposit) ★★★
-  // パーティーから預かり所へ移動 (パーティーは減る)
-  bool depositMember(int memberIdx) {
-    if (memberIdx < 0 || memberIdx >= members.size()) return false;
-    // 最後の1人は預けられない制約を入れても良い
-    // if (members.size() <= 1) return false; 
-
-    storage.push_back(members[memberIdx]);
-    members.erase(members.begin() + memberIdx);
-    return true;
-  }
-
-  // ★★★ 引き出す (Withdraw) ★★★
-  // 預かり所からパーティーへ移動 (パーティーに空きが必要)
-  bool withdrawMember(int storageIdx) {
-    if (members.size() >= MAX_MEMBERS) return false; // 満員
-    if (storageIdx < 0 || storageIdx >= storage.size()) return false;
-
-    members.push_back(storage[storageIdx]);
-    storage.erase(storage.begin() + storageIdx);
-    return true;
-  }
-  ~Party() {
-    for (auto* m : members) delete m;
-    members.clear();
-    for (auto* s : storage) delete s;
-    storage.clear();
-  }
-  // (将来的に、仲間を外す関数などもここに追加)
-};
 
 class Enemy{
 public:
