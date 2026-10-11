@@ -10,6 +10,10 @@ public:
   int xpYield;
 
   Enemy(int w, int floor);
+  Enemy(const Enemy&) = delete;
+  Enemy& operator=(const Enemy&) = delete;
+  Enemy(Enemy&&) noexcept;
+  Enemy& operator=(Enemy&&) noexcept;
 
   CharacterState& state();
   const CharacterState& state() const;

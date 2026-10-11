@@ -24,6 +24,10 @@ int initialLevelFor(int requestedId, int rolledLevel) {
 
 Enemy::Enemy(int w, int floor) : Enemy(w, rollLevel(floor), StateInitTag{}) {}
 
+Enemy::Enemy(Enemy&&) noexcept = default;
+
+Enemy& Enemy::operator=(Enemy&&) noexcept = default;
+
 Enemy::Enemy(int requestedId, int rolledLevel, StateInitTag)
     : who(EnemyCatalog::get(requestedId).id),
       stateValue(initialLevelFor(requestedId, rolledLevel), who) {

@@ -1523,9 +1523,9 @@ private:
     } else { // 味方→敵
          if (originalTarget->effects().getTauntTurns() > 0) return originalTarget;
          std::vector<CharacterState*> taunters;
-         for (auto* enemy : activeEnemies) {
-             if (enemy && enemy->state().effects().getTauntTurns() > 0 && enemy->state().stats().getHp() > 0) {
-                 taunters.push_back(&enemy->state());
+         for (auto& enemy : activeEnemies) {
+             if (enemy.state().effects().getTauntTurns() > 0 && enemy.state().stats().getHp() > 0) {
+                 taunters.push_back(&enemy.state());
              }
          }
          if (!taunters.empty()) tauntTarget = taunters[random(0, taunters.size())];
@@ -1545,8 +1545,8 @@ private:
              }
          } else {
              // 敵から「自分以外」かつ「生存者」を探す
-             for (auto* e : activeEnemies) {
-                 if (&e->state() != originalTarget && e->state().stats().getHp() > 0) others.push_back(&e->state());
+             for (auto& e : activeEnemies) {
+                 if (&e.state() != originalTarget && e.state().stats().getHp() > 0) others.push_back(&e.state());
              }
          }
          
@@ -1788,8 +1788,7 @@ public:
   CharacterState* currentTarget = nullptr; // ターゲットのStatus
 
   String message = "";
-  //Enemy* currentEnemy = nullptr;
-  std::vector<Enemy*> activeEnemies;
+  std::vector<Enemy> activeEnemies;
   Player* heroRef = nullptr; // 戦闘中の主人公への参照
   Party* partyRef = nullptr;   // 戦闘中の仲間パーティーへの参照
 
@@ -1894,9 +1893,6 @@ public:
     // 参加メンバーへの参照を保存
     heroRef = &hero;
     partyRef = &party;
-    for (auto enemy : activeEnemies) {
-      if (enemy) delete enemy;
-    }
     activeEnemies.clear();
     activeEnemies.reserve(4);
     if (floor >= 10 &&
@@ -1912,9 +1908,9 @@ public:
       else if (floor == 40) bossId = 83;
       else if (floor == 50) bossId = 84;
 
-      Enemy* boss = new Enemy(bossId, 1);
-      boss->name = boss->state().name();
-      activeEnemies.push_back(boss);
+      activeEnemies.emplace_back(bossId, 1);
+      Enemy& boss = activeEnemies.back();
+      boss.name = boss.state().name();
       critical_section_enter_blocking(&sdLock);
       String imgName = "/e_" + String(bossId) + ".bin";
       activeImages[0] = imgMgr.load(0, imgName, sd);
@@ -1979,18 +1975,18 @@ public:
         }
         
         // 敵の生成
-        Enemy* newEnemy = new Enemy(who, floor);
+        activeEnemies.emplace_back(who, floor);
+        Enemy& newEnemy = activeEnemies.back();
       
-        newEnemy->state().clearBattleEffects();
-        newEnemy->name = newEnemy->state().name();
-        activeEnemies.push_back(newEnemy);
+        newEnemy.state().clearBattleEffects();
+        newEnemy.name = newEnemy.state().name();
       }
       
       // 画像ロード処理
       critical_section_enter_blocking(&sdLock);
       for (int i = 0; i < 4; i++) {
         if (i < activeEnemies.size()) {
-          String fname = "/e_" + String(activeEnemies[i]->who) + ".bin";
+          String fname = "/e_" + String(activeEnemies[i].who) + ".bin";
           activeImages[i] = imgMgr.load(i, fname, sd);
         } else {
           activeImages[i] = nullptr;
@@ -2020,8 +2016,8 @@ public:
       actorList.push_back(&party.memberState(i));
     }
     // ★ 敵全員を行動順リストに追加
-    for (auto enemy : activeEnemies) {
-      actorList.push_back(&enemy->state());
+    for (auto& enemy : activeEnemies) {
+      actorList.push_back(&enemy.state());
     }
     
     // ★ ターン開始処理へ
@@ -2274,27 +2270,27 @@ public:
       // ★★★ 4. ターゲット選択 (敵) ★★★
       case STATE_TARGET_SELECT_ENEMY: {
         message = "誰を狙う？";
-        while (activeEnemies[enemyTargetIndex]->state().stats().getHp() <= 0){
+        while (activeEnemies[enemyTargetIndex].state().stats().getHp() <= 0){
           enemyTargetIndex = (enemyTargetIndex - 1 + activeEnemies.size()) % activeEnemies.size();
         }
         // 生きている敵だけを選べるように
         if (leftPressed) {
           do {
             enemyTargetIndex = (enemyTargetIndex - 1 + activeEnemies.size()) % activeEnemies.size();
-          } while (activeEnemies[enemyTargetIndex]->state().stats().getHp() <= 0);
+          } while (activeEnemies[enemyTargetIndex].state().stats().getHp() <= 0);
           music.playSE(2);
         }
         if (rightPressed) {
           do {
             enemyTargetIndex = (enemyTargetIndex + 1) % activeEnemies.size();
-          } while (activeEnemies[enemyTargetIndex]->state().stats().getHp() <= 0);
+          } while (activeEnemies[enemyTargetIndex].state().stats().getHp() <= 0);
           music.playSE(2);
         }
 
         // Aボタンで決定
         if (aPressed) {
           music.playSE(0);
-          currentTarget = &activeEnemies[enemyTargetIndex]->state();
+          currentTarget = &activeEnemies[enemyTargetIndex].state();
           currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンでキャンセル
@@ -2428,8 +2424,8 @@ public:
               
               // ターゲットを敵味方全員からランダムで選択
               std::vector<CharacterState*> allTargets = getAliveAllies(); // 味方リスト
-              for (auto enemy : activeEnemies) { // 敵リスト
-                  if(enemy->state().stats().getHp() > 0) allTargets.push_back(&enemy->state());
+              for (auto& enemy : activeEnemies) { // 敵リスト
+                  if(enemy.state().stats().getHp() > 0) allTargets.push_back(&enemy.state());
               }
               
               if (allTargets.empty()) {
@@ -2552,12 +2548,11 @@ public:
             // HPが半分未満の生存中の味方を探す
             CharacterState* injuredTarget = nullptr;
 
-            for (auto e : activeEnemies) {
-              if (e != nullptr &&
-                  e->state().stats().getHp() > 0 &&
-                  e->state().stats().getHp() < e->state().stats().getMaxHp() / 2)
+            for (auto& e : activeEnemies) {
+              if (e.state().stats().getHp() > 0 &&
+                  e.state().stats().getHp() < e.state().stats().getMaxHp() / 2)
               {
-                injuredTarget = &e->state();
+                injuredTarget = &e.state();
                 break;
               }
             }
@@ -2623,7 +2618,7 @@ public:
               if (currentTarget == nullptr || currentTarget->isPlayer()) {
                 // 生きている敵リストを作成
                 std::vector<CharacterState*> livingEnemies;
-                for(auto e : activeEnemies) if(e->state().stats().getHp() > 0) livingEnemies.push_back(&e->state());
+                for(auto& e : activeEnemies) if(e.state().stats().getHp() > 0) livingEnemies.push_back(&e.state());
                 
                 if (!livingEnemies.empty()) {
                   // ランダムな仲間にかける（回復AIですでに決まっている場合は上書きしないよう注意が必要だが、
@@ -2740,15 +2735,15 @@ public:
         if (partyRef) {
             for(size_t i = 0; i < partyRef->memberCount(); ++i) partyRef->memberState(i).clearPopups();
         }
-        for(auto e : activeEnemies) if(e) e->state().clearPopups();
+        for(auto& e : activeEnemies) e.state().clearPopups();
 
         if (pendingActionType == ActionType::FLEE) {
           // 1. 経験値とドロップを0にする (倒した扱いにはしない)
           // (StatusからはEnemyオブジェクトに辿れないので、リストから探す)
-          for (auto e : activeEnemies) {
-            if (&e->state() == currentActor) {
-              e->xpYield = 0;
-              e->dropItemId = 0; 
+          for (auto& e : activeEnemies) {
+            if (&e.state() == currentActor) {
+              e.xpYield = 0;
+              e.dropItemId = 0;
               break;
             }
           }
@@ -3165,8 +3160,8 @@ public:
             party.memberState(i).clearPopups();
           }
 
-          for (auto e : activeEnemies) {
-            e->state().clearPopups();
+          for (auto& e : activeEnemies) {
+            e.state().clearPopups();
           }
 
           if (messageFlow == MessageFlow::CONTINUE_TURN) {
@@ -3198,8 +3193,8 @@ public:
         // -------------------------
         bool allEnemiesDefeated = true;
 
-        for (auto enemy : activeEnemies) {
-          if (enemy && enemy->state().stats().getHp() > 0) {
+        for (auto& enemy : activeEnemies) {
+          if (enemy.state().stats().getHp() > 0) {
             allEnemiesDefeated = false;
             break;
           }
@@ -3346,8 +3341,8 @@ public:
           resultMessageIndex = 0;
 
           lastGainedXP = 0;
-          for (auto enemy : activeEnemies) {
-            lastGainedXP += enemy->xpYield;
+          for (auto& enemy : activeEnemies) {
+            lastGainedXP += enemy.xpYield;
           }
           
           // 1. 獲得メッセージ
@@ -3376,21 +3371,17 @@ public:
           // 4. ドロップ判定
           // 敵ごとに設定されている dropItemId / dropRatePercent を使う。
           // 逃走した敵は dropItemId = 0 にされているため対象外。
-          for (auto enemy : activeEnemies) {
-            if (enemy == nullptr) {
-              continue;
-            }
-
-            if (enemy->dropItemId <= 0 ||
-                enemy->dropRatePercent <= 0)
+          for (auto& enemy : activeEnemies) {
+            if (enemy.dropItemId <= 0 ||
+                enemy.dropRatePercent <= 0)
             {
               continue;
             }
 
             // 0～99 の乱数がドロップ率未満なら入手
-            if (random(0, 100) < enemy->dropRatePercent) {
+            if (random(0, 100) < enemy.dropRatePercent) {
               Item droppedItem =
-                  ItemCatalog::get(enemy->dropItemId);
+                  ItemCatalog::get(enemy.dropItemId);
 
               inventory.addItem(droppedItem);
 
@@ -3444,12 +3435,9 @@ public:
             member.clearBattleEffects();
             std::vector<CharacterState::PopupData>().swap(member.popupValues);
           }
-          for (auto enemy : activeEnemies) {
-              delete enemy; // Enemyとその中のStatusを削除
-          }
           activeEnemies.clear(); // リストを空にする
           // ★ ベクタの容量自体を解放するテクニック (Swap idiom)
-          std::vector<Enemy*>().swap(activeEnemies);
+          std::vector<Enemy>().swap(activeEnemies);
 
           // 3. メッセージリストのメモリ解放 (ここが2KBの犯人の可能性大)
           resultMessages.clear();
@@ -3566,13 +3554,13 @@ public:
         const int enemyY[] = {20, 40, 90, 110}; // 少しジグザグ配置
         for (int i = 0; i < activeEnemies.size(); ++i) {
           if (i >= 4) break; 
-          Enemy* enemy = activeEnemies[i];
+          Enemy& enemy = activeEnemies[i];
           
-          if (enemy->state().stats().getHp() > 0 || !enemy->state().popupValues.empty()) {
+          if (enemy.state().stats().getHp() > 0 || !enemy.state().popupValues.empty()) {
             int ex = enemyX[i];
             int ey = enemyY[i] - drawY; 
 
-            if (enemy->state().stats().getHp() > 0) {
+            if (enemy.state().stats().getHp() > 0) {
               //uint16_t* img = (i < enemyImages.size()) ? enemyImages[i] : nullptr;
               uint16_t* img = activeImages[i];
               g->lineSprite.fillEllipse(ex + 32, ey + 60, 24, 8, TFT_RED);
@@ -3581,15 +3569,15 @@ public:
             }
             
             // カーソル (敵)
-            if (currentBattleState == STATE_TARGET_SELECT_ENEMY && enemyTargetIndex == i && enemy->state().stats().getHp() > 0) {
+            if (currentBattleState == STATE_TARGET_SELECT_ENEMY && enemyTargetIndex == i && enemy.state().stats().getHp() > 0) {
               g->lineSprite.setTextColor(TFT_YELLOW); g->lineSprite.setTextSize(2);
               g->lineSprite.setCursor(ex + 26, ey - 20); g->lineSprite.print("▼");
             }
             // ポップアップ (敵)
-            if (!enemy->state().popupValues.empty()) {
+            if (!enemy.state().popupValues.empty()) {
               int pY = ey - 20; // 少し上から
               g->lineSprite.setTextSize(2);
-              for (const auto& data : enemy->state().popupValues) {
+              for (const auto& data : enemy.state().popupValues) {
                 int val = data.value;
                 bool isCrit = data.isCritical; // ★ 会心チェック
 
@@ -3801,14 +3789,7 @@ public:
       g->lineSprite.pushSprite(0, drawY);
     }
   }
-  ~Battle() {
-    // 残っている敵がいれば削除
-    for (auto enemy : activeEnemies) {
-        delete enemy;
-    }
-    activeEnemies.clear(); 
-    // (activeImages は ImageManager が管理しているのでここでは何もしなくてOK)
-  }
+  ~Battle() = default;
 private:
   
   void ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, MUSIC& music) {
@@ -4177,9 +4158,9 @@ private:
   std::vector<CharacterState*> getAliveEnemies() {
     std::vector<CharacterState*> enemies;
 
-    for (auto enemy : activeEnemies) {
-      if (enemy && enemy->state().stats().getHp() > 0) {
-        enemies.push_back(&enemy->state());
+    for (auto& enemy : activeEnemies) {
+      if (enemy.state().stats().getHp() > 0) {
+        enemies.push_back(&enemy.state());
       }
     }
 
