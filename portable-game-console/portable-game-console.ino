@@ -18,6 +18,7 @@
 #include "Graphic.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
+#include "Encounter.h"
 #include "Vibration.h"
 #include "Skill.h"
 #include "SkillCatalog.h"
@@ -122,21 +123,6 @@ const int learnableSkillCount = sizeof(learnableSkillIDs) / sizeof(int);
 // -------------------------
 bool audio_timer_callback(struct repeating_timer *t);
 
-
-class Encounter {
-public:
-  int stepCounter = 0;
-  const int encounterThreshold = 20; // 歩数間隔の平均
-  bool checkEncounter() {
-    stepCounter++;
-    // 10歩〜30歩の間で確率的にエンカウント
-    if (stepCounter > random(10, encounterThreshold)) {
-      stepCounter = 0;
-      return random(100) < 10; // 10% の確率で戦闘
-    }
-    return false;
-  }
-};
 
 // ---------
 // saveクラス
