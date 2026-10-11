@@ -6,6 +6,7 @@
 #include "bmp.h"
 #include "Item.h"
 #include "Status.h"
+#include "Automaton.h"
 #include "Skill.h"
 #include "Inventory.h"
 #include "Map.h"
@@ -187,32 +188,6 @@ const int learnableSkillCount = sizeof(learnableSkillIDs) / sizeof(int);
 
 
 
-class Automaton {
-public:
-  Status* status;
-
-  /**
-   * @brief 仲間（オートマタ）を生成
-   * @param level 初期レベル
-   * @param w 仲間の種類ID
-   */
-  Automaton(int level, int w) {
-    status = new Status(level, w);
-  }
-
-  const char* getname() {
-    return status->getname();
-  }
-
-  int getWho() {
-    return status->getWho();
-  }
-
-  ~Automaton() {
-    delete status;
-    status = nullptr;
-  }
-};
 
 class Party {
 public:
