@@ -1,19 +1,18 @@
 #include "Automaton.h"
 #include "CharacterState.h"
 
-Automaton::Automaton(int level, int w) {
-    status = new CharacterState(level, w);
-  }
+Automaton::Automaton(int level, int w) : stateValue(level, w) {}
+
+CharacterState& Automaton::state() { return stateValue; }
+
+const CharacterState& Automaton::state() const { return stateValue; }
 
 const char* Automaton::getname() {
-    return status->name();
+    return state().name();
   }
 
 int Automaton::getWho() {
-    return status->id();
+    return state().id();
   }
 
-Automaton::~Automaton() {
-    delete status;
-    status = nullptr;
-  }
+Automaton::~Automaton() = default;
