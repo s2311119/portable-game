@@ -1,10 +1,8 @@
 #pragma once
-
-class CharacterState;
+#include "CharacterState.h"
 
 class Enemy{
 public:
-  CharacterState* status;
   const char* name;
   int who;
   int dropItemId;
@@ -13,5 +11,13 @@ public:
 
   Enemy(int w, int floor);
 
+  CharacterState& state();
+  const CharacterState& state() const;
+
   ~Enemy();
+
+private:
+  struct StateInitTag {};
+  Enemy(int requestedId, int rolledLevel, StateInitTag);
+  CharacterState stateValue;
 };
