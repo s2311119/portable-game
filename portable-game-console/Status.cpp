@@ -37,13 +37,7 @@ int Status::getAttack() {
     float finalValue = (float)coreStats.getAttack(); // 基礎ATK
     finalValue = equipment.applyAttackBonus(finalValue);
     // バフを適用 (例: 1.5倍 or 2.0倍)
-    if (atkBuffTurns > 0) {
-      finalValue *= atkBuffRate;
-    }
-    // デバフを適用 (例: 0.7倍 or 0.5倍)
-    if (atkDebuffTurns > 0) {
-      finalValue *= atkDebuffRate;
-    }
+    finalValue = statusEffects.applyAttackModifiers(finalValue);
     
     if (finalValue < 1) finalValue = 1;
     return (int)finalValue;
@@ -52,12 +46,7 @@ int Status::getAttack() {
 int Status::getDefense() {
     float finalValue = (float)coreStats.getDefense(); // 基礎DEF
     finalValue = equipment.applyDefenseBonus(finalValue);
-    if (defBuffTurns > 0) {
-        finalValue *= defBuffRate;
-    }
-    if (defDebuffTurns > 0) {
-        finalValue *= defDebuffRate;
-    }
+    finalValue = statusEffects.applyDefenseModifiers(finalValue);
 
     if (finalValue < 1) finalValue = 1;
     return (int)finalValue;
@@ -66,12 +55,7 @@ int Status::getDefense() {
 int Status::getSpeed() {
     float finalValue = (float)coreStats.getSpeed(); // 基礎SPD
     finalValue = equipment.applySpeedBonus(finalValue);
-    if (spdBuffTurns > 0) {
-        finalValue *= spdBuffRate;
-    }
-    if (spdDebuffTurns > 0) {
-        finalValue *= spdDebuffRate;
-    }
+    finalValue = statusEffects.applySpeedModifiers(finalValue);
 
     if (finalValue < 1) finalValue = 1;
     return (int)finalValue;
@@ -80,12 +64,7 @@ int Status::getSpeed() {
 int Status::getSense() {
     float finalValue = (float)coreStats.getSense(); // 基礎SEN
     finalValue = equipment.applySenseBonus(finalValue);
-    if (senBuffTurns > 0) {
-        finalValue *= senBuffRate;
-    }
-    if (senDebuffTurns > 0) {
-        finalValue *= senDebuffRate;
-    }
+    finalValue = statusEffects.applySenseModifiers(finalValue);
 
     if (finalValue < 1) finalValue = 1;
     return (int)finalValue;
@@ -94,12 +73,7 @@ int Status::getSense() {
 int Status::getLuck() {
     float finalValue = (float)coreStats.getLuck(); // 基礎LCK
     finalValue = equipment.applyLuckBonus(finalValue);
-    if (lckBuffTurns > 0) {
-        finalValue *= lckBuffRate;
-    }
-    if (lckDebuffTurns > 0) {
-        finalValue *= lckDebuffRate;
-    }
+    finalValue = statusEffects.applyLuckModifiers(finalValue);
 
     if (finalValue < 1) finalValue = 1;
     return (int)finalValue;
@@ -115,13 +89,13 @@ int Status::getWho(){ return who; }
 
 const char* Status::getname(){return name;}
 
-int Status::getPoisonTurns() const { return poisonTurns; }
+int Status::getPoisonTurns() const { return statusEffects.getPoisonTurns(); }
 
-int Status::getParalyzedTurns() const { return paralyzedTurns; }
+int Status::getParalyzedTurns() const { return statusEffects.getParalyzedTurns(); }
 
-int Status::getSilencedTurns() const { return silencedTurns; }
+int Status::getSilencedTurns() const { return statusEffects.getSilencedTurns(); }
 
-int Status::getConfusedTurns() const { return confusedTurns; }
+int Status::getConfusedTurns() const { return statusEffects.getConfusedTurns(); }
 
 int Status::normalizeWho(int w) {
     if (w >= 0 && w <= 37) return w + 39;
@@ -133,13 +107,7 @@ void Status::updateName() {
   }
 
 float Status::getEvasionBonus() {
-    float bonus = 1.0; // 通常 1.0倍
-
-    if (evaBuffTurns > 0) {
-        bonus *= evaBuffRate;
-    }
-    
-    return bonus;
+    return statusEffects.evasionBonus();
   }
 
 std::vector<Skill>& Status::getLearnedSkills() {
@@ -163,28 +131,7 @@ Status::Status(int level, int w){
     unequip(EquipmentSlot::Weapon);
     unequip(EquipmentSlot::Armor);
     unequip(EquipmentSlot::Accessory);
-    isDoubleAction = false;
-    coverTurns = 0;
-    physDamageOneTurns = 0;
-    endureTurns = 0;
-    counterTurns = 0;
-    autoReviveTurns = 0;
-    statusImmuneTurns = 0;
-    attributeResistTurns = 0;
-    cantMoveTurns = 0;
-    reflectAllTurns = 0;
-    damageGuardCount = 0;
-    tauntTurns = 0;
-    untargetableTurns = 0;
-    poisonTurns = 0; paralyzedTurns = 0; silencedTurns = 0; confusedTurns = 0;
-    atkBuffRate = 1.0; atkBuffTurns = 0; defBuffRate = 1.0; defBuffTurns = 0;
-    spdBuffRate = 1.0; spdBuffTurns = 0; senBuffRate = 1.0; senBuffTurns = 0;
-    lckBuffRate = 1.0; lckBuffTurns = 0; evaBuffRate = 1.0; evaBuffTurns = 0;
-    atkDebuffRate = 1.0; atkDebuffTurns = 0; defDebuffRate = 1.0; defDebuffTurns = 0;
-    spdDebuffRate = 1.0; spdDebuffTurns = 0; senDebuffRate = 1.0; senDebuffTurns = 0;
-    lckDebuffRate = 1.0; lckDebuffTurns = 0;
-    hpRegenTurns = 0; tpRegenTurns = 0; invalidDamageTurns = 0; 
-    reflectPhysicalTurns = 0; reflectMagicTurns = 0;
+    statusEffects.initialize();
     // 初期技をテーブルから習得
     checkLevelUpSkills(0, Level); // 0レベルから現在のレベルまで
   }
@@ -193,27 +140,7 @@ void Status::resetBattleStats() {
     coreStats.restoreBaseMaxHp();
     
     // バフ・デバフ・状態異常の全解除
-    coverTurns = 0;
-    physDamageOneTurns = 0;
-    endureTurns = 0;
-    counterTurns = 0;
-    autoReviveTurns = 0;
-    statusImmuneTurns = 0;
-    attributeResistTurns = 0;
-    cantMoveTurns = 0;
-    reflectAllTurns = 0;
-    damageGuardCount = 0;
-    tauntTurns = 0;
-    untargetableTurns = 0;
-    poisonTurns = 0; paralyzedTurns = 0; silencedTurns = 0; confusedTurns = 0;
-    atkBuffRate = 1.0; atkBuffTurns = 0; defBuffRate = 1.0; defBuffTurns = 0;
-    spdBuffRate = 1.0; spdBuffTurns = 0; senBuffRate = 1.0; senBuffTurns = 0;
-    lckBuffRate = 1.0; lckBuffTurns = 0; evaBuffRate = 1.0; evaBuffTurns = 0;
-    atkDebuffRate = 1.0; atkDebuffTurns = 0; defDebuffRate = 1.0; defDebuffTurns = 0;
-    spdDebuffRate = 1.0; spdDebuffTurns = 0; senDebuffRate = 1.0; senDebuffTurns = 0;
-    lckDebuffRate = 1.0; lckDebuffTurns = 0;
-    hpRegenTurns = 0; tpRegenTurns = 0; invalidDamageTurns = 0; 
-    reflectPhysicalTurns = 0; reflectMagicTurns = 0;
+    statusEffects.clearBattleEffects();
     clearPopups();
   }
 
@@ -229,17 +156,17 @@ int Status::takedamage(
       Skill::Category damageCategory
   ){
     // 1. ターン制無敵 (ID 63)
-    if (invalidDamageTurns > 0) {
+    if (statusEffects.getInvalidDamageTurns() > 0) {
         return 0; // ダメージ0で終了 (回数は減らない)
     }
     // 2. 回数制バリア (ID 55, 64)
-    if (damageGuardCount > 0) {
-        damageGuardCount--; // ★ 1回消費
+    if (statusEffects.getDamageGuardCount() > 0) {
+        consumeDamageGuard(); // ★ 1回消費
         return 0; // ダメージ0で終了
     }
     // 2. アダマン・ボディ
     // 物理ダメージだけを1にする
-    else if (physDamageOneTurns > 0 &&
+    else if (statusEffects.getPhysDamageOneTurns() > 0 &&
             damageCategory == Skill::Category::PHYSICAL)
     {
         if (damage > 1) {
@@ -248,9 +175,9 @@ int Status::takedamage(
     }
     
     // 3. ラストスタンド (HP1で耐える)
-    if (endureTurns > 0 && damage >= coreStats.getHp()) {
+    if (statusEffects.getEndureTurns() > 0 && damage >= coreStats.getHp()) {
         damage = coreStats.getHp() - 1;
-        endureTurns--; 
+        consumeLastStand(); 
     }
 
     coreStats.takeDamage(damage);
@@ -267,19 +194,7 @@ void Status::Revive(int hpPercent) {
 }
 
 void Status::CureStatus(bool cureDebuffs) {
-    // 状態異常フラグをリセット
-      poisonTurns = 0;
-      poisonLevel = 0;
-      paralyzedTurns = 0;
-      silencedTurns = 0;
-      confusedTurns = 0;
-
-    // (例: スキルID 91 "リフレッシュ" の場合)
-    if (cureDebuffs) {
-        atkDebuffTurns = 0;
-        defDebuffTurns = 0;
-        spdDebuffTurns = 0;
-    }
+    statusEffects.cureStatus(cureDebuffs);
   }
 
 void Status::ReceiveTP(int amount) {
@@ -293,160 +208,157 @@ void Status::AddBuff(int skillId) {
     switch (skillId) {
         // --- 主人公 ---
         case 7: // チューニング・アタック (単体 ATK)
-            atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
+            applyAttackBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 8: // チューニング・ガード (単体 DEF)
-            defBuffRate = 1.5; defBuffTurns = DEFAULT_BUFF_TURNS;
+            applyDefenseBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 9: // アレグロ (全体 SPD)
-            spdBuffRate = 1.3; spdBuffTurns = DEFAULT_BUFF_TURNS;
+            applySpeedBuff(1.3, DEFAULT_BUFF_TURNS);
             break;
         // --- ストライカー系 ---
         case 21: // パワーチャージ (ATK 1.5倍)
-            atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
+            applyAttackBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 25: // ソードダンス (ATK/SPD 1.5倍)
-            atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
-            spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
+            applyAttackBuff(1.5, DEFAULT_BUFF_TURNS);
+            applySpeedBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 27: // かばう（次の自分の行動終了まで有効）
-            coverTurns = 2;
+            applyCover(2);
             break;
         case 29: // トリックステップ (SPD/LCK 1.5倍)
-            spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
-            lckBuffRate = 1.5; lckBuffTurns = DEFAULT_BUFF_TURNS;
+            applySpeedBuff(1.5, DEFAULT_BUFF_TURNS);
+            applyLuckBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 31: // 王者の波動 (味方全体 ATK/DEF 1.5倍)
-            atkBuffRate = 1.5; atkBuffTurns = DEFAULT_BUFF_TURNS;
-            defBuffRate = 1.5; defBuffTurns = DEFAULT_BUFF_TURNS;
+            applyAttackBuff(1.5, DEFAULT_BUFF_TURNS);
+            applyDefenseBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 32: // キングス・シールド (1ターン物理・旋律反射)
           // 使用した行動の終了時に1減るため、2から開始
-          reflectAllTurns = 2;
+          applyAllReflection(2);
           break;
         case 34: // バーサーク (ATK 2倍 / DEF 0.5倍)
-            atkBuffRate = 2.0; atkBuffTurns = LONG_BUFF_TURNS;
-            defDebuffRate = 0.5; defDebuffTurns = LONG_BUFF_TURNS; // (※デバフも付く)
+            applyAttackBuff(2.0, LONG_BUFF_TURNS);
+            applyDefenseDebuff(0.5, LONG_BUFF_TURNS); // (※デバフも付く)
             break;
         case 39: // ミラーズエッジ (回避率 2倍)
-            evaBuffRate = 2.0; evaBuffTurns = DEFAULT_BUFF_TURNS;
+            applyEvasionBuff(2.0, DEFAULT_BUFF_TURNS);
             break;
         case 43: // ダーククローク (姿を消す)
-            untargetableTurns = DEFAULT_BUFF_TURNS;
+            applyUntargetable(DEFAULT_BUFF_TURNS);
             break;
 
         // --- ガーディアン系 ---
         case 46: // プロテクト (味方単体 DEF 1.5倍)
-            defBuffRate = 1.5; defBuffTurns = DEFAULT_BUFF_TURNS;
+            applyDefenseBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 48: // ウォール (味方全体 DEF 1.2倍)
-            defBuffRate = 1.2; defBuffTurns = DEFAULT_BUFF_TURNS;
+            applyDefenseBuff(1.2, DEFAULT_BUFF_TURNS);
             break;
         case 49: // 挑発
-            tauntTurns = DEFAULT_BUFF_TURNS;
+            applyTaunt(DEFAULT_BUFF_TURNS);
             break;
         case 50: // リフレクト (物理攻撃反射 1回)
-            reflectPhysicalTurns = 1;
+            applyPhysicalReflection(1);
             break;
         case 51: // ガーディアン魂 (DEF 2倍、SPD 0.5倍)
-            defBuffRate = 2.0; defBuffTurns = LONG_BUFF_TURNS;
-            spdDebuffRate = 0.5; spdDebuffTurns = LONG_BUFF_TURNS; // (※デバフも付く)
+            applyDefenseBuff(2.0, LONG_BUFF_TURNS);
+            applySpeedDebuff(0.5, LONG_BUFF_TURNS); // (※デバフも付く)
             break;
         case 52: // 鉄壁 (DEF 2.5倍)
-            defBuffRate = 2.5; defBuffTurns = DEFAULT_BUFF_TURNS;
+            applyDefenseBuff(2.5, DEFAULT_BUFF_TURNS);
             break;
         case 53: // カウンター
-            counterTurns = DEFAULT_BUFF_TURNS;
+            applyCounter(DEFAULT_BUFF_TURNS);
             break;
         case 55: // フォースフィールド (ダメージ無効 1回)
-            damageGuardCount = 1;
+            applyDamageGuard(1);
             break;
         case 56: // アダマン・ボディ (物理ダメージ 1)
-            physDamageOneTurns = DEFAULT_BUFF_TURNS;
+            applyPhysicalDamageOne(DEFAULT_BUFF_TURNS);
             break;
         case 57: // 自己修復 (HPリジェネ)
-            hpRegenTurns = LONG_BUFF_TURNS;
+            applyHpRegeneration(LONG_BUFF_TURNS);
             break;
         case 58: // ラストスタンド (HP1で耐える 1回)
-            endureTurns = 1;
+            applyLastStand(1);
             break;
         case 59: // ギガンティック・ウォール (味方全体 DEF 2倍)
-            defBuffRate = 2.0; defBuffTurns = DEFAULT_BUFF_TURNS;
+            applyDefenseBuff(2.0, DEFAULT_BUFF_TURNS);
             break;
         case 61: // オートリバイブ (自動蘇生 1回)
-            autoReviveTurns = 99;
+            applyAutoRevive(99);
             break;
         case 62: // 最大HP上昇
             boostMaxHP();
             break;
         case 63: // 無敵 (1ターン ダメージ 0)
             // 使用直後のUpdateTurnで1減るため2から開始する
-            invalidDamageTurns = 2;
+            applyInvulnerability(2);
             break;
         case 64: // 全体バリア (ダメージ無効 1回)
-            damageGuardCount = 1;
+            applyDamageGuard(1);
             break;
         case 65: // 旋律反射
-            reflectMagicTurns = DEFAULT_BUFF_TURNS;
+            applyMagicReflection(DEFAULT_BUFF_TURNS);
             break;
         case 67: // ホーリーウォール (属性耐性UP)
-            attributeResistTurns = DEFAULT_BUFF_TURNS;
+            applyAttributeResistance(DEFAULT_BUFF_TURNS);
             // (特殊: 属性耐性フラグ)
             break;
 
         // --- リジェネレーター系 ---
         case 70: // TPリジェネ
-            tpRegenTurns = LONG_BUFF_TURNS;
+            applyTpRegeneration(LONG_BUFF_TURNS);
             break;
 
         // --- クリッパー系 ---
         case 73: // クイックステップ (自身 SPD 1.5倍)
-            spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
+            applySpeedBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 75: // エアリアルダンス (自身 AGI 1.5倍)
-            evaBuffRate = 1.5; evaBuffTurns = DEFAULT_BUFF_TURNS;
+            applyEvasionBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 77: // エアステップ (味方単体 SPD/AGI 1.5倍)
-            spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
-            evaBuffRate = 1.5; evaBuffTurns = DEFAULT_BUFF_TURNS;
+            applySpeedBuff(1.5, DEFAULT_BUFF_TURNS);
+            applyEvasionBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 79: // ラピッドムーブ (味方全体 SPD 1.5倍)
-            spdBuffRate = 1.5; spdBuffTurns = DEFAULT_BUFF_TURNS;
+            applySpeedBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 81: // ウインドウォール (味方全体 回避率UP 1.5倍)
-            evaBuffRate = 1.5; evaBuffTurns = DEFAULT_BUFF_TURNS;
+            applyEvasionBuff(1.5, DEFAULT_BUFF_TURNS);
             break;
         case 83: // 精霊の舞 (自身 TPリジェネ)
-            tpRegenTurns = LONG_BUFF_TURNS;
+            applyTpRegeneration(LONG_BUFF_TURNS);
             break;
         case 85: // オーバークロック (自身 2回行動)
-            twoActionsTurns = 1;
-            isDoubleAction = true;
+            applyDoubleAction(1);
             break;
         case 86: // リミットブレイク (自身 ATK/SPD 最大)
             // 3ターンの間、攻撃と素早さを 4.0倍 (強烈なバフ) にする
-            atkBuffRate = 4.0; 
-            atkBuffTurns = 3;
+            applyAttackBuff(4.0, 3);
             
-            spdBuffRate = 4.0; 
-            spdBuffTurns = 3;
+            applySpeedBuff(4.0, 3);
             break;
 
         // --- メンダー系 ---
         case 95: // オートリペア (単体 HP自動回復)
-            hpRegenTurns = LONG_BUFF_TURNS;
+            applyHpRegeneration(LONG_BUFF_TURNS);
             break;
         case 97: // リジェネフィールド (全体 HP自動回復)
-            hpRegenTurns = LONG_BUFF_TURNS;
+            applyHpRegeneration(LONG_BUFF_TURNS);
             break;
         case 99: // ホーリー・ウォール (状態異常無効 1回)
-            statusImmuneTurns = 1;
+            applyStatusImmunity(1);
             break;
         case 102: // TPリジェネ
-            tpRegenTurns = LONG_BUFF_TURNS;
+            applyTpRegeneration(LONG_BUFF_TURNS);
             break;
         case 103: // オラクルフィールド (全体 TP徐々に回復)
-            tpRegenTurns = LONG_BUFF_TURNS;
+            applyTpRegeneration(LONG_BUFF_TURNS);
             break;
 
         default:
@@ -468,8 +380,8 @@ bool Status::checkDebuffHit(int baseChance, Status* user) {
   }
 
 bool Status::AddDebuff(int skillId, Status* user) {
-    if (statusImmuneTurns > 0) {
-      statusImmuneTurns--; // 1回消費して防ぐ
+    if (statusEffects.getStatusImmuneTurns() > 0) {
+      consumeStatusImmunity(); // 1回消費して防ぐ
       return false; // デバフを適用せずに終了
     }
     const int DEFAULT_DEBUFF_TURNS = 3;
@@ -512,26 +424,26 @@ bool Status::AddDebuff(int skillId, Status* user) {
     switch (skillId) {
       // --- 主人公 ---
       case 10: // ラレンタンド (単体 SPD)
-        spdDebuffRate = 0.7; spdDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applySpeedDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
       case 11: // ノイズ・ジャミング (全体 ATK)
-        atkDebuffRate = 0.8; atkDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applyAttackDebuff(0.8, DEFAULT_DEBUFF_TURNS);
         break;
       // --- ストライカー系 (バフの副作用) ---
       // (case 34 は AddBuff 側で defDebuffRate = 0.5 をセット)
       // --- ギア・ナイト ---
       case 24: // アーマーブレイク (防御 0.7倍)
-        defDebuffRate = 0.7; defDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applyDefenseDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
 
       // --- ヴォイド・ストーカー ---
       case 45: // ヴォイド・ショック (高確率で麻痺)
-        paralyzedTurns = DEFAULT_DEBUFF_TURNS;
+        applyParalysis(DEFAULT_DEBUFF_TURNS);
         break;
 
       // --- ガーディアン系 ---
       case 47: // シールドバッシュ (確率でスタン/麻痺)
-        paralyzedTurns = 1;
+        applyParalysis(1);
         break;
         
       // --- ガーディアン系 (バフの副作用) ---
@@ -539,80 +451,73 @@ bool Status::AddDebuff(int skillId, Status* user) {
 
       // --- アクセラレーター ---
       case 87: // タービュランス (全体 SPD 0.7倍)
-        spdDebuffRate = 0.7; spdDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applySpeedDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
 
       // --- メンダー系 (敵の強化解除) ---
       case 101: // ディスペル (敵単体 強化解除)
-        atkBuffTurns = 0; defBuffTurns = 0; spdBuffTurns = 0;
-        senBuffTurns = 0; lckBuffTurns = 0; evaBuffTurns = 0;
-        hpRegenTurns = 0; tpRegenTurns = 0;
+        clearStandardBuffs();
         // (他の特殊バフもすべて解除)
         break;
 
       // --- ジャマー系 ---
       case 104: // スロウ (敵単体 SPD 0.7倍)
-        spdDebuffRate = 0.7; spdDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applySpeedDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
       case 105: // ポイズン (毒)
         // 猛毒中なら通常毒で上書きしない
-        if (poisonLevel < 2) {
-            poisonLevel = 1;
-            poisonTurns = DEFAULT_DEBUFF_TURNS;
+        if (statusEffects.getPoisonLevel() < 2) {
+            applyPoison(1, DEFAULT_DEBUFF_TURNS);
         }
         break;
       case 106: // パワーダウン (敵単体 ATK 0.7倍)
-        atkDebuffRate = 0.7; atkDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applyAttackDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
       case 107: // ガードダウン (敵単体 DEF 0.7倍)
-        defDebuffRate = 0.7; defDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applyDefenseDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
       case 108: // エリア・スロウ (敵全体 SPD 0.7倍)
-        spdDebuffRate = 0.7; spdDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applySpeedDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
       case 109: // サイレンス (沈黙)
-        silencedTurns = DEFAULT_DEBUFF_TURNS;
+        applySilence(DEFAULT_DEBUFF_TURNS);
         break;
       case 110: // デッドリーポイズン (猛毒)
-        poisonLevel = 2;
-        poisonTurns = DEFAULT_DEBUFF_TURNS;
+        applyPoison(2, DEFAULT_DEBUFF_TURNS);
         break;
       case 112: // エリア・ブレイク (敵全体 ATK/DEF 0.7倍)
-        atkDebuffRate = 0.7; atkDebuffTurns = DEFAULT_DEBUFF_TURNS;
-        defDebuffRate = 0.7; defDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applyAttackDebuff(0.7, DEFAULT_DEBUFF_TURNS);
+        applyDefenseDebuff(0.7, DEFAULT_DEBUFF_TURNS);
           break;
       case 113: // カオスフィールド (混乱)
-        confusedTurns = DEFAULT_DEBUFF_TURNS;
+        applyConfusion(DEFAULT_DEBUFF_TURNS);
         break;
       case 114: // ディザスター (全状態異常)
-        if (poisonLevel < 2) {
-            poisonLevel = 1;
-            poisonTurns = DEFAULT_DEBUFF_TURNS;
+        if (statusEffects.getPoisonLevel() < 2) {
+            applyPoison(1, DEFAULT_DEBUFF_TURNS);
         }
-        paralyzedTurns = DEFAULT_DEBUFF_TURNS;
-        silencedTurns = DEFAULT_DEBUFF_TURNS;
-        confusedTurns = DEFAULT_DEBUFF_TURNS;
+        applyParalysis(DEFAULT_DEBUFF_TURNS);
+        applySilence(DEFAULT_DEBUFF_TURNS);
+        applyConfusion(DEFAULT_DEBUFF_TURNS);
         break;
       case 116: // ロックダウン (行動不能/麻痺)
-        paralyzedTurns = DEFAULT_DEBUFF_TURNS;
+        applyParalysis(DEFAULT_DEBUFF_TURNS);
         break;
       case 117: // バニッシュ (敵単体 強化全解除)
         // (101:ディスペル と同じ効果)
-        atkBuffTurns = 0; defBuffTurns = 0; spdBuffTurns = 0;
-        senBuffTurns = 0; lckBuffTurns = 0; evaBuffTurns = 0;
-        hpRegenTurns = 0; tpRegenTurns = 0;
+        clearStandardBuffs();
         break;
       case 118: // ワールド・ダウン (敵全体 全能力 0.7倍)
-        atkDebuffRate = 0.7; atkDebuffTurns = DEFAULT_DEBUFF_TURNS;
-        defDebuffRate = 0.7; defDebuffTurns = DEFAULT_DEBUFF_TURNS;
-        spdDebuffRate = 0.7; spdDebuffTurns = DEFAULT_DEBUFF_TURNS;
-        senDebuffRate = 0.7; senDebuffTurns = DEFAULT_DEBUFF_TURNS;
-        lckDebuffRate = 0.7; lckDebuffTurns = DEFAULT_DEBUFF_TURNS;
+        applyAttackDebuff(0.7, DEFAULT_DEBUFF_TURNS);
+        applyDefenseDebuff(0.7, DEFAULT_DEBUFF_TURNS);
+        applySpeedDebuff(0.7, DEFAULT_DEBUFF_TURNS);
+        applySenseDebuff(0.7, DEFAULT_DEBUFF_TURNS);
+        applyLuckDebuff(0.7, DEFAULT_DEBUFF_TURNS);
         break;
 
         // --- はぐれノイズ ---
       case 122: // かく乱 (混乱)
-        confusedTurns = DEFAULT_DEBUFF_TURNS;
+        applyConfusion(DEFAULT_DEBUFF_TURNS);
         break;
 
         default:
@@ -868,10 +773,10 @@ int Status::caclulateSkillDamage(Status* target, Skill& skill, bool &retIsCrit) 
     int baseDamage = (int)((float)offensiveVal * powerMultiplier);
     
     int damage = baseDamage - (int)effectiveDef;
-    if (target->isDefending) {
+    if (target->isDefending()) {
       damage = (int)(damage * 0.7);
     }
-    if (target->attributeResistTurns > 0) {
+    if (target->getAttributeResistTurns() > 0) {
       damage = damage / 4;
     }
     // 会心ボーナス (1.5倍)
@@ -977,86 +882,30 @@ void Status::checkLevelUpSkills(int oldLevel, int newLevel) {
   }
 
 void Status::UpdateTurn() {
-    // -------------------------
-    // 通常バフ
-    // -------------------------
-    if (atkBuffTurns > 0) atkBuffTurns--;
-    if (defBuffTurns > 0) defBuffTurns--;
-    if (spdBuffTurns > 0) spdBuffTurns--;
-    if (senBuffTurns > 0) senBuffTurns--;
-    if (lckBuffTurns > 0) lckBuffTurns--;
-    if (evaBuffTurns > 0) evaBuffTurns--;
-
-    if (hpRegenTurns > 0) hpRegenTurns--;
-    if (tpRegenTurns > 0) tpRegenTurns--;
-
-    // -------------------------
-    // 特殊なターン制バフ
-    // -------------------------
-    if (coverTurns > 0) coverTurns--;
-    if (tauntTurns > 0) tauntTurns--;
-    if (untargetableTurns > 0) untargetableTurns--;
-    if (counterTurns > 0) counterTurns--;
-    if (physDamageOneTurns > 0) physDamageOneTurns--;
-    if (attributeResistTurns > 0) attributeResistTurns--;
-
-    if (invalidDamageTurns > 0) invalidDamageTurns--;
-
-    // 反射系は現状の仕様を維持。
-    // 次のコミットで「ターン制 / 回数制」を整理する。
-
-    // キングス・シールド：ターン制
-    if (reflectAllTurns > 0) reflectAllTurns--;
-
-    // 旋律反射：ターン制
-    if (reflectMagicTurns > 0) reflectMagicTurns--;
-
-    // -------------------------
-    // デバフ
-    // -------------------------
-    if (atkDebuffTurns > 0) atkDebuffTurns--;
-    if (defDebuffTurns > 0) defDebuffTurns--;
-    if (spdDebuffTurns > 0) spdDebuffTurns--;
-    if (senDebuffTurns > 0) senDebuffTurns--;
-    if (lckDebuffTurns > 0) lckDebuffTurns--;
-
-    // -------------------------
-    // 状態異常
-    // -------------------------
-    if (poisonTurns > 0) {
-      poisonTurns--;
-
-      if (poisonTurns == 0) {
-        poisonLevel = 0;
-      }
-    }
-
-    if (paralyzedTurns > 0) paralyzedTurns--;
-    if (silencedTurns > 0) silencedTurns--;
-    if (confusedTurns > 0) confusedTurns--;
+    statusEffects.updateTurn();
   }
 
 int Status::ApplyTurnEffects() {
     int value = 0;
 
-    if (hpRegenTurns > 0) {
+    if (statusEffects.getHpRegenTurns() > 0) {
       int heal = getMaxHp() * 0.1;
       if (heal < 1) heal = 1;
       ReceiveHeal(heal);
       value = -heal;
     }
 
-    if (tpRegenTurns > 0) {
+    if (statusEffects.getTpRegenTurns() > 0) {
       ReceiveTP(getMaxTp() * 0.05);
     }
 
-    if (poisonTurns > 0) {
-      int poisonRate = (poisonLevel >= 2) ? 20 : 10;
+    if (statusEffects.getPoisonTurns() > 0) {
+      int poisonRate = (statusEffects.getPoisonLevel() >= 2) ? 20 : 10;
       int poisonDmg = getMaxHp() * poisonRate / 100;
 
       if (poisonDmg < 1) poisonDmg = 1;
 
-      if (attributeResistTurns > 0) {
+      if (statusEffects.getAttributeResistTurns() > 0) {
         poisonDmg /= 2;
         if (poisonDmg < 1) poisonDmg = 1;
       }
@@ -1150,3 +999,175 @@ Status::~Status() {
 const Status::EvolutionRule* const Status::evolutionTable = EvolutionCatalog::getRules().rules;
 // サイズも同様に定義
 const int Status::evolutionRuleCount = EvolutionCatalog::RULE_COUNT;
+
+int Status::getPoisonLevel() const { return statusEffects.getPoisonLevel(); }
+
+int Status::getCoverTurns() const { return statusEffects.getCoverTurns(); }
+
+float Status::getAtkBuffRate() const { return statusEffects.getAtkBuffRate(); }
+
+int Status::getAtkBuffTurns() const { return statusEffects.getAtkBuffTurns(); }
+
+float Status::getDefBuffRate() const { return statusEffects.getDefBuffRate(); }
+
+int Status::getDefBuffTurns() const { return statusEffects.getDefBuffTurns(); }
+
+float Status::getSpdBuffRate() const { return statusEffects.getSpdBuffRate(); }
+
+int Status::getSpdBuffTurns() const { return statusEffects.getSpdBuffTurns(); }
+
+float Status::getSenBuffRate() const { return statusEffects.getSenBuffRate(); }
+
+int Status::getSenBuffTurns() const { return statusEffects.getSenBuffTurns(); }
+
+float Status::getLckBuffRate() const { return statusEffects.getLckBuffRate(); }
+
+int Status::getLckBuffTurns() const { return statusEffects.getLckBuffTurns(); }
+
+float Status::getEvaBuffRate() const { return statusEffects.getEvaBuffRate(); }
+
+int Status::getEvaBuffTurns() const { return statusEffects.getEvaBuffTurns(); }
+
+float Status::getAtkDebuffRate() const { return statusEffects.getAtkDebuffRate(); }
+
+int Status::getAtkDebuffTurns() const { return statusEffects.getAtkDebuffTurns(); }
+
+float Status::getDefDebuffRate() const { return statusEffects.getDefDebuffRate(); }
+
+int Status::getDefDebuffTurns() const { return statusEffects.getDefDebuffTurns(); }
+
+float Status::getSpdDebuffRate() const { return statusEffects.getSpdDebuffRate(); }
+
+int Status::getSpdDebuffTurns() const { return statusEffects.getSpdDebuffTurns(); }
+
+float Status::getSenDebuffRate() const { return statusEffects.getSenDebuffRate(); }
+
+int Status::getSenDebuffTurns() const { return statusEffects.getSenDebuffTurns(); }
+
+float Status::getLckDebuffRate() const { return statusEffects.getLckDebuffRate(); }
+
+int Status::getLckDebuffTurns() const { return statusEffects.getLckDebuffTurns(); }
+
+int Status::getHpRegenTurns() const { return statusEffects.getHpRegenTurns(); }
+
+int Status::getTpRegenTurns() const { return statusEffects.getTpRegenTurns(); }
+
+int Status::getInvalidDamageTurns() const { return statusEffects.getInvalidDamageTurns(); }
+
+int Status::getReflectPhysicalTurns() const { return statusEffects.getReflectPhysicalTurns(); }
+
+int Status::getReflectMagicTurns() const { return statusEffects.getReflectMagicTurns(); }
+
+int Status::getTauntTurns() const { return statusEffects.getTauntTurns(); }
+
+int Status::getTwoActionsTurns() const { return statusEffects.getTwoActionsTurns(); }
+
+int Status::getUntargetableTurns() const { return statusEffects.getUntargetableTurns(); }
+
+int Status::getPhysDamageOneTurns() const { return statusEffects.getPhysDamageOneTurns(); }
+
+int Status::getEndureTurns() const { return statusEffects.getEndureTurns(); }
+
+int Status::getCounterTurns() const { return statusEffects.getCounterTurns(); }
+
+int Status::getAutoReviveTurns() const { return statusEffects.getAutoReviveTurns(); }
+
+int Status::getStatusImmuneTurns() const { return statusEffects.getStatusImmuneTurns(); }
+
+int Status::getAttributeResistTurns() const { return statusEffects.getAttributeResistTurns(); }
+
+int Status::getCantMoveTurns() const { return statusEffects.getCantMoveTurns(); }
+
+int Status::getReflectAllTurns() const { return statusEffects.getReflectAllTurns(); }
+
+int Status::getDamageGuardCount() const { return statusEffects.getDamageGuardCount(); }
+
+bool Status::hasDoubleAction() const { return statusEffects.getIsDoubleAction(); }
+
+bool Status::isDefending() const { return statusEffects.getIsDefending(); }
+
+void Status::applyAttackBuff(float rate, int turns) { statusEffects.applyAttackBuff(rate, turns); }
+
+void Status::applyDefenseBuff(float rate, int turns) { statusEffects.applyDefenseBuff(rate, turns); }
+
+void Status::applySpeedBuff(float rate, int turns) { statusEffects.applySpeedBuff(rate, turns); }
+
+void Status::applyLuckBuff(float rate, int turns) { statusEffects.applyLuckBuff(rate, turns); }
+
+void Status::applyEvasionBuff(float rate, int turns) { statusEffects.applyEvasionBuff(rate, turns); }
+
+void Status::applyAttackDebuff(float rate, int turns) { statusEffects.applyAttackDebuff(rate, turns); }
+
+void Status::applyDefenseDebuff(float rate, int turns) { statusEffects.applyDefenseDebuff(rate, turns); }
+
+void Status::applySpeedDebuff(float rate, int turns) { statusEffects.applySpeedDebuff(rate, turns); }
+
+void Status::applySenseDebuff(float rate, int turns) { statusEffects.applySenseDebuff(rate, turns); }
+
+void Status::applyLuckDebuff(float rate, int turns) { statusEffects.applyLuckDebuff(rate, turns); }
+
+void Status::applyCover(int turns) { statusEffects.applyCover(turns); }
+
+void Status::applyAllReflection(int turns) { statusEffects.applyAllReflection(turns); }
+
+void Status::applyUntargetable(int turns) { statusEffects.applyUntargetable(turns); }
+
+void Status::applyTaunt(int turns) { statusEffects.applyTaunt(turns); }
+
+void Status::applyPhysicalReflection(int turns) { statusEffects.applyPhysicalReflection(turns); }
+
+void Status::applyCounter(int turns) { statusEffects.applyCounter(turns); }
+
+void Status::applyDamageGuard(int turns) { statusEffects.applyDamageGuard(turns); }
+
+void Status::applyPhysicalDamageOne(int turns) { statusEffects.applyPhysicalDamageOne(turns); }
+
+void Status::applyHpRegeneration(int turns) { statusEffects.applyHpRegeneration(turns); }
+
+void Status::applyLastStand(int turns) { statusEffects.applyLastStand(turns); }
+
+void Status::applyAutoRevive(int turns) { statusEffects.applyAutoRevive(turns); }
+
+void Status::applyInvulnerability(int turns) { statusEffects.applyInvulnerability(turns); }
+
+void Status::applyMagicReflection(int turns) { statusEffects.applyMagicReflection(turns); }
+
+void Status::applyAttributeResistance(int turns) { statusEffects.applyAttributeResistance(turns); }
+
+void Status::applyTpRegeneration(int turns) { statusEffects.applyTpRegeneration(turns); }
+
+void Status::applyStatusImmunity(int turns) { statusEffects.applyStatusImmunity(turns); }
+
+void Status::applyParalysis(int turns) { statusEffects.applyParalysis(turns); }
+
+void Status::applySilence(int turns) { statusEffects.applySilence(turns); }
+
+void Status::applyConfusion(int turns) { statusEffects.applyConfusion(turns); }
+
+void Status::applyPoison(int level, int turns) { statusEffects.applyPoison(level, turns); }
+
+void Status::applyDoubleAction(int turns) { statusEffects.applyDoubleAction(turns); }
+
+void Status::clearStandardBuffs() { statusEffects.clearStandardBuffs(); }
+
+void Status::consumeDamageGuard() { statusEffects.consumeDamageGuard(); }
+
+void Status::consumeLastStand() { statusEffects.consumeLastStand(); }
+
+void Status::consumeStatusImmunity() { statusEffects.consumeStatusImmunity(); }
+
+void Status::consumePhysicalReflection() { statusEffects.consumePhysicalReflection(); }
+
+void Status::consumeAutoRevive() { statusEffects.consumeAutoRevive(); }
+
+void Status::consumeBlockedAction() { statusEffects.consumeBlockedAction(); }
+
+void Status::applyActionBlock(int turns) { statusEffects.applyActionBlock(turns); }
+
+void Status::enableDoubleAction() { statusEffects.enableDoubleAction(); }
+
+void Status::consumeDoubleAction() { statusEffects.consumeDoubleAction(); }
+
+void Status::beginDefense() { statusEffects.beginDefense(); }
+
+void Status::endDefense() { statusEffects.endDefense(); }

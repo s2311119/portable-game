@@ -1521,18 +1521,18 @@ private:
     // --- 1. 挑発 (Taunt) ---
     Status* tauntTarget = nullptr;
     if (originalTarget->isPlayer()) { // 敵→味方
-         if (originalTarget->tauntTurns > 0) return originalTarget;
-         if (heroRef && heroRef->status->tauntTurns > 0 && heroRef->status->getHp() > 0) tauntTarget = heroRef->status;
+         if (originalTarget->getTauntTurns() > 0) return originalTarget;
+         if (heroRef && heroRef->status->getTauntTurns() > 0 && heroRef->status->getHp() > 0) tauntTarget = heroRef->status;
          if (partyRef) {
              for (auto* ally : partyRef->members) {
-                 if (ally && ally->status->tauntTurns > 0 && ally->status->getHp() > 0) tauntTarget = ally->status;
+                 if (ally && ally->status->getTauntTurns() > 0 && ally->status->getHp() > 0) tauntTarget = ally->status;
              }
          }
     } else { // 味方→敵
-         if (originalTarget->tauntTurns > 0) return originalTarget;
+         if (originalTarget->getTauntTurns() > 0) return originalTarget;
          std::vector<Status*> taunters;
          for (auto* enemy : activeEnemies) {
-             if (enemy && enemy->status && enemy->status->tauntTurns > 0 && enemy->status->getHp() > 0) {
+             if (enemy && enemy->status && enemy->status->getTauntTurns() > 0 && enemy->status->getHp() > 0) {
                  taunters.push_back(enemy->status);
              }
          }
@@ -1542,7 +1542,7 @@ private:
 
     // --- 2. ステルス (Untargetable) ---
     // 狙われた人がステルス中なら、別の生存者に逸らす
-    if (originalTarget->untargetableTurns > 0) {
+    if (originalTarget->getUntargetableTurns() > 0) {
          std::vector<Status*> others;
          if (originalTarget->isPlayer()) {
              // 主人公・仲間から「自分以外」かつ「生存者」を探す
@@ -1567,9 +1567,9 @@ private:
     // 味方限定
     if (originalTarget->isPlayer()) {
          // 誰かが「かばう」発動中か？
-         if (heroRef->status != originalTarget && heroRef->status->coverTurns > 0 && heroRef->status->getHp() > 0) return heroRef->status;
+         if (heroRef->status != originalTarget && heroRef->status->getCoverTurns() > 0 && heroRef->status->getHp() > 0) return heroRef->status;
          for (auto* ally : partyRef->members) {
-             if (ally->status != originalTarget && ally->status->coverTurns > 0 && ally->status->getHp() > 0) return ally->status;
+             if (ally->status != originalTarget && ally->status->getCoverTurns() > 0 && ally->status->getHp() > 0) return ally->status;
          }
     }
 
@@ -1616,23 +1616,23 @@ private:
     if (isOffensive) {
       // キングス・シールド：
       // 有効ターン中は物理・旋律を何度でも反射する
-      if (defender->reflectAllTurns > 0) {
+      if (defender->getReflectAllTurns() > 0) {
         isReflected = true;
       }
 
       // リフレクト：
       // 物理攻撃を1回だけ反射して、その場で消費する
-      else if (defender->reflectPhysicalTurns > 0 &&
+      else if (defender->getReflectPhysicalTurns() > 0 &&
               skill.category == Skill::Category::PHYSICAL)
       {
         isReflected = true;
-        defender->reflectPhysicalTurns = 0;
+        defender->consumePhysicalReflection();
       }
 
       // 旋律反射：
       // 有効ターン中は旋律攻撃を反射する
       // 反射した回数ではなくUpdateTurn()で寿命を減らす
-      else if (defender->reflectMagicTurns > 0 &&
+      else if (defender->getReflectMagicTurns() > 0 &&
               skill.category == Skill::Category::MELODY)
       {
         isReflected = true;
@@ -1674,7 +1674,7 @@ private:
     // 実際に物理ダメージを受けたときだけ反撃
     if (tookDamage &&
         defender->getHp() > 0 &&
-        defender->counterTurns > 0 &&
+        defender->getCounterTurns() > 0 &&
         skill.category == Skill::Category::PHYSICAL &&
         defender != attacker)
     {
@@ -2386,8 +2386,8 @@ public:
         }
         if (currentActor->getHp() <= 0) {
           // オートリバイブ判定
-          if (currentActor->autoReviveTurns > 0) {
-            currentActor->autoReviveTurns = 0; // 効果消費
+          if (currentActor->getAutoReviveTurns() > 0) {
+            currentActor->consumeAutoRevive(); // 効果消費
             currentActor->Revive(50); // HP半分で復活
             music.playSE(7);
             message += "\n" + String(currentActor->getname()) + " は自動蘇生した！";
@@ -2400,14 +2400,14 @@ public:
         }
 
         // 3. 強制行動不能チェック
-        if (currentActor->cantMoveTurns > 0) {
+        if (currentActor->getCantMoveTurns() > 0) {
           if (message != "") {
             message += "\n";
           }
 
           message += String(currentActor->getname()) + " は動けない！";
 
-          currentActor->cantMoveTurns--;
+          currentActor->consumeBlockedAction();
 
           messageFlow = MessageFlow::END_TURN;
           currentBattleState = STATE_ACTION_MSG;
@@ -2533,7 +2533,7 @@ public:
             }
           }
           else if (who == 82) { // ハーベスト・スティンガー
-            if (currentTarget && currentTarget->poisonTurns > 0) selectedSkillIndex = findSkillIndex(42);
+            if (currentTarget && currentTarget->getPoisonTurns() > 0) selectedSkillIndex = findSkillIndex(42);
             else if (random(100) < 70) {
               int r = random(3);
               if (r==0) selectedSkillIndex = findSkillIndex(105); 
@@ -2718,7 +2718,7 @@ public:
 
         // ★このキャラの実際の行動順が来たので、
         // 前回の「ぼうぎょ」をここで解除する
-        currentActor->isDefending = false;
+        currentActor->endDefense();
 
         // 行動前に倒されていたキャラはスキップ
         if (currentActor->getHp() <= 0) {
@@ -2776,7 +2776,7 @@ public:
         }
         if (pendingActionType == ActionType::DEFEND) { // 防御
           // 1. 防御フラグを立てる
-          currentActor->isDefending = true;
+          currentActor->beginDefense();
 
           // 2. 音とメッセージ
           music.playSE(5); // 何か適当な音（物理防御音など）
@@ -3149,9 +3149,9 @@ public:
 
         // 行動後フラグ処理
         if (currentSkill.id == 126) {
-          currentActor->cantMoveTurns = 1;
+          currentActor->applyActionBlock(1);
         }
-        if (currentSkill.id == 85) currentActor->isDoubleAction = true; 
+        if (currentSkill.id == 85) currentActor->enableDoubleAction(); 
 
         // 振動処理
         if (currentTarget && !currentTarget->popupValues.empty()) {
@@ -3299,9 +3299,9 @@ public:
         if (messageFlow == MessageFlow::ACTION_COMPLETE &&
             currentActor != nullptr &&
             currentActor->getHp() > 0 &&
-            currentActor->isDoubleAction)
+            currentActor->hasDoubleAction())
         {
-          currentActor->isDoubleAction = false;
+          currentActor->consumeDoubleAction();
 
           // 前の行動情報をクリア
           pendingActionType = ActionType::NONE;
