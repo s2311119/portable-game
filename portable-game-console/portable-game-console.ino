@@ -18,7 +18,7 @@
 #include "Graphic.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
-#include "Encounter.h"
+#include "EncounterManager.h"
 #include "EncounterSpec.h"
 #include "Exploration.h"
 #include "FieldEventHandler.h"
@@ -3352,7 +3352,7 @@ struct GameContext {
   MUSIC* music;
   Sd* sd;
   Menu* menu;
-  Encounter* encounter;
+  EncounterManager* encounterManager;
   Exploration exploration;
   FieldEventHandler fieldEventHandler;
   FloorManager floorManager;
@@ -4241,7 +4241,7 @@ void setup() {
 
   // 共通初期化
   ctx->menu = new Menu();
-  ctx->encounter = new Encounter();
+  ctx->encounterManager = new EncounterManager();
   ctx->battle = new Battle();
 
   // Graphicクラスへ階層通知
@@ -4288,7 +4288,7 @@ void loop() {
   auto& hero = ctx->session->player();
   auto& ctrl = *ctx->controller;
   auto& menu = *ctx->menu;
-  auto& encounter = *ctx->encounter;
+  auto& encounterManager = *ctx->encounterManager;
   auto& inventory = ctx->session->inventory();
   auto& party = ctx->session->party();
   auto& storage = ctx->session->storage();
@@ -4323,13 +4323,13 @@ void loop() {
     // 3. 移動していて、メニューが開いていない場合のみイベントとエンカウントをチェック
     if (moved && !menu.active) {
       // 5. イベントが発生しなかった場合のみ、エンカウントをチェック
-      if (!eventOccurred && !map.isTown()) {
-        if (!map.isBossRoom() &&
-            encounter.checkEncounter()) {
-          vib.trigger(300);
-          state = STATE_BATTLE;
-          ctx->battle->start(music, sd, hero, party, ctx->session->progress().floor(), imgmgr, map);
-        }
+      EncounterRandom encounterRandom = {nullptr,
+                                         field_random_adapter::drawMax,
+                                         field_random_adapter::drawRange};
+      if (!eventOccurred && encounterManager.onStep(map, encounterRandom)) {
+        vib.trigger(300);
+        state = STATE_BATTLE;
+        ctx->battle->start(music, sd, hero, party, ctx->session->progress().floor(), imgmgr, map);
       }
     }
 
