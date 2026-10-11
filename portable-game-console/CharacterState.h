@@ -89,6 +89,10 @@ public:
 
   void forceLearnSkill(int skillId);
   CharacterState(int level, int w);
+  CharacterState(const CharacterState&) = delete;
+  CharacterState& operator=(const CharacterState&) = delete;
+  CharacterState(CharacterState&&) noexcept;
+  CharacterState& operator=(CharacterState&&) noexcept;
 
   void clearBattleEffects();
   void applyMaxHpIncrease(int increasedMaxHp, int increasedHp);

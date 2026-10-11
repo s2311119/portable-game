@@ -3,6 +3,10 @@
 
 Automaton::Automaton(int level, int w) : stateValue(level, w) {}
 
+Automaton::Automaton(Automaton&&) noexcept = default;
+
+Automaton& Automaton::operator=(Automaton&&) noexcept = default;
+
 CharacterState& Automaton::state() { return stateValue; }
 
 const CharacterState& Automaton::state() const { return stateValue; }

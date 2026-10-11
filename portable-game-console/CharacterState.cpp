@@ -273,6 +273,10 @@ void CharacterState::clearPopups() {
     popupValues.clear();
   }
 
+CharacterState::CharacterState(CharacterState&&) noexcept = default;
+
+CharacterState& CharacterState::operator=(CharacterState&&) noexcept = default;
+
 CharacterState::~CharacterState() {
     skillSet.releaseStorage();
     
