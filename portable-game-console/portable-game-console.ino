@@ -30,6 +30,7 @@
 #include "Sd.h"
 #include "SaveManager.h"
 #include "ImageManager.h"
+#include "GameSession.h"
 #include "MemoryMonitor.h"
 #include <utility>
 
@@ -3329,18 +3330,13 @@ private:
 };
 
 struct GameContext {
-  Map* map;
-  Player* hero;
+  GameSession* session = nullptr;
   Graphic* graphic;
   Controller* controller;
   MUSIC* music;
   Sd* sd;
   Menu* menu;
   Encounter* encounter;
-  Inventory* inventory;
-  Party* party;
-  AutomatonStorage storage;
-  WorldProgress progress;
   FloorManager floorManager;
   GameState state;
   EventType currentEvent = EVENT_NONE;
@@ -3360,7 +3356,7 @@ void applyFloorMapConfig(GameContext* ctx);
 void applyFloorMapConfig(GameContext* ctx)
 {
   FloorMapConfig config =
-      ctx->floorManager.getConfig(ctx->progress);
+      ctx->floorManager.getConfig(ctx->session->progress());
 
   ctx->music->switchTrack(
       config.type == Map::TYPE_TOWN ? 0 : 1,
@@ -3368,17 +3364,17 @@ void applyFloorMapConfig(GameContext* ctx)
   );
 
   ctx->graphic->setFloor(
-      ctx->progress.floor()
+      ctx->session->progress().floor()
   );
 
-  ctx->map->regenerate(
+  ctx->session->map().regenerate(
       config.width,
       config.height,
       config.type,
-      ctx->progress.floor()
+      ctx->session->progress().floor()
   );
 
-  ctx->hero->reset(*ctx->map);
+  ctx->session->player().reset(ctx->session->map());
 }
 
 // タイマー割り込み関数
@@ -4124,12 +4120,12 @@ void setup() {
         ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
       } else {
         // ロード用の仮オブジェクト生成
-        ctx->map = new Map(20, 20, Map::TYPE_TOWN, ctx->progress.floor());
-        ctx->hero = new Player(*ctx->map, 1, 38); 
-        ctx->inventory = new Inventory();
-        ctx->party = new Party();
+        ctx->session = new GameSession();
         
-        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music, *ctx->map, ctx->progress, *ctx->hero, *ctx->party, ctx->storage, *ctx->inventory)) {
+        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music,
+            ctx->session->map(), ctx->session->progress(),
+            ctx->session->player(), ctx->session->party(),
+            ctx->session->storage(), ctx->session->inventory())) {
           loadSuccess = true;
           ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
         } else {
@@ -4172,32 +4168,23 @@ void setup() {
   // 3. ゲーム開始準備
   if (startNewGame) {
     // 新規作成
-    ctx->progress = WorldProgress();
-    if (ctx->map) delete ctx->map;
-    if (ctx->hero) delete ctx->hero;
-    if (ctx->inventory) delete ctx->inventory;
-    if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
-    ctx->storage.clearForRestore();
-    ctx->map = new Map(20, 20, Map::TYPE_TOWN, ctx->progress.floor());
-    
-    ctx->hero = new Player(*ctx->map, 1, 38);
+    if (ctx->session) delete ctx->session;
+    ctx->session = new GameSession();
 
     Map::ObjectPos startPos =
-        ctx->map->getPlayerStartPos();
+        ctx->session->map().getPlayerStartPos();
 
-    ctx->hero->X =
+    ctx->session->player().X =
         startPos.x * Map::TILE_SIZE;
 
-    ctx->hero->Y =
+    ctx->session->player().Y =
         startPos.y * Map::TILE_SIZE;
 
-    ctx->inventory = new Inventory();
     // 初期アイテム
-    ctx->inventory->addItem(ItemCatalog::get(100)); // リペアキット
+    ctx->session->inventory().addItem(ItemCatalog::get(100)); // リペアキット
     
-    ctx->party = new Party();
     Automaton* firstAlly = new Automaton(1, 39);
-    ctx->party->addMember(std::move(*firstAlly));
+    ctx->session->party().addMember(std::move(*firstAlly));
     delete firstAlly;
   }
 
@@ -4207,13 +4194,13 @@ void setup() {
   ctx->battle = new Battle();
 
   // Graphicクラスへ階層通知
-  ctx->graphic->setFloor(ctx->progress.floor());
+  ctx->graphic->setFloor(ctx->session->progress().floor());
 
   // 初回描画 (ここもGraphicクラスに任せるので安全)
-  int camX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
-  int camY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
-  ctx->graphic->drawFullBackground(*ctx->map, *ctx->hero, camX, camY);
-  if (ctx->map->isTown()) {
+  int camX = ctx->session->player().X - Graphic::SCREEN_WIDTH / 2;
+  int camY = ctx->session->player().Y - Graphic::SCREEN_HEIGHT / 2;
+  ctx->graphic->drawFullBackground(ctx->session->map(), ctx->session->player(), camX, camY);
+  if (ctx->session->map().isTown()) {
     // 集落なら bgm_0.raw
     ctx->music->switchTrack(0, *ctx->sd); 
   } else {
@@ -4233,27 +4220,27 @@ void loop() {
 
     // MapとHeroの内容だけ再初期化（new/deleteなし）
     noInterrupts();
-    ctx->map->regenerate(20, 20, Map::TYPE_DUNGEON, ctx->progress.floor());
-    ctx->hero->reset(*ctx->map);
+    ctx->session->map().regenerate(20, 20, Map::TYPE_DUNGEON, ctx->session->progress().floor());
+    ctx->session->player().reset(ctx->session->map());
 
-    ctx->graphic->setFloor(ctx->progress.floor());
+    ctx->graphic->setFloor(ctx->session->progress().floor());
 
-    int cameraX = ctx->hero->X - Graphic::SCREEN_WIDTH / 2;
-    int cameraY = ctx->hero->Y - Graphic::SCREEN_HEIGHT / 2;
-    ctx->graphic->invalidateAndRedraw(*ctx->map, *ctx->hero, cameraX, cameraY);
+    int cameraX = ctx->session->player().X - Graphic::SCREEN_WIDTH / 2;
+    int cameraY = ctx->session->player().Y - Graphic::SCREEN_HEIGHT / 2;
+    ctx->graphic->invalidateAndRedraw(ctx->session->map(), ctx->session->player(), cameraX, cameraY);
     interrupts();
   }
   static GameState prevState = STATE_GAME;
   static int gameOverCursor = 0;
   auto& g = *ctx->graphic;
-  auto& map = *ctx->map;
-  auto& hero = *ctx->hero;
+  auto& map = ctx->session->map();
+  auto& hero = ctx->session->player();
   auto& ctrl = *ctx->controller;
   auto& menu = *ctx->menu;
   auto& encounter = *ctx->encounter;
-  auto& inventory = *ctx->inventory;
-  auto& party = *ctx->party;
-  auto& storage = ctx->storage;
+  auto& inventory = ctx->session->inventory();
+  auto& party = ctx->session->party();
+  auto& storage = ctx->session->storage();
   auto& state = ctx->state;
   auto& music = *ctx->music;
   auto& sd = *ctx->sd;
@@ -4289,7 +4276,7 @@ void loop() {
             encounter.checkEncounter()) {
           vib.trigger(300);
           state = STATE_BATTLE;
-          ctx->battle->start(music, sd, hero, party, ctx->progress.floor(), imgmgr, map);
+          ctx->battle->start(music, sd, hero, party, ctx->session->progress().floor(), imgmgr, map);
         }
       }
     }
@@ -4309,7 +4296,7 @@ void loop() {
 
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
-    menu.update(ctrl, inventory, hero, party, storage, map, ctx->progress, music, sd, save, settings, vib);
+    menu.update(ctrl, inventory, hero, party, storage, map, ctx->session->progress(), music, sd, save, settings, vib);
     //g.screenSprite.fillScreen(TFT_BLACK);
     menu.draw(&g, inventory, hero, party, storage, settings);
     //g.screenSprite.pushSprite(0,0);
@@ -4323,7 +4310,7 @@ void loop() {
 
   else if (state == STATE_BATTLE) {
     auto &battle = *ctx->battle;
-    battle.update(ctrl, state, music, sd, hero, inventory, vib, map, ctx->progress, g);
+    battle.update(ctrl, state, music, sd, hero, inventory, vib, map, ctx->session->progress(), g);
     battle.draw(&g);
     //g.screenSprite.pushSprite(0, 0);
   }
@@ -4346,7 +4333,7 @@ void loop() {
         map.setTile(heroTileX, heroTileY, Map::TILE_BOX_OPEN);
           
         // 2. 中身の抽選
-        int floor = ctx->progress.floor();
+        int floor = ctx->session->progress().floor();
         int itemId = 0;
         int r = random(100);
 
@@ -4419,7 +4406,7 @@ void loop() {
       }
 
       case EVENT_STAIR_UP: {
-        if (ctx->floorManager.moveUp(ctx->progress)) {
+        if (ctx->floorManager.moveUp(ctx->session->progress())) {
           applyFloorMapConfig(ctx);
         }
 
@@ -4429,7 +4416,7 @@ void loop() {
       }
 
       case EVENT_STAIR_DOWN: {
-        if (ctx->floorManager.moveDown(ctx->progress)) {
+        if (ctx->floorManager.moveDown(ctx->session->progress())) {
           applyFloorMapConfig(ctx);
         }
 
@@ -4510,22 +4497,22 @@ void loop() {
       case EVENT_BOSS_BATTLE: {
 
         int bossIndex =
-            (ctx->progress.floor() / 10) - 1;
+            (ctx->session->progress().floor() / 10) - 1;
 
         // 撃破済みボスのタイルが何らかの理由で残っていた場合
-        if (ctx->progress.floor() >= 10 &&
-            ctx->progress.floor() <= 50 &&
-            ctx->progress.floor() % 10 == 0 &&
+        if (ctx->session->progress().floor() >= 10 &&
+            ctx->session->progress().floor() <= 50 &&
+            ctx->session->progress().floor() % 10 == 0 &&
             bossIndex >= 0 &&
             bossIndex < 5 &&
-            ctx->progress.bosses().isDefeated(bossIndex))
+            ctx->session->progress().bosses().isDefeated(bossIndex))
         {
           // ボスを復活させず、集落へ補正する
           map.regenerate(
               20,
               20,
               Map::TYPE_TOWN,
-              ctx->progress.floor()
+              ctx->session->progress().floor()
           );
           hero.reset(map);
 
@@ -4546,7 +4533,7 @@ void loop() {
             sd,
             hero,
             party,
-            ctx->progress.floor(),
+            ctx->session->progress().floor(),
             imgmgr,
             map
         );
