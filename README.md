@@ -3331,7 +3331,9 @@ Gameへ結果を返す。
 enum class MenuFlowResult {
     NONE,
     CLOSE_MENU,
-    REQUEST_SAVE
+    REQUEST_SAVE,
+    SETTINGS_CHANGED,
+    SAVE_SETTINGS
 };
 ```
 
@@ -3502,7 +3504,7 @@ REQUEST_SAVE
 Game：
 
 ```cpp
-saveManager.save(session);
+saveManager.saveGame(session);
 ```
 
 を実行する。
@@ -5455,11 +5457,11 @@ private:
 `GameState` は、
 
 ```text
-STATE_GAME
-STATE_MENU
-STATE_BATTLE
-STATE_EVENT
-STATE_GAME_OVER
+GAME
+MENU
+BATTLE
+EVENT
+GAME_OVER
 ```
 
 などの、
@@ -5515,7 +5517,7 @@ if (state == GameState::MENU) {
     if (result ==
         MenuFlowResult::REQUEST_SAVE)
     {
-        saveManager.save(
+        saveManager.saveGame(
             session
         );
     }
@@ -6310,12 +6312,6 @@ EncounterSpec --> BattleKind
 Battle --> BattleKind
 Battle ..> BattleResult
 
-EventManager --> WorldProgress
-EventManager --> Map
-EventManager --> Player
-EventManager --> Inventory
-EventManager --> Party
-EventManager --> AutomatonStorage
 FloorManager --> WorldProgress
 
 Game *-- Exploration
@@ -9165,124 +9161,3 @@ Git historyが
 
 な状態を完成とする。
 
-# 44. 現時点で未確定の設計
-
-以下は今後の議論で確定する。
-
-```text
-最終的な.h / .cpp一覧
-
-Arduino Project内の
-file / folder構成
-
-Domain
-Catalog
-System
-UI
-Renderer
-Hardware Service
-Persistence
-
-をfolder分けするか
-
-Arduino IDEとの相性を考えて
-flat構成にするか
-
-どの型を
-独立headerへ置くか
-
-DTO / Result / enumを
-どこへ置くか
-
-どのclassを
-header-onlyにするか
-
-Catalog実装を
-.h / .cppのどちらへ置くか
-
-実際のrefactoring移行順序
-
-各Phaseの完了条件
-
-各Phaseで
-どのclassから分離するか
-
-Audio / Storageの
-安全な移行時期
-
-Workへ渡す
-execution brief
-```
-
----
-
-# 45. 次に議論する内容
-
-次は、
-
-> 最終的なファイル / フォルダ構成
-
-を設計する。
-
-主な検討項目：
-
-```text
-最終的に
-何個の.h / .cppを作るか
-
-1 class = 1 file
-をどこまで適用するか
-
-enum / Result / DTOを
-どのfileへ置くか
-
-Domain Model
-
-Catalog
-
-Game Rule / System
-
-Game Flow
-
-UI Logic
-
-Renderer
-
-Hardware / I/O
-
-Persistence
-
-をfolderで分離するか
-
-Arduino IDEで扱いやすい
-flat構成を優先するか
-
-header-onlyにするclass
-
-.cppを持たせるclass
-
-Catalogの巨大switch / tableを
-どこへ置くか
-
-include cycleを
-どう避けるか
-
-forward declarationを
-どこで使用するか
-```
-
-ファイル構成を確定した後、
-
-```text
-移行Phase
-↓
-各Phaseの完了条件
-↓
-commit単位
-↓
-Work execution brief
-↓
-Workへ引き渡し
-```
-
-の順で仕上げる。
