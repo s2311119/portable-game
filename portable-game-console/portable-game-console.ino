@@ -574,7 +574,7 @@ public:
     // -------------------------------------------------
     // 2. 主人公
     // -------------------------------------------------
-    hero.status->saveTo(file);
+    hero.state().saveTo(file);
 
     // -------------------------------------------------
     // 3. インベントリ
@@ -796,7 +796,7 @@ public:
     // -------------------------------------------------
     // 主人公
     // -------------------------------------------------
-    hero.status->loadFrom(file);
+    hero.state().loadFrom(file);
 
     // -------------------------------------------------
     // インベントリ
@@ -1070,7 +1070,7 @@ public:
               int scrollId = 200 + skill.id;
               bool hasScroll = (inventory.countItem(scrollId) > 0);
               bool alreadyLearned = false;
-              alreadyLearned = hero.status->skills().has(skill.id);
+              alreadyLearned = hero.state().skills().has(skill.id);
               uint16_t color = TFT_WHITE;
               if (i == listCursor) color = TFT_YELLOW;
               else if (alreadyLearned) color = TFT_GREEN;
@@ -1090,7 +1090,7 @@ public:
           g->lineSprite.setCursor(x + 20, y + 155);
           g->lineSprite.setTextColor(TFT_WHITE);
           bool isLearned = false;
-          isLearned = hero.status->skills().has(targetSkillId);
+          isLearned = hero.state().skills().has(targetSkillId);
           if (isLearned) { g->lineSprite.setTextColor(TFT_GREEN); g->lineSprite.print("習得済みです"); } 
           else if (scrollCount > 0) { g->lineSprite.setTextColor(TFT_CYAN); g->lineSprite.printf("習得可能！ (所持: %d)", scrollCount); } 
           else { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.setTextSize(1); g->lineSprite.setCursor(x + 20, y + 160); g->lineSprite.printf("必要: %s", ItemCatalog::get(reqScrollId).name); }
@@ -1149,7 +1149,7 @@ public:
           uint16_t color = (listCursor == 0) ? TFT_YELLOW : TFT_WHITE;
           g->lineSprite.setTextColor(color);
           g->lineSprite.setCursor(x + 20, y + 55);
-          g->lineSprite.printf("調律師 HP:%d/%d", hero.status->stats().getHp(), hero.status->stats().getMaxHp());
+          g->lineSprite.printf("調律師 HP:%d/%d", hero.state().stats().getHp(), hero.state().stats().getMaxHp());
 
           for (int i = 0; i < party.members.size(); i++) {
             color = (listCursor == i + 1) ? TFT_YELLOW : TFT_WHITE;
@@ -1236,7 +1236,7 @@ public:
         g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
         g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
         
-        CharacterState* s = hero.status; // 主人公固定
+        CharacterState* s = &hero.state(); // 主人公固定
         
         g->lineSprite.setTextSize(2);
         g->lineSprite.setTextColor(TFT_WHITE);
@@ -1523,7 +1523,7 @@ private:
     CharacterState* tauntTarget = nullptr;
     if (originalTarget->isPlayer()) { // 敵→味方
          if (originalTarget->effects().getTauntTurns() > 0) return originalTarget;
-         if (heroRef && heroRef->status->effects().getTauntTurns() > 0 && heroRef->status->stats().getHp() > 0) tauntTarget = heroRef->status;
+         if (heroRef && heroRef->state().effects().getTauntTurns() > 0 && heroRef->state().stats().getHp() > 0) tauntTarget = &heroRef->state();
          if (partyRef) {
              for (auto* ally : partyRef->members) {
                  if (ally && ally->status->effects().getTauntTurns() > 0 && ally->status->stats().getHp() > 0) tauntTarget = ally->status;
@@ -1547,7 +1547,7 @@ private:
          std::vector<CharacterState*> others;
          if (originalTarget->isPlayer()) {
              // 主人公・仲間から「自分以外」かつ「生存者」を探す
-             if (heroRef->status != originalTarget && heroRef->status->stats().getHp() > 0) others.push_back(heroRef->status);
+             if (&heroRef->state() != originalTarget && heroRef->state().stats().getHp() > 0) others.push_back(&heroRef->state());
              for (auto* m : partyRef->members) {
                  if (m->status != originalTarget && m->status->stats().getHp() > 0) others.push_back(m->status);
              }
@@ -1568,7 +1568,7 @@ private:
     // 味方限定
     if (originalTarget->isPlayer()) {
          // 誰かが「かばう」発動中か？
-         if (heroRef->status != originalTarget && heroRef->status->effects().getCoverTurns() > 0 && heroRef->status->stats().getHp() > 0) return heroRef->status;
+         if (&heroRef->state() != originalTarget && heroRef->state().effects().getCoverTurns() > 0 && heroRef->state().stats().getHp() > 0) return &heroRef->state();
          for (auto* ally : partyRef->members) {
              if (ally->status != originalTarget && ally->status->effects().getCoverTurns() > 0 && ally->status->stats().getHp() > 0) return ally->status;
          }
@@ -2024,7 +2024,7 @@ public:
     critical_section_exit(&sdLock);
     // ★ 行動順リストを作成 (ソートはしない)
     actorList.clear();
-    actorList.push_back(hero.status);
+    actorList.push_back(&hero.state());
     for (auto ally : party.members) {
       actorList.push_back(ally->status);
     }
@@ -2746,7 +2746,7 @@ public:
 
         messageFlow = MessageFlow::ACTION_COMPLETE;
         // ポップアップを安全にクリア
-        if (heroRef && heroRef->status) heroRef->status->clearPopups();
+        if (heroRef) heroRef->state().clearPopups();
         if (partyRef) {
             for(auto m : partyRef->members) if(m && m->status) m->status->clearPopups();
         }
@@ -3169,7 +3169,7 @@ public:
       // 11. 行動結果のメッセージ表示 (待機のみ)
       case STATE_ACTION_MSG:
         if (aPressed) {
-          hero.status->clearPopups();
+          hero.state().clearPopups();
 
           for (auto m : party.members) {
             m->status->clearPopups();
@@ -3220,7 +3220,7 @@ public:
         // -------------------------
         bool anyoneAlive = false;
 
-        if (hero.status->stats().getHp() > 0) {
+        if (hero.state().stats().getHp() > 0) {
           anyoneAlive = true;
         }
 
@@ -3364,9 +3364,9 @@ public:
           resultMessages.push_back(String(lastGainedXP) + "Expを得た!");
           
           // 2. レベルアップ・進化判定 (主人公)
-          if (hero.status->stats().getHp() > 0) {
-            const ProgressionResult res = CharacterProgressionSystem::gainExperience(*hero.status, lastGainedXP);
-            if (res.newLevel > res.oldLevel) resultMessages.push_back("調律師はLv" + String(hero.status->progress().level()) + "になった!");
+          if (hero.state().stats().getHp() > 0) {
+            const ProgressionResult res = CharacterProgressionSystem::gainExperience(hero.state(), lastGainedXP);
+            if (res.newLevel > res.oldLevel) resultMessages.push_back("調律師はLv" + String(hero.state().progress().level()) + "になった!");
           }
           // 3. レベルアップ・進化判定 (仲間)
           for(auto ally : party.members) {
@@ -3446,8 +3446,8 @@ public:
           }
           
           // 戦闘終了時にステータスをリセット
-          hero.status->clearBattleEffects();
-          std::vector<CharacterState::PopupData>().swap(hero.status->popupValues);
+          hero.state().clearBattleEffects();
+          std::vector<CharacterState::PopupData>().swap(hero.state().popupValues);
           for(auto m : party.members) {
             m->status->clearBattleEffects();
             std::vector<CharacterState::PopupData>().swap(m->status->popupValues);
@@ -3521,7 +3521,7 @@ public:
         g->lineSprite.setTextSize(2);
 
         CharacterState* s = nullptr;
-        if (statusPage == 0) s = hero.status;
+        if (statusPage == 0) s = &hero.state();
         else if (statusPage - 1 < party.members.size()) s = party.members[statusPage - 1]->status;
         
         if (s != nullptr) {
@@ -3627,8 +3627,8 @@ public:
         const int heroY = 20 - drawY; // 右上
         
         // 主人公
-        if (hero.status->stats().getHp() > 0 || !hero.status->popupValues.empty()) {
-          if (hero.status->stats().getHp() > 0) {
+        if (hero.state().stats().getHp() > 0 || !hero.state().popupValues.empty()) {
+          if (hero.state().stats().getHp() > 0) {
             //uint16_t* img = (!allyImages.empty()) ? allyImages[0] : nullptr;
             uint16_t* img = activeImages[4];
             g->lineSprite.fillEllipse(heroX + 32, heroY + 60, 24, 8, TFT_CYAN);
@@ -3636,10 +3636,10 @@ public:
             else g->lineSprite.fillRect(heroX, heroY, 64, 64, TFT_BLUE);
           }
           // ポップアップ
-          if (!hero.status->popupValues.empty()) {
+          if (!hero.state().popupValues.empty()) {
             int pY = heroY - 20;
             g->lineSprite.setTextSize(2);
-            for (const auto& data : hero.status->popupValues) {
+            for (const auto& data : hero.state().popupValues) {
               int val = data.value;
               bool isCrit = data.isCritical;
               if (val == 0) { 
@@ -3734,7 +3734,7 @@ public:
           if (allyTargetIndex < allies.size()) {
             CharacterState* targetedAlly = allies[allyTargetIndex];
             int tx = 0, ty = 0;
-            if (targetedAlly == hero.status) { tx = 220; ty = 20; } 
+            if (targetedAlly == &hero.state()) { tx = 220; ty = 20; }
             else {
               for (int i = 0; i < party.members.size(); i++) {
                 if (party.members[i]->status == targetedAlly) {
@@ -4131,8 +4131,8 @@ private:
   std::vector<CharacterState*> getAliveAllies() {
     std::vector<CharacterState*> allies;
     // 主人公
-    if (heroRef->status->stats().getHp() > 0) {
-      allies.push_back(heroRef->status);
+    if (heroRef->state().stats().getHp() > 0) {
+      allies.push_back(&heroRef->state());
     }
     // 仲間
     for (auto ally : partyRef->members) {
@@ -4147,9 +4147,9 @@ private:
     std::vector<CharacterState*> allies;
 
     // 主人公
-    if (heroRef && heroRef->status &&
-        heroRef->status->stats().getHp() <= 0) {
-      allies.push_back(heroRef->status);
+    if (heroRef &&
+        heroRef->state().stats().getHp() <= 0) {
+      allies.push_back(&heroRef->state());
     }
 
     // 仲間
@@ -4168,8 +4168,8 @@ private:
   std::vector<CharacterState*> getAllAllies() {
     std::vector<CharacterState*> allies;
 
-    if (heroRef && heroRef->status) {
-      allies.push_back(heroRef->status);
+    if (heroRef) {
+      allies.push_back(&heroRef->state());
     }
 
     if (partyRef) {
@@ -4586,7 +4586,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
         music.playSE(0);
         // 対象のStatus特定
         CharacterState* targetStatus = nullptr;
-        if (listCursor == 0) targetStatus = hero.status;
+        if (listCursor == 0) targetStatus = &hero.state();
         else targetStatus = party.members[listCursor - 1]->status;
 
         // アイテム効果適用
@@ -4726,7 +4726,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
 
           // ★ 1. すでに覚えているかチェック
           bool alreadyLearned = false;
-          alreadyLearned = hero.status->skills().has(skillIdToLearn);
+          alreadyLearned = hero.state().skills().has(skillIdToLearn);
 
           if (alreadyLearned) {
             music.playSE(1);
@@ -4736,7 +4736,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           else if (inventory.countItem(requiredScrollId) > 0) {
               // 消費して習得
               inventory.removeItem(requiredScrollId);
-              hero.status->learnSkill(skillIdToLearn);
+              hero.state().learnSkill(skillIdToLearn);
               music.playSE(0);
               // (※ここで「覚えた！」というフラグを立てて、draw側でメッセージを出すと親切です)
           } else {
@@ -4785,7 +4785,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           Item newItem = inventory.items[invIndex].item; 
 
           // ★ 主人公固定
-          CharacterState* s = hero.status;
+          CharacterState* s = &hero.state();
           
           // 1. 外す (インベントリに戻す)
           int oldId = -1;
@@ -4822,8 +4822,8 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
             inventory.money -= cost;
             
             // 全回復
-            hero.status->revive(100);
-            hero.status->heal(9999); hero.status->restoreTP(9999);
+            hero.state().revive(100);
+            hero.state().heal(9999); hero.state().restoreTP(9999);
             for(auto m : party.members) {
               m->status->revive(100);
               m->status->heal(9999); m->status->restoreTP(9999);

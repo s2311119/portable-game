@@ -3,8 +3,7 @@
 #include "Map.h"
 #include "CharacterState.h"
 
-Player::Player(Map& map, int level, int who) {
-    status = new CharacterState(level, who);
+Player::Player(Map& map, int level, int who) : stateValue(level, who) {
     bool positionFound = false;
     // 最初の草タイル(TILE_GRASS)を探す
     for (int y = 1; y < map.getMAP_HEIGHT() - 1; y++) {
@@ -41,9 +40,8 @@ void Player::reset(Map& map) {
     oldY = Y;
 }
 
-Player::~Player() {
-    if (status != nullptr) {
-      delete status;
-      status = nullptr;
-    }
-}
+CharacterState& Player::state() { return stateValue; }
+
+const CharacterState& Player::state() const { return stateValue; }
+
+Player::~Player() = default;
