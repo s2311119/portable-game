@@ -125,7 +125,7 @@ public:
 
   int enemyTargetIndex = 0;   // 敵リスト(activeEnemies)のカーソル (targetIndexから変更)
   int allyTargetIndex = 0;    // 味方リストのカーソル (新規)
-  CharacterState* currentTarget = nullptr; // ターゲットのStatus
+  std::optional<CombatantRef> currentTarget; // 現在の対象
 
   String message = "";
   std::vector<Enemy> activeEnemies;
@@ -137,9 +137,9 @@ public:
   //int lastGainedXP = 0;
 
   // ★★★ 行動順管理リスト ★★★
-  std::vector<CharacterState*> actorList; // 戦闘参加者 (Speed順)
+  std::vector<CombatantRef> actorList; // 戦闘参加者 (Speed順)
   int currentActorIndex = 0;        // 現在行動中のキャラのインデックス
-  CharacterState* currentActor = nullptr; // 現在行動中のキャラのStatus
+  std::optional<CombatantRef> currentActor; // 現在行動中のキャラ
   // 1ターン分の行動予定
   std::vector<BattleAction> plannedActions;
   BattleAction currentBattleAction;

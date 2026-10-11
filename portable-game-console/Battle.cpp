@@ -311,8 +311,8 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
     pendingActionType = ActionType::NONE;
     pendingSkillIndex = -1;
     messageFlow = MessageFlow::ACTION_COMPLETE;
-    currentTarget = nullptr;
-    currentActor = nullptr;
+    currentTarget = std::nullopt;
+    currentActor = std::nullopt;
     currentActorIndex = 0;
     lastDamage = 0;
     lastActionMessage = "";
@@ -384,13 +384,13 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
     critical_section_exit(&sdLock);
     // ★ 行動順リストを作成 (ソートはしない)
     actorList.clear();
-    actorList.push_back(&hero.state());
+    actorList.push_back({CombatantSide::PLAYER, 0});
     for (size_t i = 0; i < party.memberCount(); ++i) {
-      actorList.push_back(&party.memberState(i));
+      actorList.push_back({CombatantSide::ALLY, static_cast<int>(i)});
     }
     // ★ 敵全員を行動順リストに追加
-    for (auto& enemy : activeEnemies) {
-      actorList.push_back(&enemy.state());
+    for (size_t i = 0; i < activeEnemies.size(); ++i) {
+      actorList.push_back({CombatantSide::ENEMY, static_cast<int>(i)});
     }
     
     // ★ ターン開始処理へ
@@ -399,6 +399,10 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
 
 void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g) {
     if (!inBattle) return;
+    CharacterState* currentActor = resolveCombatant(this->currentActor);
+    CharacterState* currentTarget = resolveCombatant(this->currentTarget);
+    CharacterState* originalActor = currentActor;
+    CharacterState* originalTarget = currentTarget;
     Party& party = *partyRef; 
 
     bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
@@ -495,7 +499,7 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
         // -------------------------
         // 次に行動を決めるキャラ
         // -------------------------
-        currentActor = actorList[currentActorIndex];
+        currentActor = resolveCombatant(actorList[currentActorIndex]);
 
         if (currentActor == nullptr) {
           currentActorIndex++;
@@ -1818,7 +1822,7 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
 
           // 4. 行動順リストの解放
           actorList.clear();
-          std::vector<CharacterState*>().swap(actorList);
+          std::vector<CombatantRef>().swap(actorList);
           if (actualBossDefeated) {
             // 撃破フラグを立てる
             int bossIndex = (progress.floor() / 10) - 1;
@@ -1850,10 +1854,18 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
         break;
       
     } // switch 終了
+    if (!inBattle) {
+      this->currentActor = std::nullopt;
+      this->currentTarget = std::nullopt;
+    } else {
+      if (currentActor != originalActor) this->currentActor = refFor(currentActor);
+      if (currentTarget != originalTarget) this->currentTarget = refFor(currentTarget);
+    }
   }// update 終了
 
 void Battle::draw(Graphic* g) { 
     if (!inBattle) return;
+    CharacterState* currentActor = resolveCombatant(this->currentActor);
 
     // ★ ここでスプライトを作るのをやめる！
     // 代わりに g->lineSprite を使う
