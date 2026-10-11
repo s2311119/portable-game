@@ -1,0 +1,21 @@
+#pragma once
+
+enum EventType {
+  EVENT_NONE,
+  EVENT_TREASURE_BOX,
+  EVENT_STAIR_UP,
+  EVENT_STAIR_DOWN,
+  EVENT_AUTOMATON,
+  EVENT_INN,     // ★追加
+  EVENT_SHOP,    // ★追加
+  EVENT_STORAGE,  // ★追加
+  EVENT_BOSS_BATTLE
+};
+
+enum GameState {
+  STATE_GAME,
+  STATE_MENU, 
+  STATE_BATTLE,
+  STATE_EVENT,
+  STATE_GAME_OVER
+};
