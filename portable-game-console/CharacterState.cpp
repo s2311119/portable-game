@@ -580,46 +580,6 @@ int CharacterState::gainXP(int amount) {
     return 0; // 変化なし
   }
 
-int CharacterState::caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int ALuck, int DLuck, bool &retIsCrit){
-    // 回避計算
-    int baseHitRate = 95;
-    int hitRate = baseHitRate + (ASpeed - DSpeed);
-    if(hitRate > 100) hitRate = 100;
-    else if(hitRate < 5) hitRate = 5;
-    
-    bool isHit = (random(0, 100) < hitRate);
-    if(!isHit) {
-        retIsCrit = false; // ミス
-        return 0;
-    }
-
-    // クリ計算
-    int basecriticalRate = 5;
-    int criticalRate = basecriticalRate + (ALuck - DLuck);
-    if(criticalRate > 100) criticalRate = 100;
-    else if(criticalRate < 0) criticalRate = 0;
-    
-    // ★ 計算結果を引数の変数に書き込む
-    retIsCrit = (random(0, 100) < criticalRate);
-
-    // ダメージ計算
-    float effectiveDef = (float)Defense * 0.5;
-    if (retIsCrit) effectiveDef *= 0.5; // 貫通
-
-    int damage = (int)((float)Attack - effectiveDef);
-
-    if (retIsCrit) damage = damage * 1.5; // 倍率
-
-    float variance = (float)random(90, 111) / 100.0;
-    damage = (int)((float)damage * variance);
-
-    int minDamage = Attack / 20; 
-    if (minDamage < 1) minDamage = 1;
-    if (damage < minDamage) damage = minDamage;
-    damage /= 4;
-    return damage;
-  }
-
 bool CharacterState::isPlayer() {
     return (who >= 38 && who <= 79); // GDDのID定義 (38以上は味方)
   }

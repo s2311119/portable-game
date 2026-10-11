@@ -127,8 +127,6 @@ public:
 
   int gainXP(int amount);
 
-  int caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int ALuck, int DLuck, bool &retIsCrit);
-
   bool isPlayer();
 
   void addAttack(int amount);
