@@ -1,4 +1,5 @@
 #pragma once
+#include "CoreStats.h"
 #include "EvolutionCatalog.h"
 
 #include "Skill.h"
@@ -8,22 +9,7 @@ class FsFile;
 
 class Status{
 private:
-  int HP;
-  int originalMaxHP;
-  int MaxHP;
-  //tune point
-  int TP;
-  int MaxTP;
-  //物理攻撃に関係
-  int Attack;
-  //防御に関係
-  int Defense;
-  //回避率、命中率に関係
-  int Speed;
-  //旋律、ノイズ攻撃に使用
-  int Sense;
-  // ドロ率、クリ率に関係
-  int Luck;
+  CoreStats coreStats;
   int Level;
   int who;
   const char* name;

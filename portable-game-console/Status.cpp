@@ -15,18 +15,18 @@ int Status::getPreEvolution(int currentId) {
     return lineage.count > 1 ? lineage.ids[1] : -1;
   }
 
-int Status::getHp(){return HP;}
+int Status::getHp(){return coreStats.getHp();}
 
-void Status::setHp(int val){ HP = val;}
+void Status::setHp(int val){ coreStats.setHp(val);}
 
-int Status::getMaxHp(){return MaxHP;}
+int Status::getMaxHp(){return coreStats.getMaxHp();}
 
-int Status::getTp(){return TP;}
+int Status::getTp(){return coreStats.getTp();}
 
-int Status::getMaxTp(){return MaxTP;}
+int Status::getMaxTp(){return coreStats.getMaxTp();}
 
 int Status::getAttack() {
-    float finalValue = (float)this->Attack; // 基礎ATK
+    float finalValue = (float)coreStats.getAttack(); // 基礎ATK
     // 武器の補正
     if (equipWeaponId != -1) {
       Item weapon = ItemCatalog::get(equipWeaponId);
@@ -49,7 +49,7 @@ int Status::getAttack() {
   }
 
 int Status::getDefense() {
-    float finalValue = (float)this->Defense; // 基礎DEF
+    float finalValue = (float)coreStats.getDefense(); // 基礎DEF
     // 防具の補正
     if (equipArmorId != -1) {
       Item armor = ItemCatalog::get(equipArmorId);
@@ -69,7 +69,7 @@ int Status::getDefense() {
   }
 
 int Status::getSpeed() {
-    float finalValue = (float)this->Speed; // 基礎SPD
+    float finalValue = (float)coreStats.getSpeed(); // 基礎SPD
     // アクセ補正
     if (equipAccId == 502) finalValue += 10;  // クイックブーツ
     if (equipAccId == 599) finalValue += 500; // トリニティ・コア
@@ -85,7 +85,7 @@ int Status::getSpeed() {
   }
 
 int Status::getSense() {
-    float finalValue = (float)this->Sense; // 基礎SEN
+    float finalValue = (float)coreStats.getSense(); // 基礎SEN
     // アクセ補正
     if (equipAccId == 503) finalValue += 10;  // スナイパーレンズ
     if (equipAccId == 599) finalValue += 500; // トリニティ・コア
@@ -101,7 +101,7 @@ int Status::getSense() {
   }
 
 int Status::getLuck() {
-    float finalValue = (float)this->Luck; // 基礎LCK
+    float finalValue = (float)coreStats.getLuck(); // 基礎LCK
     // アクセ補正
     if (equipAccId == 504) finalValue += 50;  // ラッキーコイン
     if (equipAccId == 599) finalValue += 500; // トリニティ・コア
@@ -167,22 +167,7 @@ Status::Status(int level, int w){
     who = w;
     const CoreStatsData initialStats =
         CharacterCatalog::initialStatsFor(w, level);
-    MaxHP = initialStats.maxHp;
-    originalMaxHP = MaxHP;
-    HP = MaxHP;
-    //tune point
-    MaxTP = initialStats.maxTp;
-    TP = MaxTP;
-    //物理攻撃に関係
-    Attack = initialStats.attack;
-    //防御に関係
-    Defense = initialStats.defense;
-    //回避率、命中率に関係
-    Speed = initialStats.speed;
-    //旋律、ノイズ攻撃に使用
-    Sense = initialStats.sense;
-    // ドロ率、クリ率に関係
-    Luck = initialStats.luck;
+    coreStats.initialize(initialStats);
     currentXP = 0;
     nextLevelXP = calculateNextXP(Level);
     learnedSkills.reserve(10);
@@ -217,8 +202,7 @@ Status::Status(int level, int w){
   }
 
 void Status::resetBattleStats() {
-    MaxHP = originalMaxHP; // HP上限を戻す
-    if (HP > MaxHP) HP = MaxHP;
+    coreStats.restoreBaseMaxHp();
     
     // バフ・デバフ・状態異常の全解除
     coverTurns = 0;
@@ -246,9 +230,9 @@ void Status::resetBattleStats() {
   }
 
 void Status::boostMaxHP() {
-    if (MaxHP == originalMaxHP) { // 重ね掛け防止
-      MaxHP = (int)(MaxHP * 1.5);
-      HP = (int)(HP * 1.5); // 現在HPも割合で増やす
+    if (coreStats.getMaxHp() == coreStats.getBaseMaxHp()) { // 重ね掛け防止
+      coreStats.applyMaxHpIncrease((int)(coreStats.getMaxHp() * 1.5));
+      coreStats.setHp((int)(coreStats.getHp() * 1.5)); // 現在HPも割合で増やす
     }
   }
 
@@ -276,35 +260,23 @@ int Status::takedamage(
     }
     
     // 3. ラストスタンド (HP1で耐える)
-    if (endureTurns > 0 && damage >= HP) {
-        damage = HP - 1;
+    if (endureTurns > 0 && damage >= coreStats.getHp()) {
+        damage = coreStats.getHp() - 1;
         endureTurns--; 
     }
 
-    HP -= damage;
-    if(HP < 0) HP = 0;
+    coreStats.takeDamage(damage);
     
     return damage;
   }
 
 void Status::ReceiveHeal(int amount) {
-    if (HP <= 0) return; // 戦闘不能者は回復しない (蘇生は Revive を使う)
-    
-    HP += amount;
-    if (HP > MaxHP) {
-        HP = MaxHP;
-    }
-  }
+    coreStats.heal(amount);
+}
 
 void Status::Revive(int hpPercent) {
-    if (HP > 0) return; // 既に生きている
-
-    if (hpPercent <= 0) hpPercent = 1;
-    if (hpPercent > 100) hpPercent = 100;
-    
-    // 最大HPの N% で復活
-    HP = MaxHP * hpPercent / 100;
-  }
+    coreStats.revive(hpPercent);
+}
 
 void Status::CureStatus(bool cureDebuffs) {
     // 状態異常フラグをリセット
@@ -323,14 +295,8 @@ void Status::CureStatus(bool cureDebuffs) {
   }
 
 void Status::ReceiveTP(int amount) {
-    TP += amount;
-    if (TP > MaxTP) {
-        TP = MaxTP;
-    }
-    if (TP < 0) {
-        TP = 0;
-    }
-  }
+    coreStats.restoreTP(amount);
+}
 
 void Status::AddBuff(int skillId) {
     const int DEFAULT_BUFF_TURNS = 3;
@@ -672,32 +638,14 @@ int Status::calculateNextXP(int level) {
   }
 
 void Status::recalculateStats() {
-    // 現在のHPが最大HPを超えるのを防ぐため、上昇分だけ加算する
-    int oldMaxHP = MaxHP;
     const CoreStatsData stats =
         CharacterCatalog::statsFor(who, Level);
-    MaxHP = stats.maxHp;
-    originalMaxHP = MaxHP;
-    HP += (MaxHP - oldMaxHP); // 上昇分を加算
-    if (HP > MaxHP) HP = MaxHP; // (もし全回復させたいなら HP = MaxHP;)
-
-    // TPや他のステータスは再計算
-    MaxTP = stats.maxTp;
-    TP = MaxTP; // TPは全回復
-    Attack = stats.attack;
-    Defense = stats.defense;
-    Speed = stats.speed;
-    Sense = stats.sense;
-    Luck = stats.luck;
-  }
+    coreStats.applyRecalculatedStats(stats);
+}
 
 bool Status::useTP(int cost) {
-    if (TP >= cost) {
-      TP -= cost;
-      return true;
-    }
-    return false; // TPが足りない
-  }
+    return coreStats.spendTP(cost);
+}
 
 int Status::gainXP(int amount) {
     if (Level >= 99) {
@@ -990,9 +938,8 @@ bool Status::isPlayer() {
   }
 
 void Status::addAttack(int amount) {
-    Attack += amount;
-    // (将来的に上限なども設定)
-  }
+    coreStats.addAttack(amount);
+}
 
 void Status::learnSkill(const Skill& newSkill) {
     // (既に覚えていないかチェックしたほうが親切だが、今は省略)
@@ -1016,8 +963,7 @@ void Status::evolve(int newWhoId) {
     recalculateStats(); 
 
     // 3. 進化ボーナスとしてHP/TPを全回復
-    this->HP = this->MaxHP;
-    this->TP = this->MaxTP;
+    coreStats.restoreToFull();
     checkLevelUpSkills(0, oldLevel);
   }
 
@@ -1137,8 +1083,8 @@ void Status::saveTo(FsFile& file) {
     file.println(who);
     file.println(Level);
     file.println(currentXP);
-    file.println(HP);
-    file.println(TP);
+    file.println(coreStats.getHp());
+    file.println(coreStats.getTp());
     file.println(equipWeaponId); // ★ 追加
     file.println(equipArmorId);  // ★ 追加
     file.println(equipAccId);    // ★ 追加
@@ -1178,15 +1124,7 @@ void Status::loadFrom(FsFile& file) {
     // -------------------------
     // 保存時の現在HP / TPを復元
     // -------------------------
-    HP = savedHP;
-    TP = savedTP;
-
-    // 壊れた/古いセーブデータ対策
-    if (HP < 0) HP = 0;
-    if (HP > MaxHP) HP = MaxHP;
-
-    if (TP < 0) TP = 0;
-    if (TP > MaxTP) TP = MaxTP;
+    coreStats.restoreCurrentPoints(savedHP, savedTP);
 
     // -------------------------
     // 習得済みスキル復元
