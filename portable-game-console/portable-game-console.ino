@@ -1041,7 +1041,7 @@ public:
                   uint16_t color = (i == listCursor) ? TFT_YELLOW : TFT_WHITE;
                   g->lineSprite.setTextColor(color);
                   g->lineSprite.setCursor(x + 20, y + 55 + i * 28);
-                  g->lineSprite.printf("%s Lv%d HP%d/%d", ally->getname(), ally->status->getLevel(), ally->status->getHp(), ally->status->getMaxHp());
+                  g->lineSprite.printf("%s Lv%d HP%d/%d", ally->getname(), ally->status->progress().level(), ally->status->stats().getHp(), ally->status->stats().getMaxHp());
               }
           }
 
@@ -1146,14 +1146,14 @@ public:
           uint16_t color = (listCursor == 0) ? TFT_YELLOW : TFT_WHITE;
           g->lineSprite.setTextColor(color);
           g->lineSprite.setCursor(x + 20, y + 55);
-          g->lineSprite.printf("調律師 HP:%d/%d", hero.status->getHp(), hero.status->getMaxHp());
+          g->lineSprite.printf("調律師 HP:%d/%d", hero.status->stats().getHp(), hero.status->stats().getMaxHp());
 
           for (int i = 0; i < party.members.size(); i++) {
             color = (listCursor == i + 1) ? TFT_YELLOW : TFT_WHITE;
             g->lineSprite.setTextColor(color);
             g->lineSprite.setCursor(x + 20, y + 55 + (i + 1) * 28);
             auto* s = party.members[i]->status;
-            g->lineSprite.printf("%s HP:%d/%d", s->getname(), s->getHp(), s->getMaxHp());
+            g->lineSprite.printf("%s HP:%d/%d", s->name(), s->stats().getHp(), s->stats().getMaxHp());
           }
 
       } else if (currentMenuState == STATE_STORAGE) {
@@ -1191,8 +1191,8 @@ public:
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
                   g->lineSprite.printf(
                       "%s Lv%d",
-                      party.storage[i]->status->getname(),
-                      party.storage[i]->status->getLevel()
+                      party.storage[i]->status->name(),
+                      party.storage[i]->status->progress().level()
                   );
               }
           }
@@ -1205,8 +1205,8 @@ public:
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
                   g->lineSprite.printf(
                       "%s Lv%d",
-                      party.members[i]->status->getname(),
-                      party.members[i]->status->getLevel()
+                      party.members[i]->status->name(),
+                      party.members[i]->status->progress().level()
                   );
               }
           }
@@ -1238,12 +1238,12 @@ public:
         g->lineSprite.setTextSize(2);
         g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.printf("装備 (%s)", s->getname()); 
+        g->lineSprite.printf("装備 (%s)", s->name()); 
         g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
 
-        String wName = (s->weaponId() == -1) ? "なし" : ItemCatalog::get(s->weaponId()).name;
-        String aName = (s->armorId() == -1) ? "なし" : ItemCatalog::get(s->armorId()).name;
-        String acName = (s->accessoryId() == -1) ? "なし" : ItemCatalog::get(s->accessoryId()).name;
+        String wName = (s->equipmentState().weaponId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().weaponId()).name;
+        String aName = (s->equipmentState().armorId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().armorId()).name;
+        String acName = (s->equipmentState().accessoryId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().accessoryId()).name;
 
         g->lineSprite.setTextColor(listCursor == 0 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.setCursor(x + 20, y + 60); g->lineSprite.printf("武器: %s", wName.c_str());
@@ -1256,7 +1256,7 @@ public:
         
         g->lineSprite.setTextColor(TFT_CYAN);
         g->lineSprite.setCursor(x + 20, y + 160);
-        g->lineSprite.printf("ATK:%d DEF:%d", s->getAttack(), s->getDefense());
+        g->lineSprite.printf("ATK:%d DEF:%d", s->attack(), s->defense());
       }else if (currentMenuState == STATE_EQUIP_LIST) {
         int x = 10, y = 40 + yOffset;
         int w = 300, h = 190;
@@ -1503,7 +1503,7 @@ private:
 
   CharacterState* resolveTarget(CharacterState* originalTarget, Skill& skill) {
     if (originalTarget == nullptr) return nullptr; // 安全対策
-    if (originalTarget->getHp() <= 0) return originalTarget;
+    if (originalTarget->stats().getHp() <= 0) return originalTarget;
     
     // 自分・全体・味方への補助技は対象変更しない。
     // RANDOM_ENEMY は各ヒットごとに resolveTarget() を通す。
@@ -1519,18 +1519,18 @@ private:
     // --- 1. 挑発 (Taunt) ---
     CharacterState* tauntTarget = nullptr;
     if (originalTarget->isPlayer()) { // 敵→味方
-         if (originalTarget->getTauntTurns() > 0) return originalTarget;
-         if (heroRef && heroRef->status->getTauntTurns() > 0 && heroRef->status->getHp() > 0) tauntTarget = heroRef->status;
+         if (originalTarget->effects().getTauntTurns() > 0) return originalTarget;
+         if (heroRef && heroRef->status->effects().getTauntTurns() > 0 && heroRef->status->stats().getHp() > 0) tauntTarget = heroRef->status;
          if (partyRef) {
              for (auto* ally : partyRef->members) {
-                 if (ally && ally->status->getTauntTurns() > 0 && ally->status->getHp() > 0) tauntTarget = ally->status;
+                 if (ally && ally->status->effects().getTauntTurns() > 0 && ally->status->stats().getHp() > 0) tauntTarget = ally->status;
              }
          }
     } else { // 味方→敵
-         if (originalTarget->getTauntTurns() > 0) return originalTarget;
+         if (originalTarget->effects().getTauntTurns() > 0) return originalTarget;
          std::vector<CharacterState*> taunters;
          for (auto* enemy : activeEnemies) {
-             if (enemy && enemy->status && enemy->status->getTauntTurns() > 0 && enemy->status->getHp() > 0) {
+             if (enemy && enemy->status && enemy->status->effects().getTauntTurns() > 0 && enemy->status->stats().getHp() > 0) {
                  taunters.push_back(enemy->status);
              }
          }
@@ -1540,18 +1540,18 @@ private:
 
     // --- 2. ステルス (Untargetable) ---
     // 狙われた人がステルス中なら、別の生存者に逸らす
-    if (originalTarget->getUntargetableTurns() > 0) {
+    if (originalTarget->effects().getUntargetableTurns() > 0) {
          std::vector<CharacterState*> others;
          if (originalTarget->isPlayer()) {
              // 主人公・仲間から「自分以外」かつ「生存者」を探す
-             if (heroRef->status != originalTarget && heroRef->status->getHp() > 0) others.push_back(heroRef->status);
+             if (heroRef->status != originalTarget && heroRef->status->stats().getHp() > 0) others.push_back(heroRef->status);
              for (auto* m : partyRef->members) {
-                 if (m->status != originalTarget && m->status->getHp() > 0) others.push_back(m->status);
+                 if (m->status != originalTarget && m->status->stats().getHp() > 0) others.push_back(m->status);
              }
          } else {
              // 敵から「自分以外」かつ「生存者」を探す
              for (auto* e : activeEnemies) {
-                 if (e->status != originalTarget && e->status->getHp() > 0) others.push_back(e->status);
+                 if (e->status != originalTarget && e->status->stats().getHp() > 0) others.push_back(e->status);
              }
          }
          
@@ -1565,9 +1565,9 @@ private:
     // 味方限定
     if (originalTarget->isPlayer()) {
          // 誰かが「かばう」発動中か？
-         if (heroRef->status != originalTarget && heroRef->status->getCoverTurns() > 0 && heroRef->status->getHp() > 0) return heroRef->status;
+         if (heroRef->status != originalTarget && heroRef->status->effects().getCoverTurns() > 0 && heroRef->status->stats().getHp() > 0) return heroRef->status;
          for (auto* ally : partyRef->members) {
-             if (ally->status != originalTarget && ally->status->getCoverTurns() > 0 && ally->status->getHp() > 0) return ally->status;
+             if (ally->status != originalTarget && ally->status->effects().getCoverTurns() > 0 && ally->status->stats().getHp() > 0) return ally->status;
          }
     }
 
@@ -1583,7 +1583,7 @@ private:
   {
     if (attacker == nullptr ||
         originalTarget == nullptr ||
-        originalTarget->getHp() <= 0)
+        originalTarget->stats().getHp() <= 0)
     {
       return false;
     }
@@ -1598,7 +1598,7 @@ private:
     }
 
     if (defender == nullptr ||
-        defender->getHp() <= 0)
+        defender->stats().getHp() <= 0)
     {
       return false;
     }
@@ -1614,13 +1614,13 @@ private:
     if (isOffensive) {
       // キングス・シールド：
       // 有効ターン中は物理・旋律を何度でも反射する
-      if (defender->getReflectAllTurns() > 0) {
+      if (defender->effects().getReflectAllTurns() > 0) {
         isReflected = true;
       }
 
       // リフレクト：
       // 物理攻撃を1回だけ反射して、その場で消費する
-      else if (defender->getReflectPhysicalTurns() > 0 &&
+      else if (defender->effects().getReflectPhysicalTurns() > 0 &&
               skill.category == Skill::Category::PHYSICAL)
       {
         isReflected = true;
@@ -1630,7 +1630,7 @@ private:
       // 旋律反射：
       // 有効ターン中は旋律攻撃を反射する
       // 反射した回数ではなくUpdateTurn()で寿命を減らす
-      else if (defender->getReflectMagicTurns() > 0 &&
+      else if (defender->effects().getReflectMagicTurns() > 0 &&
               skill.category == Skill::Category::MELODY)
       {
         isReflected = true;
@@ -1642,7 +1642,7 @@ private:
 
       message +=
           "\n" +
-          String(defender->getname()) +
+          String(defender->name()) +
           " は跳ね返した！";
 
       // 反射された場合は使用者自身へ実行
@@ -1657,7 +1657,7 @@ private:
     }
 
     // カウンター判定のため、攻撃前HPを覚えておく
-    int hpBefore = defender->getHp();
+    int hpBefore = defender->stats().getHp();
 
     ExecuteSkill(
         skill,
@@ -1667,27 +1667,27 @@ private:
     );
 
     bool tookDamage =
-        defender->getHp() < hpBefore;
+        defender->stats().getHp() < hpBefore;
 
     // 実際に物理ダメージを受けたときだけ反撃
     if (tookDamage &&
-        defender->getHp() > 0 &&
-        defender->getCounterTurns() > 0 &&
+        defender->stats().getHp() > 0 &&
+        defender->effects().getCounterTurns() > 0 &&
         skill.category == Skill::Category::PHYSICAL &&
         defender != attacker)
     {
       message +=
           "\n" +
-          String(defender->getname()) +
+          String(defender->name()) +
           " の反撃！";
 
       music.playSE(3);
 
       int counterDamage =
-          defender->getAttack();
+          defender->attack();
 
       counterDamage =
-          attacker->takedamage(
+          attacker->takeDamage(
               counterDamage,
               Skill::Category::PHYSICAL
           );
@@ -1698,7 +1698,7 @@ private:
       );
     }
 
-    return defender->getHp() <= 0;
+    return defender->stats().getHp() <= 0;
   }
 
 public:
@@ -1835,7 +1835,7 @@ public:
     action.target = target;
 
     if (actor != nullptr) {
-      action.speedSnapshot = actor->getSpeed();
+      action.speedSnapshot = actor->speed();
     }
 
     // 先制技判定
@@ -1917,7 +1917,7 @@ public:
       else if (floor == 50) bossId = 84;
 
       Enemy* boss = new Enemy(bossId, 1);
-      if (boss->status) boss->name = boss->status->getname();
+      if (boss->status) boss->name = boss->status->name();
       activeEnemies.push_back(boss);
       critical_section_enter_blocking(&sdLock);
       String imgName = "/e_" + String(bossId) + ".bin";
@@ -1986,8 +1986,8 @@ public:
         Enemy* newEnemy = new Enemy(who, floor);
       
         if (newEnemy->status) {
-          newEnemy->status->resetBattleStats();
-          newEnemy->name = newEnemy->status->getname();
+          newEnemy->status->clearBattleEffects();
+          newEnemy->name = newEnemy->status->name();
         }
         activeEnemies.push_back(newEnemy);
       }
@@ -2011,7 +2011,7 @@ public:
     activeImages[4] = imgMgr.load(4, "/a_38.bin", sd);
     for (int i = 0; i < party.members.size(); i++) {
       if (i < 3) {
-        int id = party.members[i]->status->getWho();
+        int id = party.members[i]->status->id();
         if (id == 99) id = 38; // デバッグ用
 
         String fname = "/a_" + String(id) + ".bin";
@@ -2141,7 +2141,7 @@ public:
         }
 
         // 死亡中なら行動予約しない
-        if (currentActor->getHp() <= 0) {
+        if (currentActor->stats().getHp() <= 0) {
           currentActorIndex++;
           currentBattleState = STATE_ACTOR_SELECT;
           break;
@@ -2167,7 +2167,7 @@ public:
 
       // 2. 味方のコマンド入力
       case STATE_COMMAND_SELECT: 
-        message = String(currentActor->getname()) + "：コマンドを選ぼう！";
+        message = String(currentActor->name()) + "：コマンドを選ぼう！";
         if (leftPressed) {commandSelected = (commandSelected - 1 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
         if (upPressed)   {commandSelected = (commandSelected - 2 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
         if (rightPressed){commandSelected = (commandSelected + 1) % CMD_COUNT; music.playSE(2);}
@@ -2188,9 +2188,9 @@ public:
             currentBattleState = STATE_BATTLE_END;
           } 
           else if (commandSelected == 2) { // せんりつ
-            if (currentActor->getSilencedTurns() > 0) {
+            if (currentActor->effects().getSilencedTurns() > 0) {
               music.playSE(1);
-              message = String(currentActor->getname()) + " は沈黙している！";
+              message = String(currentActor->name()) + " は沈黙している！";
               // (Aボタン押しっぱなしループを防ぐ)
               if(ctrl.pressed(ctrl.BTN_A)) delay(200);
             } else {
@@ -2234,7 +2234,7 @@ public:
         if (aPressed) {
           Skill skill = SkillCatalog::get(currentActor->skills().skillIdAt(skillSelected));
           
-          if (currentActor->getTp() >= skill.tpCost) {
+          if (currentActor->stats().getTp() >= skill.tpCost) {
             music.playSE(0);
 
             pendingActionType = ActionType::SKILL;
@@ -2280,20 +2280,20 @@ public:
       // ★★★ 4. ターゲット選択 (敵) ★★★
       case STATE_TARGET_SELECT_ENEMY: {
         message = "誰を狙う？";
-        while (activeEnemies[enemyTargetIndex]->status->getHp() <= 0){
+        while (activeEnemies[enemyTargetIndex]->status->stats().getHp() <= 0){
           enemyTargetIndex = (enemyTargetIndex - 1 + activeEnemies.size()) % activeEnemies.size();
         }
         // 生きている敵だけを選べるように
         if (leftPressed) {
           do {
             enemyTargetIndex = (enemyTargetIndex - 1 + activeEnemies.size()) % activeEnemies.size();
-          } while (activeEnemies[enemyTargetIndex]->status->getHp() <= 0);
+          } while (activeEnemies[enemyTargetIndex]->status->stats().getHp() <= 0);
           music.playSE(2);
         }
         if (rightPressed) {
           do {
             enemyTargetIndex = (enemyTargetIndex + 1) % activeEnemies.size();
-          } while (activeEnemies[enemyTargetIndex]->status->getHp() <= 0);
+          } while (activeEnemies[enemyTargetIndex]->status->stats().getHp() <= 0);
           music.playSE(2);
         }
 
@@ -2377,20 +2377,20 @@ public:
 
         if (lastDamage > 0) { // 毒ダメージ
           music.playSE(3);
-          message = String(currentActor->getname()) + " は毒:" + String(lastDamage) + " のダメージ！";
+          message = String(currentActor->name()) + " は毒:" + String(lastDamage) + " のダメージ！";
         } else if (lastDamage < 0) { // HPリジェネ
           music.playSE(7);
-          message = String(currentActor->getname()) + " は回復:" + String(-lastDamage) + " 回復！";
+          message = String(currentActor->name()) + " は回復:" + String(-lastDamage) + " 回復！";
         }
-        if (currentActor->getHp() <= 0) {
+        if (currentActor->stats().getHp() <= 0) {
           // オートリバイブ判定
-          if (currentActor->getAutoReviveTurns() > 0) {
+          if (currentActor->effects().getAutoReviveTurns() > 0) {
             currentActor->consumeAutoRevive(); // 効果消費
-            currentActor->Revive(50); // HP半分で復活
+            currentActor->revive(50); // HP半分で復活
             music.playSE(7);
-            message += "\n" + String(currentActor->getname()) + " は自動蘇生した！";
+            message += "\n" + String(currentActor->name()) + " は自動蘇生した！";
           }else{
-            message = String(currentActor->getname()) + " は力尽きた…";
+            message = String(currentActor->name()) + " は力尽きた…";
             messageFlow = MessageFlow::END_TURN;
             currentBattleState = STATE_ACTION_MSG;
             break;
@@ -2398,12 +2398,12 @@ public:
         }
 
         // 3. 強制行動不能チェック
-        if (currentActor->getCantMoveTurns() > 0) {
+        if (currentActor->effects().getCantMoveTurns() > 0) {
           if (message != "") {
             message += "\n";
           }
 
-          message += String(currentActor->getname()) + " は動けない！";
+          message += String(currentActor->name()) + " は動けない！";
 
           currentActor->consumeBlockedAction();
 
@@ -2413,9 +2413,9 @@ public:
         }
 
         // 4. 麻痺(Paralyzed)チェック (isParalyzed -> getParalyzedTurns)
-        if (currentActor->getParalyzedTurns() > 0) {
+        if (currentActor->effects().getParalyzedTurns() > 0) {
           if (random(100) < 50) { // (例: 50%で行動不能)
-            message = String(currentActor->getname()) + " は痺れて動けない！";
+            message = String(currentActor->name()) + " は痺れて動けない！";
             messageFlow = MessageFlow::END_TURN;
             currentBattleState = STATE_ACTION_MSG;
             break;
@@ -2423,8 +2423,8 @@ public:
         }
         
         // 5. 混乱(Confused)チェック
-        if (currentActor->getConfusedTurns() > 0) {
-          message = String(currentActor->getname()) + " は混乱している！";
+        if (currentActor->effects().getConfusedTurns() > 0) {
+          message = String(currentActor->name()) + " は混乱している！";
           // (例: 50%で暴走)
           if (random(100) < 50) {
               message += "\nわけがわからず攻撃！";
@@ -2435,7 +2435,7 @@ public:
               // ターゲットを敵味方全員からランダムで選択
               std::vector<CharacterState*> allTargets = getAliveAllies(); // 味方リスト
               for (auto enemy : activeEnemies) { // 敵リスト
-                  if(enemy->status->getHp() > 0) allTargets.push_back(enemy->status);
+                  if(enemy->status->stats().getHp() > 0) allTargets.push_back(enemy->status);
               }
               
               if (allTargets.empty()) {
@@ -2474,7 +2474,7 @@ public:
 
       // 7. 敵のAI実行
       case STATE_ENEMY_AI: {
-        String enemyName = currentActor->getname();
+        String enemyName = currentActor->name();
         message = enemyName + " の攻撃!";
         // pendingAction = 0; // デフォルトは通常攻撃
         pendingActionType = ActionType::ATTACK;
@@ -2482,7 +2482,7 @@ public:
         
         bool willFlee = false;
         // はぐれノイズ(36): 50%で逃げる
-        int who = currentActor->getWho();
+        int who = currentActor->id();
         if (who == 36 && random(100) < 30) willFlee = true;
         
         // ノイズ・キング(37): 70%で逃げる (より逃げやすい)
@@ -2502,11 +2502,11 @@ public:
         // 2. スキル選択ロジック
         const SkillSet& skills = currentActor->skills();
         
-        if (skills.count() != 0 && currentActor->getSilencedTurns() <= 0) {
-          int who = currentActor->getWho();
-          int curTP = currentActor->getTp();
-          int curHP = currentActor->getHp();
-          int maxHP = currentActor->getMaxHp();
+        if (skills.count() != 0 && currentActor->effects().getSilencedTurns() <= 0) {
+          int who = currentActor->id();
+          int curTP = currentActor->stats().getTp();
+          int curHP = currentActor->stats().getHp();
+          int maxHP = currentActor->stats().getMaxHp();
           int selectedSkillIndex = -1; 
 
           // [ヘルパー] IDでスキルを探す
@@ -2531,7 +2531,7 @@ public:
             }
           }
           else if (who == 82) { // ハーベスト・スティンガー
-            if (currentTarget && currentTarget->getPoisonTurns() > 0) selectedSkillIndex = findSkillIndex(42);
+            if (currentTarget && currentTarget->effects().getPoisonTurns() > 0) selectedSkillIndex = findSkillIndex(42);
             else if (random(100) < 70) {
               int r = random(3);
               if (r==0) selectedSkillIndex = findSkillIndex(105); 
@@ -2561,8 +2561,8 @@ public:
             for (auto e : activeEnemies) {
               if (e != nullptr &&
                   e->status != nullptr &&
-                  e->status->getHp() > 0 &&
-                  e->status->getHp() < e->status->getMaxHp() / 2)
+                  e->status->stats().getHp() > 0 &&
+                  e->status->stats().getHp() < e->status->stats().getMaxHp() / 2)
               {
                 injuredTarget = e->status;
                 break;
@@ -2630,7 +2630,7 @@ public:
               if (currentTarget == nullptr || currentTarget->isPlayer()) {
                 // 生きている敵リストを作成
                 std::vector<CharacterState*> livingEnemies;
-                for(auto e : activeEnemies) if(e->status->getHp() > 0) livingEnemies.push_back(e->status);
+                for(auto e : activeEnemies) if(e->status->stats().getHp() > 0) livingEnemies.push_back(e->status);
                 
                 if (!livingEnemies.empty()) {
                   // ランダムな仲間にかける（回復AIですでに決まっている場合は上書きしないよう注意が必要だが、
@@ -2719,7 +2719,7 @@ public:
         currentActor->endDefense();
 
         // 行動前に倒されていたキャラはスキップ
-        if (currentActor->getHp() <= 0) {
+        if (currentActor->stats().getHp() <= 0) {
           currentPlannedActionIndex++;
           currentBattleState = STATE_EXECUTE_NEXT_ACTION;
           break;
@@ -2762,7 +2762,7 @@ public:
 
           // 2. HPを0にして強制退場させる
           // (ダメージ処理ではなく、直接0を代入)
-          currentActor->setHp(0); 
+          currentActor->retireFromBattle(); 
 
           // 3. 効果音 (逃走音)
           music.playSE(3); // シュッという音など
@@ -2778,7 +2778,7 @@ public:
 
           // 2. 音とメッセージ
           music.playSE(5); // 何か適当な音（物理防御音など）
-          message = String(currentActor->getname()) + " は身を守っている！";
+          message = String(currentActor->name()) + " は身を守っている！";
           
           // 3. メッセージ表示ステートへ
           messageFlow = MessageFlow::ACTION_COMPLETE;
@@ -2800,10 +2800,10 @@ public:
         // 行動予約後に沈黙を受けている可能性があるため、
         // 実行時にもスキル使用可否を確認する
         if (pendingActionType == ActionType::SKILL &&
-            currentActor->getSilencedTurns() > 0)
+            currentActor->effects().getSilencedTurns() > 0)
         {
           message =
-              String(currentActor->getname()) +
+              String(currentActor->name()) +
               " は沈黙していて旋律を使えない！";
 
           messageFlow = MessageFlow::END_TURN;
@@ -2822,7 +2822,7 @@ public:
 
           // 予約していた攻撃対象がすでに倒れていた場合
           if (currentTarget == nullptr ||
-              currentTarget->getHp() <= 0)
+              currentTarget->stats().getHp() <= 0)
           {
             std::vector<CharacterState*> candidates =
                 currentActor->isPlayer()
@@ -2831,7 +2831,7 @@ public:
 
             if (candidates.empty()) {
               message =
-                  String(currentActor->getname()) +
+                  String(currentActor->name()) +
                   " の攻撃！\n対象がいない！";
 
               messageFlow = MessageFlow::END_TURN;
@@ -2845,7 +2845,7 @@ public:
             targetChanged = true;
           }
 
-          message = String(currentActor->getname()) + " の攻撃！";
+          message = String(currentActor->name()) + " の攻撃！";
 
           if (targetChanged) {
             message += "\n対象を変更した！";
@@ -2869,7 +2869,7 @@ public:
 
           // 単体の敵対象技で、予約していた相手がすでに倒れていた場合
           if (currentSkill.scope == Skill::TargetScope::SINGLE_ENEMY &&
-              (currentTarget == nullptr || currentTarget->getHp() <= 0))
+              (currentTarget == nullptr || currentTarget->stats().getHp() <= 0))
           {
             // 使用者から見た「敵」の生存者を取得
             std::vector<CharacterState*> candidates =
@@ -2894,7 +2894,7 @@ public:
           // 単体蘇生の対象が、実行前に別の蘇生で既に復活していた場合
           if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
               currentSkill.type == Skill::EffectType::REVIVE &&
-              (currentTarget == nullptr || currentTarget->getHp() > 0))
+              (currentTarget == nullptr || currentTarget->stats().getHp() > 0))
           {
             message += "\n対象はすでに復活している！";
             messageFlow = MessageFlow::END_TURN;
@@ -2906,7 +2906,7 @@ public:
           if (currentSkill.scope == Skill::TargetScope::SINGLE_ALLY &&
               (currentSkill.type == Skill::EffectType::HEAL ||
               currentSkill.type == Skill::EffectType::BUFF) &&
-              (currentTarget == nullptr || currentTarget->getHp() <= 0))
+              (currentTarget == nullptr || currentTarget->stats().getHp() <= 0))
           {
             // 使用者から見た生存中の味方
             std::vector<CharacterState*> candidates =
@@ -2916,7 +2916,7 @@ public:
 
             if (candidates.empty()) {
               message =
-                  String(currentActor->getname()) +
+                  String(currentActor->name()) +
                   " の " +
                   currentSkill.name +
                   "！\n対象がいない！";
@@ -2933,15 +2933,15 @@ public:
           }
 
           // TP消費をここに集約
-          if (!currentActor->useTP(currentSkill.tpCost)) {
-            message = String(currentActor->getname()) + " はTPが足りない！";
+          if (!currentActor->spendTP(currentSkill.tpCost)) {
+            message = String(currentActor->name()) + " はTPが足りない！";
             messageFlow = MessageFlow::END_TURN;
             currentBattleState = STATE_ACTION_MSG;
             break;
           }
 
           message =
-            String(currentActor->getname()) +
+            String(currentActor->name()) +
             " の " +
             currentSkill.name +
             "！";
@@ -2963,7 +2963,7 @@ public:
             Skill::TargetScope::SINGLE_ENEMY)
         {
           if (currentTarget != nullptr &&
-              currentTarget->getHp() > 0)
+              currentTarget->stats().getHp() > 0)
           {
             executeHostileSkillOnTarget(
                 currentSkill,
@@ -2985,7 +2985,7 @@ public:
           bool targetCanReceiveSkill =
               currentTarget != nullptr &&
               (
-                currentTarget->getHp() > 0 ||
+                currentTarget->stats().getHp() > 0 ||
                 currentSkill.type ==
                     Skill::EffectType::REVIVE
               );
@@ -3104,7 +3104,7 @@ public:
 
               for (auto target : targets) {
                 if (target != nullptr &&
-                    target->getHp() > 0)
+                    target->stats().getHp() > 0)
                 {
                   live.push_back(target);
                 }
@@ -3206,7 +3206,7 @@ public:
         bool allEnemiesDefeated = true;
 
         for (auto enemy : activeEnemies) {
-          if (enemy && enemy->status && enemy->status->getHp() > 0) {
+          if (enemy && enemy->status && enemy->status->stats().getHp() > 0) {
             allEnemiesDefeated = false;
             break;
           }
@@ -3217,13 +3217,13 @@ public:
         // -------------------------
         bool anyoneAlive = false;
 
-        if (hero.status->getHp() > 0) {
+        if (hero.status->stats().getHp() > 0) {
           anyoneAlive = true;
         }
 
         if (!anyoneAlive) {
           for (auto m : party.members) {
-            if (m && m->status && m->status->getHp() > 0) {
+            if (m && m->status && m->status->stats().getHp() > 0) {
               anyoneAlive = true;
               break;
             }
@@ -3296,8 +3296,8 @@ public:
         // かつ本人がまだ生きている場合のみ再行動する
         if (messageFlow == MessageFlow::ACTION_COMPLETE &&
             currentActor != nullptr &&
-            currentActor->getHp() > 0 &&
-            currentActor->hasDoubleAction())
+            currentActor->stats().getHp() > 0 &&
+            currentActor->effects().getIsDoubleAction())
         {
           currentActor->consumeDoubleAction();
 
@@ -3308,7 +3308,7 @@ public:
           messageFlow = MessageFlow::ACTION_COMPLETE;
 
           if (currentActor->isPlayer()) {
-            message = String(currentActor->getname()) + " の再行動！";
+            message = String(currentActor->name()) + " の再行動！";
             currentBattleState = STATE_COMMAND_SELECT;
           }
           else {
@@ -3361,18 +3361,18 @@ public:
           resultMessages.push_back(String(lastGainedXP) + "Expを得た!");
           
           // 2. レベルアップ・進化判定 (主人公)
-          if (hero.status->getHp() > 0) {
+          if (hero.status->stats().getHp() > 0) {
             int res = hero.status->gainXP(lastGainedXP);
-            if (res >= 1) resultMessages.push_back("調律師はLv" + String(hero.status->getLevel()) + "になった!");
+            if (res >= 1) resultMessages.push_back("調律師はLv" + String(hero.status->progress().level()) + "になった!");
           }
           // 3. レベルアップ・進化判定 (仲間)
           for(auto ally : party.members) {
-            if (ally->status->getHp() > 0) {
+            if (ally->status->stats().getHp() > 0) {
               int allyRes = ally->status->gainXP(lastGainedXP);
-              if (allyRes >= 1) resultMessages.push_back(String(ally->status->getname()) + "はLv" + String(ally->status->getLevel()) + "になった!");
+              if (allyRes >= 1) resultMessages.push_back(String(ally->status->name()) + "はLv" + String(ally->status->progress().level()) + "になった!");
               if (allyRes == 2) {
                 resultMessages.push_back(
-                    String(ally->status->getname()) +
+                    String(ally->status->name()) +
                     "は進化した!"
                 );
               }
@@ -3443,10 +3443,10 @@ public:
           }
           
           // 戦闘終了時にステータスをリセット
-          hero.status->resetBattleStats();
+          hero.status->clearBattleEffects();
           std::vector<CharacterState::PopupData>().swap(hero.status->popupValues);
           for(auto m : party.members) {
-            m->status->resetBattleStats();
+            m->status->clearBattleEffects();
             std::vector<CharacterState::PopupData>().swap(m->status->popupValues);
           }
           for (auto enemy : activeEnemies) {
@@ -3524,13 +3524,13 @@ public:
         if (s != nullptr) {
           // 名前とレベル
           g->lineSprite.setCursor(10, 10 - drawY);
-          g->lineSprite.printf("%s Lv%d", s->getname(), s->getLevel());
+          g->lineSprite.printf("%s Lv%d", s->name(), s->progress().level());
           
           // HP / TP
           g->lineSprite.setCursor(10, 40 - drawY);
-          g->lineSprite.printf("HP: %d / %d", s->getHp(), s->getMaxHp());
+          g->lineSprite.printf("HP: %d / %d", s->stats().getHp(), s->stats().getMaxHp());
           g->lineSprite.setCursor(10, 65 - drawY);
-          g->lineSprite.printf("TP: %d / %d", s->getTp(), s->getMaxTp());
+          g->lineSprite.printf("TP: %d / %d", s->stats().getTp(), s->stats().getMaxTp());
 
           // 能力値
           g->lineSprite.setTextSize(1.5); 
@@ -3538,20 +3538,20 @@ public:
           int startY = 100; int gap = 25;
 
           g->lineSprite.setCursor(col1, startY - drawY);
-          g->lineSprite.printf("ATK: %d", s->getAttack());
+          g->lineSprite.printf("ATK: %d", s->attack());
           g->lineSprite.setCursor(col2, startY - drawY);
-          g->lineSprite.printf("DEF: %d", s->getDefense());
+          g->lineSprite.printf("DEF: %d", s->defense());
 
           g->lineSprite.setCursor(col1, startY + gap - drawY);
-          g->lineSprite.printf("SPD: %d", s->getSpeed());
+          g->lineSprite.printf("SPD: %d", s->speed());
           g->lineSprite.setCursor(col2, startY + gap - drawY);
-          g->lineSprite.printf("SEN: %d", s->getSense());
+          g->lineSprite.printf("SEN: %d", s->sense());
 
           g->lineSprite.setCursor(col1, startY + gap*2 - drawY);
-          g->lineSprite.printf("LCK: %d", s->getLuck());
+          g->lineSprite.printf("LCK: %d", s->luck());
           
           g->lineSprite.setCursor(col2, startY + gap*2 - drawY);
-          g->lineSprite.printf("EXP: %d", s->getXP()); 
+          g->lineSprite.printf("EXP: %d", s->progress().xp()); 
 
           // ページガイド
           g->lineSprite.setTextSize(2);
@@ -3573,11 +3573,11 @@ public:
           if (i >= 4) break; 
           Enemy* enemy = activeEnemies[i];
           
-          if (enemy->status->getHp() > 0 || !enemy->status->popupValues.empty()) {
+          if (enemy->status->stats().getHp() > 0 || !enemy->status->popupValues.empty()) {
             int ex = enemyX[i];
             int ey = enemyY[i] - drawY; 
 
-            if (enemy->status->getHp() > 0) {
+            if (enemy->status->stats().getHp() > 0) {
               //uint16_t* img = (i < enemyImages.size()) ? enemyImages[i] : nullptr;
               uint16_t* img = activeImages[i];
               g->lineSprite.fillEllipse(ex + 32, ey + 60, 24, 8, TFT_RED);
@@ -3586,7 +3586,7 @@ public:
             }
             
             // カーソル (敵)
-            if (currentBattleState == STATE_TARGET_SELECT_ENEMY && enemyTargetIndex == i && enemy->status->getHp() > 0) {
+            if (currentBattleState == STATE_TARGET_SELECT_ENEMY && enemyTargetIndex == i && enemy->status->stats().getHp() > 0) {
               g->lineSprite.setTextColor(TFT_YELLOW); g->lineSprite.setTextSize(2);
               g->lineSprite.setCursor(ex + 26, ey - 20); g->lineSprite.print("▼");
             }
@@ -3624,8 +3624,8 @@ public:
         const int heroY = 20 - drawY; // 右上
         
         // 主人公
-        if (hero.status->getHp() > 0 || !hero.status->popupValues.empty()) {
-          if (hero.status->getHp() > 0) {
+        if (hero.status->stats().getHp() > 0 || !hero.status->popupValues.empty()) {
+          if (hero.status->stats().getHp() > 0) {
             //uint16_t* img = (!allyImages.empty()) ? allyImages[0] : nullptr;
             uint16_t* img = activeImages[4];
             g->lineSprite.fillEllipse(heroX + 32, heroY + 60, 24, 8, TFT_CYAN);
@@ -3668,8 +3668,8 @@ public:
           Automaton* ally = party.members[i];
           int ay = allyY_base[i] - drawY;
 
-          if (ally->status->getHp() > 0 || !ally->status->popupValues.empty()) {
-            if (ally->status->getHp() > 0) {
+          if (ally->status->stats().getHp() > 0 || !ally->status->popupValues.empty()) {
+            if (ally->status->stats().getHp() > 0) {
               //uint16_t* img = (i + 1 < allyImages.size()) ? allyImages[i + 1] : nullptr;
               uint16_t* img = activeImages[5 + i];
               g->lineSprite.fillEllipse(allyX[i] + 32, ay + 60, 24, 8, TFT_CYAN);
@@ -3839,7 +3839,7 @@ private:
           }
         }
         actualDamage =
-            target->takedamage(value, skill.category);
+            target->takeDamage(value, skill.category);
 
         target->addPopup(actualDamage, isCrit);
         lastDamage += actualDamage;
@@ -3849,7 +3849,7 @@ private:
         // ★ isCrit を渡す
         music.playSE(7);
         value = user->calculateHealAmount(skill, isCrit);
-        target->ReceiveHeal(value);
+        target->heal(value);
         target->addPopup(-value, isCrit); // ★ 結果をポップアップへ (回復も赤字/強調表示される)
         lastDamage -= value; 
         break;
@@ -3871,7 +3871,7 @@ private:
               else music.playSE(7);
             }
             actualDamage =
-                target->takedamage(value, skill.category);
+                target->takeDamage(value, skill.category);
 
             target->addPopup(actualDamage, isCrit);
             lastDamage += actualDamage;
@@ -3899,8 +3899,8 @@ private:
         lastActionMessage = "治った！";
         break;
       case Skill::EffectType::REVIVE:
-        if (skill.id == 98) target->Revive(100); 
-        else target->Revive(50);
+        if (skill.id == 98) target->revive(100); 
+        else target->revive(50);
         music.playSE(7);
         lastActionMessage = "復活！";
         break;
@@ -3908,21 +3908,21 @@ private:
       case Skill::EffectType::SPECIAL:
         if (skill.id == 100) { 
           music.playSE(7);
-          target->ReceiveTP(skill.power); 
+          target->restoreTP(skill.power); 
           lastActionMessage = "TP回復";
         } // 2. アサシネイト (即死)
         else if (skill.id == 42) {
-          int chance = 30 + (user->getLuck() - target->getLuck()); // 基本30%
+          int chance = 30 + (user->luck() - target->luck()); // 基本30%
           if (random(0, 100) < chance) {
             music.playSE(4);
-            int dmg = target->getHp();
+            int dmg = target->stats().getHp();
 
             actualDamage =
-                target->takedamage(dmg, skill.category);
+                target->takeDamage(dmg, skill.category);
 
             target->addPopup(actualDamage, true);
 
-            if (target->getHp() <= 0) {
+            if (target->stats().getHp() <= 0) {
               lastActionMessage = "急所を突いた! 即死!";
             }
             else {
@@ -3936,7 +3936,7 @@ private:
             value = user->caclulateSkillDamage(target, skill, isCrit) / 2;
             if(value<1) value=1;
             actualDamage =
-                target->takedamage(value, skill.category);
+                target->takeDamage(value, skill.category);
 
             target->addPopup(actualDamage, isCrit);
             lastActionMessage = "急所を外した...";
@@ -3955,19 +3955,19 @@ private:
                 );
 
             actualDamage =
-                target->takedamage(value, skill.category);
+                target->takeDamage(value, skill.category);
 
             target->addPopup(actualDamage, isCrit);
 
             // 実際に与えたダメージ分だけ吸収
-            user->ReceiveHeal(actualDamage);
+            user->heal(actualDamage);
             user->addPopup(-actualDamage, false);
             lastActionMessage = "体力を奪い取った!";
           } else { // TP吸収
             music.playSE(7);
             int drain = 30;
-            target->ReceiveTP(-drain);
-            user->ReceiveTP(drain);
+            target->restoreTP(-drain);
+            user->restoreTP(drain);
             lastActionMessage = "TPを奪い取った!";
           }
         }
@@ -3989,7 +3989,7 @@ private:
               );
 
           actualDamage =
-              target->takedamage(value, skill.category);
+              target->takeDamage(value, skill.category);
 
           target->addPopup(actualDamage, isCrit);
 
@@ -4046,7 +4046,7 @@ private:
               );
 
           actualDamage =
-              target->takedamage(value, skill.category);
+              target->takeDamage(value, skill.category);
 
           target->addPopup(actualDamage, isCrit);
 
@@ -4077,7 +4077,7 @@ private:
               );
 
           actualDamage =
-              target->takedamage(value, skill.category);
+              target->takeDamage(value, skill.category);
 
           target->addPopup(actualDamage, isCrit);
 
@@ -4102,7 +4102,7 @@ private:
               );
 
           actualDamage =
-              target->takedamage(value, skill.category);
+              target->takeDamage(value, skill.category);
 
           target->addPopup(actualDamage, isCrit);
 
@@ -4133,12 +4133,12 @@ private:
   std::vector<CharacterState*> getAliveAllies() {
     std::vector<CharacterState*> allies;
     // 主人公
-    if (heroRef->status->getHp() > 0) {
+    if (heroRef->status->stats().getHp() > 0) {
       allies.push_back(heroRef->status);
     }
     // 仲間
     for (auto ally : partyRef->members) {
-      if (ally->status->getHp() > 0) {
+      if (ally->status->stats().getHp() > 0) {
         allies.push_back(ally->status);
       }
     }
@@ -4150,7 +4150,7 @@ private:
 
     // 主人公
     if (heroRef && heroRef->status &&
-        heroRef->status->getHp() <= 0) {
+        heroRef->status->stats().getHp() <= 0) {
       allies.push_back(heroRef->status);
     }
 
@@ -4158,7 +4158,7 @@ private:
     if (partyRef) {
       for (auto ally : partyRef->members) {
         if (ally && ally->status &&
-            ally->status->getHp() <= 0) {
+            ally->status->stats().getHp() <= 0) {
           allies.push_back(ally->status);
         }
       }
@@ -4189,7 +4189,7 @@ private:
     std::vector<CharacterState*> enemies;
 
     for (auto enemy : activeEnemies) {
-      if (enemy && enemy->status && enemy->status->getHp() > 0) {
+      if (enemy && enemy->status && enemy->status->stats().getHp() > 0) {
         enemies.push_back(enemy->status);
       }
     }
@@ -4594,10 +4594,10 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
         // アイテム効果適用
         int itemId = inventory.items[selectedItemIndex].item.id;
         
-        if (itemId == 100) targetStatus->ReceiveHeal(50);
-        else if (itemId == 101) targetStatus->ReceiveHeal(200);
-        else if (itemId == 102) targetStatus->ReceiveHeal(9999);
-        else if (itemId == 103) targetStatus->ReceiveTP(20);
+        if (itemId == 100) targetStatus->heal(50);
+        else if (itemId == 101) targetStatus->heal(200);
+        else if (itemId == 102) targetStatus->heal(9999);
+        else if (itemId == 103) targetStatus->restoreTP(20);
         else if (itemId == 104) targetStatus->CureStatus(true);
 
         // 消費して戻る
@@ -4688,7 +4688,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
             
             // 1. この仲間の進化ルールか？
             // 2. トリガーはアイテムか？
-            if (rule.before_who_id == selectedAlly->status->getWho() && 
+            if (rule.before_who_id == selectedAlly->status->id() && 
                 rule.trigger_type == CharacterState::EvolutionTriggerType::TRIGGER_ITEM) 
             {
               int requiredItemId = rule.trigger_value; // 必要なアイテムID
@@ -4764,7 +4764,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           else if (inventory.countItem(requiredScrollId) > 0) {
               // 消費して習得
               inventory.removeItem(requiredScrollId);
-              hero.status->learnSkill(SkillCatalog::get(skillIdToLearn));
+              hero.status->learnSkill(skillIdToLearn);
               music.playSE(0);
               // (※ここで「覚えた！」というフラグを立てて、draw側でメッセージを出すと親切です)
           } else {
@@ -4817,9 +4817,9 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           
           // 1. 外す (インベントリに戻す)
           int oldId = -1;
-          if (equipSlot == 0) oldId = s->weaponId();
-          if (equipSlot == 1) oldId = s->armorId();
-          if (equipSlot == 2) oldId = s->accessoryId();
+          if (equipSlot == 0) oldId = s->equipmentState().weaponId();
+          if (equipSlot == 1) oldId = s->equipmentState().armorId();
+          if (equipSlot == 2) oldId = s->equipmentState().accessoryId();
 
           if (oldId != -1) {
             inventory.addItem(ItemCatalog::get(oldId));
@@ -4850,11 +4850,11 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
             inventory.money -= cost;
             
             // 全回復
-            hero.status->Revive(100);
-            hero.status->ReceiveHeal(9999); hero.status->ReceiveTP(9999);
+            hero.status->revive(100);
+            hero.status->heal(9999); hero.status->restoreTP(9999);
             for(auto m : party.members) {
-              m->status->Revive(100);
-              m->status->ReceiveHeal(9999); m->status->ReceiveTP(9999);
+              m->status->revive(100);
+              m->status->heal(9999); m->status->restoreTP(9999);
             }
             // (ここで「回復した！」メッセージを出したいが、簡易的に閉じる)
             active = false; 

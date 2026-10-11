@@ -18,53 +18,15 @@ private:
   StatusEffects statusEffects;
   Progression progression;
   int who;
-  const char* name;
+  const char* nameValue;
   SkillSet skillSet; // 習得済みの旋律リスト
   int getPreEvolution(int currentId);
 public:
-  int getPoisonLevel() const;
-  int getCoverTurns() const;
-  float getAtkBuffRate() const;
-  int getAtkBuffTurns() const;
-  float getDefBuffRate() const;
-  int getDefBuffTurns() const;
-  float getSpdBuffRate() const;
-  int getSpdBuffTurns() const;
-  float getSenBuffRate() const;
-  int getSenBuffTurns() const;
-  float getLckBuffRate() const;
-  int getLckBuffTurns() const;
-  float getEvaBuffRate() const;
-  int getEvaBuffTurns() const;
-  float getAtkDebuffRate() const;
-  int getAtkDebuffTurns() const;
-  float getDefDebuffRate() const;
-  int getDefDebuffTurns() const;
-  float getSpdDebuffRate() const;
-  int getSpdDebuffTurns() const;
-  float getSenDebuffRate() const;
-  int getSenDebuffTurns() const;
-  float getLckDebuffRate() const;
-  int getLckDebuffTurns() const;
-  int getHpRegenTurns() const;
-  int getTpRegenTurns() const;
-  int getInvalidDamageTurns() const;
-  int getReflectPhysicalTurns() const;
-  int getReflectMagicTurns() const;
-  int getTauntTurns() const;
-  int getTwoActionsTurns() const;
-  int getUntargetableTurns() const;
-  int getPhysDamageOneTurns() const;
-  int getEndureTurns() const;
-  int getCounterTurns() const;
-  int getAutoReviveTurns() const;
-  int getStatusImmuneTurns() const;
-  int getAttributeResistTurns() const;
-  int getCantMoveTurns() const;
-  int getReflectAllTurns() const;
-  int getDamageGuardCount() const;
-  bool hasDoubleAction() const;
-  bool isDefending() const;
+  const CoreStats& stats() const;
+  const Equipment& equipmentState() const;
+  const StatusEffects& effects() const;
+  const Progression& progress() const;
+  void retireFromBattle();
   void applyAttackBuff(float rate, int turns);
   void applyDefenseBuff(float rate, int turns);
   void applySpeedBuff(float rate, int turns);
@@ -110,39 +72,23 @@ public:
   void endDefense();
   void equip(EquipmentSlot slot, int itemId);
   void unequip(EquipmentSlot slot);
-  int weaponId() const;
-  int armorId() const;
-  int accessoryId() const;
   struct PopupData {
     int value;      // 数値
     bool isCritical; // 会心かどうか
   };
   std::vector<PopupData> popupValues; // int から PopupData に変更
-  int getHp();
-  void setHp(int val);
-  int getMaxHp();
-  int getTp();
-  int getMaxTp();
-  int getAttack();
-  int getDefense();
-  int getSpeed();
-  int getSense();
-  int getLuck();
-  int getLevel();
-  int getXP();
-  int getNextXP();
-  int getWho();
-  const char* getname();
-  int getPoisonTurns() const;
-  int getParalyzedTurns() const;
-  int getSilencedTurns() const;
-  int getConfusedTurns() const;
+  int attack() const;
+  int defense() const;
+  int speed() const;
+  int sense() const;
+  int luck() const;
+  int id() const;
+  const char* name() const;
   int normalizeWho(int w);
   void updateName();
   using EvolutionTriggerType = EvolutionCatalog::EvolutionTriggerType;
   static constexpr EvolutionTriggerType TRIGGER_LEVEL = EvolutionCatalog::TRIGGER_LEVEL;
   static constexpr EvolutionTriggerType TRIGGER_ITEM = EvolutionCatalog::TRIGGER_ITEM;
-  float getEvasionBonus();
 
   using EvolutionRule = EvolutionCatalog::EvolutionRule;
 
@@ -153,32 +99,31 @@ public:
   void forceLearnSkill(int skillId);
   CharacterState(int level, int w);
 
-  void resetBattleStats();
+  void clearBattleEffects();
   // ★ MaxHP増加処理 (ID 62)
   void boostMaxHP();
 
-  int takedamage(
+  int takeDamage(
       int damage,
       Skill::Category damageCategory = Skill::Category::OTHER
   );
 
-  void ReceiveHeal(int amount);
+  void heal(int amount);
 
-  void Revive(int hpPercent);
+  void revive(int hpPercent);
 
   void CureStatus(bool cureDebuffs);
 
-  void ReceiveTP(int amount);
+  void restoreTP(int amount);
 
   void AddBuff(int skillId);
   bool checkDebuffHit(int baseChance, CharacterState* user);
   bool AddDebuff(int skillId, CharacterState* user = nullptr);
 
-  int calculateNextXP(int level);
 
   void recalculateStats();
 
-  bool useTP(int cost);
+  bool spendTP(int cost);
 
   int gainXP(int amount);
 
@@ -192,7 +137,7 @@ public:
 
   void addAttack(int amount);
 
-  void learnSkill(const Skill& newSkill);
+  void learnSkill(int skillId);
   
   void evolve(int newWhoId);
 

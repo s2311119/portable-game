@@ -12,28 +12,12 @@ void CharacterState::equip(EquipmentSlot slot, int itemId) { equipment.equip(slo
 
 void CharacterState::unequip(EquipmentSlot slot) { equipment.unequip(slot); }
 
-int CharacterState::weaponId() const { return equipment.weaponId(); }
-
-int CharacterState::armorId() const { return equipment.armorId(); }
-
-int CharacterState::accessoryId() const { return equipment.accessoryId(); }
-
 int CharacterState::getPreEvolution(int currentId) {
     const EvolutionCatalog::Lineage lineage = EvolutionCatalog::getLineage(currentId);
     return lineage.count > 1 ? lineage.ids[1] : -1;
   }
 
-int CharacterState::getHp(){return coreStats.getHp();}
-
-void CharacterState::setHp(int val){ coreStats.setHp(val);}
-
-int CharacterState::getMaxHp(){return coreStats.getMaxHp();}
-
-int CharacterState::getTp(){return coreStats.getTp();}
-
-int CharacterState::getMaxTp(){return coreStats.getMaxTp();}
-
-int CharacterState::getAttack() {
+int CharacterState::attack() const {
     float finalValue = (float)coreStats.getAttack(); // 基礎ATK
     finalValue = equipment.applyAttackBonus(finalValue);
     // バフを適用 (例: 1.5倍 or 2.0倍)
@@ -43,7 +27,7 @@ int CharacterState::getAttack() {
     return (int)finalValue;
   }
 
-int CharacterState::getDefense() {
+int CharacterState::defense() const {
     float finalValue = (float)coreStats.getDefense(); // 基礎DEF
     finalValue = equipment.applyDefenseBonus(finalValue);
     finalValue = statusEffects.applyDefenseModifiers(finalValue);
@@ -52,7 +36,7 @@ int CharacterState::getDefense() {
     return (int)finalValue;
   }
 
-int CharacterState::getSpeed() {
+int CharacterState::speed() const {
     float finalValue = (float)coreStats.getSpeed(); // 基礎SPD
     finalValue = equipment.applySpeedBonus(finalValue);
     finalValue = statusEffects.applySpeedModifiers(finalValue);
@@ -61,7 +45,7 @@ int CharacterState::getSpeed() {
     return (int)finalValue;
   }
 
-int CharacterState::getSense() {
+int CharacterState::sense() const {
     float finalValue = (float)coreStats.getSense(); // 基礎SEN
     finalValue = equipment.applySenseBonus(finalValue);
     finalValue = statusEffects.applySenseModifiers(finalValue);
@@ -70,7 +54,7 @@ int CharacterState::getSense() {
     return (int)finalValue;
   }
 
-int CharacterState::getLuck() {
+int CharacterState::luck() const {
     float finalValue = (float)coreStats.getLuck(); // 基礎LCK
     finalValue = equipment.applyLuckBonus(finalValue);
     finalValue = statusEffects.applyLuckModifiers(finalValue);
@@ -79,23 +63,9 @@ int CharacterState::getLuck() {
     return (int)finalValue;
   }
 
-int CharacterState::getLevel(){return progression.level();}
+int CharacterState::id() const{ return who; }
 
-int CharacterState::getXP(){ return progression.xp(); }
-
-int CharacterState::getNextXP(){ return progression.nextLevelXp(); }
-
-int CharacterState::getWho(){ return who; }
-
-const char* CharacterState::getname(){return name;}
-
-int CharacterState::getPoisonTurns() const { return statusEffects.getPoisonTurns(); }
-
-int CharacterState::getParalyzedTurns() const { return statusEffects.getParalyzedTurns(); }
-
-int CharacterState::getSilencedTurns() const { return statusEffects.getSilencedTurns(); }
-
-int CharacterState::getConfusedTurns() const { return statusEffects.getConfusedTurns(); }
+const char* CharacterState::name() const{return nameValue;}
 
 int CharacterState::normalizeWho(int w) {
     if (w >= 0 && w <= 37) return w + 39;
@@ -103,11 +73,7 @@ int CharacterState::normalizeWho(int w) {
   }
 
 void CharacterState::updateName() {
-    name = CharacterCatalog::nameFor(who);
-  }
-
-float CharacterState::getEvasionBonus() {
-    return statusEffects.evasionBonus();
+    nameValue = CharacterCatalog::nameFor(who);
   }
 
 const SkillSet& CharacterState::skills() const {
@@ -115,7 +81,7 @@ const SkillSet& CharacterState::skills() const {
   }
 
 void CharacterState::forceLearnSkill(int skillId) {
-    learnSkill(SkillCatalog::get(skillId));
+    learnSkill(skillId);
   }
 
 CharacterState::CharacterState(int level, int w){
@@ -134,7 +100,7 @@ CharacterState::CharacterState(int level, int w){
     checkLevelUpSkills(0, progression.level()); // 0レベルから現在のレベルまで
   }
 
-void CharacterState::resetBattleStats() {
+void CharacterState::clearBattleEffects() {
     coreStats.restoreBaseMaxHp();
     
     // バフ・デバフ・状態異常の全解除
@@ -149,7 +115,7 @@ void CharacterState::boostMaxHP() {
     }
   }
 
-int CharacterState::takedamage(
+int CharacterState::takeDamage(
       int damage,
       Skill::Category damageCategory
   ){
@@ -183,11 +149,11 @@ int CharacterState::takedamage(
     return damage;
   }
 
-void CharacterState::ReceiveHeal(int amount) {
+void CharacterState::heal(int amount) {
     coreStats.heal(amount);
 }
 
-void CharacterState::Revive(int hpPercent) {
+void CharacterState::revive(int hpPercent) {
     coreStats.revive(hpPercent);
 }
 
@@ -195,7 +161,7 @@ void CharacterState::CureStatus(bool cureDebuffs) {
     statusEffects.cureStatus(cureDebuffs);
   }
 
-void CharacterState::ReceiveTP(int amount) {
+void CharacterState::restoreTP(int amount) {
     coreStats.restoreTP(amount);
 }
 
@@ -368,7 +334,7 @@ bool CharacterState::checkDebuffHit(int baseChance, CharacterState* user) {
     if (user == nullptr) return true; // ユーザー指定なしなら必中（自分への副作用など）
     
     // 基本確率 + (かけた人の運 - かけられた人の運)
-    int chance = baseChance + (user->getLuck() - this->getLuck());
+    int chance = baseChance + (user->luck() - this->luck());
     
     // 最低保証5%、最大95% (完全に無効化したい場合は属性耐性などで処理)
     if (chance < 5) chance = 5;
@@ -524,17 +490,13 @@ bool CharacterState::AddDebuff(int skillId, CharacterState* user) {
     return true;
   }
 
-int CharacterState::calculateNextXP(int level) {
-    return Progression::nextLevelXpFor(level);
-  }
-
 void CharacterState::recalculateStats() {
     const CoreStatsData stats =
         CharacterCatalog::statsFor(who, progression.level());
     coreStats.applyRecalculatedStats(stats);
 }
 
-bool CharacterState::useTP(int cost) {
+bool CharacterState::spendTP(int cost) {
     return coreStats.spendTP(cost);
 }
 
@@ -678,7 +640,7 @@ int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, b
         // 基本命中率
         int hitRate =
             95 +
-            (this->getSpeed() - target->getSpeed());
+            (this->speed() - target->speed());
 
         // まず通常状態での「回避率」を求める
         if (hitRate > 100) hitRate = 100;
@@ -689,7 +651,7 @@ int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, b
         // 対象の回避率バフを反映
         // 例：回避率2倍なら、通常5%回避 → 10%回避
         float evasionBonus =
-            target->getEvasionBonus();
+            target->effects().evasionBonus();
 
         missRate =
             static_cast<int>(
@@ -708,32 +670,32 @@ int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, b
         }
       }
     }
-    if ((target->getWho() == 36 || target->getWho() == 37|| target->getWho() == 75 || target->getWho() == 76) && 
+    if ((target->id() == 36 || target->id() == 37|| target->id() == 75 || target->id() == 76) && 
         skill.dependence == Skill::StatDependence::SEN) {
       retIsCrit = false;
       return 0; // ダメージ0 (無効)
     }
     // --- 基礎ステータス決定 ---
-    int offensiveVal = (skill.dependence == Skill::StatDependence::SEN) ? this->getSense() : this->getAttack();
-    int defensiveVal = (skill.dependence == Skill::StatDependence::SEN) ? target->getSense() : target->getDefense();
+    int offensiveVal = (skill.dependence == Skill::StatDependence::SEN) ? this->sense() : this->attack();
+    int defensiveVal = (skill.dependence == Skill::StatDependence::SEN) ? target->sense() : target->defense();
 
     // --- 特殊技の威力補正 ---
     float skillPower = (float)skill.power;
 
     // ID 35: カラミティ・エンド (HPが低いほど高威力)
     if (skill.id == 35) {
-        float hpRatio = (float)this->getHp() / (float)this->getMaxHp();
+        float hpRatio = (float)this->stats().getHp() / (float)this->stats().getMaxHp();
         // HP100%なら1倍、HP1%なら3倍など
         skillPower = skillPower * (3.0 - (hpRatio * 2.0)); 
     }
     // ID 119: エナジー・バーン (敵のTPが多いほど高威力)
     else if (skill.id == 119) {
-        skillPower += target->getTp() / 2; 
+        skillPower += target->stats().getTp() / 2; 
     }
     // ID 115: ペイン・イーター (状態異常の敵に威力2倍)
     else if (skill.id == 115) {
-        if (target->getPoisonTurns() > 0 || target->getParalyzedTurns() > 0 || 
-            target->getSilencedTurns() > 0 || target->getConfusedTurns() > 0) {
+        if (target->effects().getPoisonTurns() > 0 || target->effects().getParalyzedTurns() > 0 || 
+            target->effects().getSilencedTurns() > 0 || target->effects().getConfusedTurns() > 0) {
             skillPower *= 2.0;
         }
     }
@@ -743,7 +705,7 @@ int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, b
     // ID 28, 40: 高クリティカル
     if (skill.id == 28 || skill.id == 40) critBonus = 30; 
 
-    int critRate = 5 + (this->getLuck() - target->getLuck()) + critBonus;
+    int critRate = 5 + (this->luck() - target->luck()) + critBonus;
     if(critRate > 100) critRate = 100;
     if(critRate < 0) critRate = 0;
     retIsCrit = (random(0, 100) < critRate);
@@ -766,10 +728,10 @@ int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, b
     int baseDamage = (int)((float)offensiveVal * powerMultiplier);
     
     int damage = baseDamage - (int)effectiveDef;
-    if (target->isDefending()) {
+    if (target->effects().getIsDefending()) {
       damage = (int)(damage * 0.7);
     }
-    if (target->getAttributeResistTurns() > 0) {
+    if (target->effects().getAttributeResistTurns() > 0) {
       damage = damage / 4;
     }
     // 会心ボーナス (1.5倍)
@@ -788,13 +750,13 @@ int CharacterState::caclulateSkillDamage(CharacterState* target, Skill& skill, b
   }
 
 int CharacterState::calculateHealAmount(Skill& skill, bool &retIsCrit) {
-    int base = this->getSense();
+    int base = this->sense();
     float multiplier = (float)skill.power / 50.0;
     int heal = (int)((float)base * multiplier);
     
     // --- ★ 会心判定 (回復) ---
     // (回復の会心率は運の10%程度とする)
-    int critRate = this->getLuck() / 10; 
+    int critRate = this->luck() / 10; 
     if (critRate < 5) critRate = 5; // 最低5%
     
     retIsCrit = (random(0, 100) < critRate);
@@ -827,8 +789,8 @@ void CharacterState::addAttack(int amount) {
     coreStats.addAttack(amount);
 }
 
-void CharacterState::learnSkill(const Skill& newSkill) {
-    skillSet.learn(newSkill.id);
+void CharacterState::learnSkill(int skillId) {
+    skillSet.learn(skillId);
   }
 
 void CharacterState::evolve(int newWhoId) {
@@ -859,7 +821,7 @@ void CharacterState::checkLevelUpSkills(int oldLevel, int newLevel) {
             SkillLearnsetCatalog::getLearnableSkills(
                 normalizedCheckID, oldLevel, newLevel);
         for (int i = 0; i < skills.count; i++) {
-          learnSkill(SkillCatalog::get(skills.ids[i])); // 重複チェック付きで習得
+          learnSkill(skills.ids[i]); // 重複チェック付きで習得
         }
 
         // ★ 次のループのために、進化前のIDを取得する
@@ -875,19 +837,19 @@ int CharacterState::ApplyTurnEffects() {
     int value = 0;
 
     if (statusEffects.getHpRegenTurns() > 0) {
-      int heal = getMaxHp() * 0.1;
+      int heal = stats().getMaxHp() * 0.1;
       if (heal < 1) heal = 1;
-      ReceiveHeal(heal);
+      this->heal(heal);
       value = -heal;
     }
 
     if (statusEffects.getTpRegenTurns() > 0) {
-      ReceiveTP(getMaxTp() * 0.05);
+      restoreTP(stats().getMaxTp() * 0.05);
     }
 
     if (statusEffects.getPoisonTurns() > 0) {
       int poisonRate = (statusEffects.getPoisonLevel() >= 2) ? 20 : 10;
-      int poisonDmg = getMaxHp() * poisonRate / 100;
+      int poisonDmg = stats().getMaxHp() * poisonRate / 100;
 
       if (poisonDmg < 1) poisonDmg = 1;
 
@@ -897,7 +859,7 @@ int CharacterState::ApplyTurnEffects() {
       }
 
       value =
-        takedamage(poisonDmg);
+        takeDamage(poisonDmg);
     }
     return value;
   }
@@ -908,9 +870,9 @@ void CharacterState::saveTo(FsFile& file) {
     file.println(progression.xp());
     file.println(coreStats.getHp());
     file.println(coreStats.getTp());
-    file.println(weaponId()); // ★ 追加
-    file.println(armorId());  // ★ 追加
-    file.println(accessoryId());    // ★ 追加
+    file.println(equipmentState().weaponId()); // ★ 追加
+    file.println(equipmentState().armorId());  // ★ 追加
+    file.println(equipmentState().accessoryId());    // ★ 追加
     // 覚えているスキルの数とID
     file.println(skillSet.count());
     for (int i = 0; i < skillSet.count(); ++i) {
@@ -984,92 +946,6 @@ CharacterState::~CharacterState() {
 const CharacterState::EvolutionRule* const CharacterState::evolutionTable = EvolutionCatalog::getRules().rules;
 // サイズも同様に定義
 const int CharacterState::evolutionRuleCount = EvolutionCatalog::RULE_COUNT;
-
-int CharacterState::getPoisonLevel() const { return statusEffects.getPoisonLevel(); }
-
-int CharacterState::getCoverTurns() const { return statusEffects.getCoverTurns(); }
-
-float CharacterState::getAtkBuffRate() const { return statusEffects.getAtkBuffRate(); }
-
-int CharacterState::getAtkBuffTurns() const { return statusEffects.getAtkBuffTurns(); }
-
-float CharacterState::getDefBuffRate() const { return statusEffects.getDefBuffRate(); }
-
-int CharacterState::getDefBuffTurns() const { return statusEffects.getDefBuffTurns(); }
-
-float CharacterState::getSpdBuffRate() const { return statusEffects.getSpdBuffRate(); }
-
-int CharacterState::getSpdBuffTurns() const { return statusEffects.getSpdBuffTurns(); }
-
-float CharacterState::getSenBuffRate() const { return statusEffects.getSenBuffRate(); }
-
-int CharacterState::getSenBuffTurns() const { return statusEffects.getSenBuffTurns(); }
-
-float CharacterState::getLckBuffRate() const { return statusEffects.getLckBuffRate(); }
-
-int CharacterState::getLckBuffTurns() const { return statusEffects.getLckBuffTurns(); }
-
-float CharacterState::getEvaBuffRate() const { return statusEffects.getEvaBuffRate(); }
-
-int CharacterState::getEvaBuffTurns() const { return statusEffects.getEvaBuffTurns(); }
-
-float CharacterState::getAtkDebuffRate() const { return statusEffects.getAtkDebuffRate(); }
-
-int CharacterState::getAtkDebuffTurns() const { return statusEffects.getAtkDebuffTurns(); }
-
-float CharacterState::getDefDebuffRate() const { return statusEffects.getDefDebuffRate(); }
-
-int CharacterState::getDefDebuffTurns() const { return statusEffects.getDefDebuffTurns(); }
-
-float CharacterState::getSpdDebuffRate() const { return statusEffects.getSpdDebuffRate(); }
-
-int CharacterState::getSpdDebuffTurns() const { return statusEffects.getSpdDebuffTurns(); }
-
-float CharacterState::getSenDebuffRate() const { return statusEffects.getSenDebuffRate(); }
-
-int CharacterState::getSenDebuffTurns() const { return statusEffects.getSenDebuffTurns(); }
-
-float CharacterState::getLckDebuffRate() const { return statusEffects.getLckDebuffRate(); }
-
-int CharacterState::getLckDebuffTurns() const { return statusEffects.getLckDebuffTurns(); }
-
-int CharacterState::getHpRegenTurns() const { return statusEffects.getHpRegenTurns(); }
-
-int CharacterState::getTpRegenTurns() const { return statusEffects.getTpRegenTurns(); }
-
-int CharacterState::getInvalidDamageTurns() const { return statusEffects.getInvalidDamageTurns(); }
-
-int CharacterState::getReflectPhysicalTurns() const { return statusEffects.getReflectPhysicalTurns(); }
-
-int CharacterState::getReflectMagicTurns() const { return statusEffects.getReflectMagicTurns(); }
-
-int CharacterState::getTauntTurns() const { return statusEffects.getTauntTurns(); }
-
-int CharacterState::getTwoActionsTurns() const { return statusEffects.getTwoActionsTurns(); }
-
-int CharacterState::getUntargetableTurns() const { return statusEffects.getUntargetableTurns(); }
-
-int CharacterState::getPhysDamageOneTurns() const { return statusEffects.getPhysDamageOneTurns(); }
-
-int CharacterState::getEndureTurns() const { return statusEffects.getEndureTurns(); }
-
-int CharacterState::getCounterTurns() const { return statusEffects.getCounterTurns(); }
-
-int CharacterState::getAutoReviveTurns() const { return statusEffects.getAutoReviveTurns(); }
-
-int CharacterState::getStatusImmuneTurns() const { return statusEffects.getStatusImmuneTurns(); }
-
-int CharacterState::getAttributeResistTurns() const { return statusEffects.getAttributeResistTurns(); }
-
-int CharacterState::getCantMoveTurns() const { return statusEffects.getCantMoveTurns(); }
-
-int CharacterState::getReflectAllTurns() const { return statusEffects.getReflectAllTurns(); }
-
-int CharacterState::getDamageGuardCount() const { return statusEffects.getDamageGuardCount(); }
-
-bool CharacterState::hasDoubleAction() const { return statusEffects.getIsDoubleAction(); }
-
-bool CharacterState::isDefending() const { return statusEffects.getIsDefending(); }
 
 void CharacterState::applyAttackBuff(float rate, int turns) { statusEffects.applyAttackBuff(rate, turns); }
 
@@ -1156,3 +1032,13 @@ void CharacterState::consumeDoubleAction() { statusEffects.consumeDoubleAction()
 void CharacterState::beginDefense() { statusEffects.beginDefense(); }
 
 void CharacterState::endDefense() { statusEffects.endDefense(); }
+
+const CoreStats& CharacterState::stats() const { return coreStats; }
+
+const Equipment& CharacterState::equipmentState() const { return equipment; }
+
+const StatusEffects& CharacterState::effects() const { return statusEffects; }
+
+const Progression& CharacterState::progress() const { return progression; }
+
+void CharacterState::retireFromBattle() { coreStats.setHp(0); }

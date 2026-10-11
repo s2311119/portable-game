@@ -6,11 +6,11 @@ Automaton::Automaton(int level, int w) {
   }
 
 const char* Automaton::getname() {
-    return status->getname();
+    return status->name();
   }
 
 int Automaton::getWho() {
-    return status->getWho();
+    return status->id();
   }
 
 Automaton::~Automaton() {
