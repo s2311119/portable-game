@@ -4121,11 +4121,17 @@ void setup() {
       } else {
         // ロード用の仮オブジェクト生成
         ctx->session = new GameSession();
-        
-        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music,
+
+        ctx->music->paused = true;
+        critical_section_enter_blocking(&sdLock);
+        bool loaded = ctx->saveManager->loadGame(*ctx->sd, *ctx->music,
             ctx->session->map(), ctx->session->progress(),
             ctx->session->player(), ctx->session->party(),
-            ctx->session->storage(), ctx->session->inventory())) {
+            ctx->session->storage(), ctx->session->inventory());
+        critical_section_exit(&sdLock);
+        ctx->music->paused = false;
+
+        if (loaded) {
           loadSuccess = true;
           ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
         } else {

@@ -124,9 +124,6 @@
       AutomatonStorage& storage,
       Inventory& inventory
   ) {
-    music.paused = true;
-    critical_section_enter_blocking(&sdLock);
-
     FsFile file =
         sd.sdfat.open(
             SAVE_FILENAME,
@@ -134,16 +131,12 @@
         );
 
     if (!file) {
-      critical_section_exit(&sdLock);
-      music.paused = false;
       return false;
     }
 
     // ロード失敗時の共通終了処理
     auto failLoad = [&]() -> bool {
       file.close();
-      critical_section_exit(&sdLock);
-      music.paused = false;
       return false;
     };
 
@@ -413,9 +406,6 @@
     }
 
     file.close();
-
-    critical_section_exit(&sdLock);
-    music.paused = false;
 
     return true;
   }
