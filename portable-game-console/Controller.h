@@ -1,17 +1,11 @@
 #pragma once
 
 #include <stdint.h>
-#include "LegacyGameTypes.h"
-
-class Player;
-class Map;
 
 class Controller {
 public:
   const int BTN_UP=0, BTN_DOWN=3, BTN_LEFT=1, BTN_RIGHT=2;
   const int BTN_X=20, BTN_A=26, BTN_Y=27, BTN_B=21;
-  uint32_t lastMoveTime = 0;
-  const uint32_t moveIntervalMs = 80;
 
   // --- デバウンス用 ---
   const int btnPins[8] = {BTN_X, BTN_A, BTN_Y, BTN_B, BTN_UP, BTN_DOWN, BTN_LEFT, BTN_RIGHT};
@@ -25,12 +19,4 @@ public:
   bool pressed(int pin);
 
   bool pressedDebounced(int pin);
-  
-  // --- キャラ移動 ---
-  void update_cara_point(Player &c);
-
-  // --- 壁判定 ---
-  void check_wall(Player &hero, Map &map);
-
-  bool check_event(Player &hero, Map &map, GameState &state, EventType &currentEvent);
 };
