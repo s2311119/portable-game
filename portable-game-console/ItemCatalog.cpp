@@ -1,6 +1,7 @@
 #include "ItemCatalog.h"
 
 #include "Skill.h"
+#include "SkillCatalog.h"
 
 Item ItemCatalog::get(int id) {
   
@@ -41,8 +42,8 @@ Item ItemCatalog::get(int id) {
   // --- 2. 巻物 (200-299) ---
   if (id >= 200 && id < 300) {
     int skillId = id - 200;
-    static Skill tempSkill(skillId); 
-    tempSkill = Skill(skillId);
+    static Skill tempSkill = SkillCatalog::get(skillId); 
+    tempSkill = SkillCatalog::get(skillId);
     return Item(id, tempSkill.name, Item::ITEM_CONSUMABLE, 0, 500); 
   }
 

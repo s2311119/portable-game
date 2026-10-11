@@ -16,6 +16,7 @@
 #include "Controller.h"
 #include "Vibration.h"
 #include "Skill.h"
+#include "SkillCatalog.h"
 #include "Inventory.h"
 #include "Map.h"
 #include "MemoryMonitor.h"
@@ -1062,7 +1063,7 @@ public:
           if (endIdx > learnableSkillCount) endIdx = learnableSkillCount;
 
           for (int i = startIdx; i < endIdx; i++) {
-              Skill skill(learnableSkillIDs[i]);
+              Skill skill = SkillCatalog::get(learnableSkillIDs[i]);
               int scrollId = 200 + skill.id;
               bool hasScroll = (inventory.countItem(scrollId) > 0);
               bool alreadyLearned = false;
@@ -2793,7 +2794,7 @@ public:
         }
 
         // スキル情報取得
-        Skill currentSkill(0);
+        Skill currentSkill = SkillCatalog::get(0);
 
         // 実行時に予約対象を変更したか
         bool targetChanged = false;
@@ -2813,7 +2814,7 @@ public:
         }
 
         if (pendingActionType == ActionType::ATTACK) {
-          currentSkill = Skill(0);
+          currentSkill = SkillCatalog::get(0);
           currentSkill.name = "攻撃";
           currentSkill.power = 50;
           currentSkill.type = Skill::EffectType::DAMAGE;
@@ -4770,7 +4771,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           else if (inventory.countItem(requiredScrollId) > 0) {
               // 消費して習得
               inventory.removeItem(requiredScrollId);
-              hero.status->learnSkill(Skill(skillIdToLearn));
+              hero.status->learnSkill(SkillCatalog::get(skillIdToLearn));
               music.playSE(0);
               // (※ここで「覚えた！」というフラグを立てて、draw側でメッセージを出すと親切です)
           } else {

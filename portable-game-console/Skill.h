@@ -44,5 +44,4 @@ public:
   };
   Category category;
 
-  Skill(int recid);
 };

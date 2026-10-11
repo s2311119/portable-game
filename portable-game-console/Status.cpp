@@ -1,4 +1,5 @@
 #include "Status.h"
+#include "SkillCatalog.h"
 
 #include <Arduino.h>
 #include <SdFat.h>
@@ -893,7 +894,7 @@ void Status::setBossStats(int hp, int tp, int atk, int def, int spd, int sen, in
   }
 
 void Status::forceLearnSkill(int skillId) {
-    learnSkill(Skill(skillId));
+    learnSkill(SkillCatalog::get(skillId));
   }
 
 Status::Status(int level, int w){
@@ -1768,7 +1769,7 @@ void Status::checkLevelUpSkills(int oldLevel, int newLevel) {
               rule.level <= newLevel &&
               (rule.level > oldLevel || oldLevel == 0)) // 範囲内、または初期化時(0)
           {
-            learnSkill(Skill(rule.skill_id)); // 重複チェック付きで習得
+            learnSkill(SkillCatalog::get(rule.skill_id)); // 重複チェック付きで習得
           }
         }
 
@@ -1932,7 +1933,7 @@ void Status::loadFrom(FsFile& file) {
 
     for (int i = 0; i < skillCount; i++) {
       int skillId = file.readStringUntil('\n').toInt();
-      learnedSkills.push_back(Skill(skillId));
+      learnedSkills.push_back(SkillCatalog::get(skillId));
     }
 
     // レベル上は覚えているはずなのに、
