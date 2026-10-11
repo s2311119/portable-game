@@ -123,13 +123,6 @@ public:
   static constexpr EvolutionTriggerType TRIGGER_LEVEL = EvolutionCatalog::TRIGGER_LEVEL;
   static constexpr EvolutionTriggerType TRIGGER_ITEM = EvolutionCatalog::TRIGGER_ITEM;
   float getEvasionBonus();
-  struct SkillLearningRule {
-    int who_id; // 対象のID (例: 39)
-    int level;  // 習得レベル (例: 10)
-    int skill_id; // 習得する旋律のID (例: 101)
-  };
-  static const SkillLearningRule skillLearningTable[];
-  static const int skillLearningRuleCount;
 
   using EvolutionRule = EvolutionCatalog::EvolutionRule;
 

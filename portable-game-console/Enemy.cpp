@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include "SkillLearnsetCatalog.h"
 
 #include <Arduino.h>
 #include "Status.h"
@@ -129,60 +130,39 @@ Enemy::Enemy(int w, int floor){
 
       case 80: 
         status = new Status(1, 80);
-        status->forceLearnSkill(21);
-        status->forceLearnSkill(106);
-        status->forceLearnSkill(47);
         break;
 
       // 20階ボス
       case 81: 
         status = new Status(1, 81);
-        status->forceLearnSkill(52);
-        status->forceLearnSkill(34);
-        status->forceLearnSkill(87);
         break;
 
       // 30階ボス
       case 82: 
         status = new Status(1, 82);
         // 状態異常3つ
-        status->forceLearnSkill(105); // ポイズン (毒)
-        status->forceLearnSkill(45);  // ヴォイド・ショック (麻痺)
-        status->forceLearnSkill(113); // カオスフィールド (混乱)
         // 攻撃スキル
-        status->forceLearnSkill(42);  // アサシネイト (確率で即死級ダメージ)
         break;
 
       // 40階ボス
       case 83: 
         status = new Status(1, 83);
-        status->forceLearnSkill(73);  // クイックステップ (素早さUP)
-        status->forceLearnSkill(39);  // ミラーズエッジ (回避率2倍)
-        status->forceLearnSkill(109); // サイレンス (沈黙与) -> 詠唱を封じる
-        status->forceLearnSkill(25);  // ソードダンス (攻撃・素早さUP)
-        status->forceLearnSkill(123); // ファントムラッシュ (ランダム2~5回攻撃)
-        status->forceLearnSkill(80);  // インビジブルエッジ (回避無視の必中攻撃)
         break;
 
       // 50階 ラスボス
       case 84: 
         status = new Status(1, 84);
-        status->forceLearnSkill(86);  // リミットブレイク (全能力最大強化)
-        status->forceLearnSkill(118); // ワールド・ダウン (敵全体全能力DOWN)
-        status->forceLearnSkill(114); // ディザスター (全状態異常付与)
-        status->forceLearnSkill(57);  // 自己修復 (HPリジェネ)
-        status->forceLearnSkill(64);  // 全体バリア (ダメージ1回無効)
-        status->forceLearnSkill(65);  // 旋律反射 (魔法反射)
-        status->forceLearnSkill(53);  // カウンター (物理反撃)
-        status->forceLearnSkill(111); // TPドレイン (TP吸収)
-        status->forceLearnSkill(127); // ラッキーセブン (ランダム1~8回攻撃)
-        status->forceLearnSkill(126); // ロイヤルチャージ (溜めて次のターン超火力)
         break;
 
       default: // 未定義ID
         who = 0; 
         status = new Status(3, who);
         break;
+    }
+    const SkillLearnsetCatalog::InitialSkills initialSkills =
+        SkillLearnsetCatalog::getInitialSkills(who);
+    for (int i = 0; i < initialSkills.count; i++) {
+      status->forceLearnSkill(initialSkills.ids[i]);
     }
     const EnemyData& data = EnemyCatalog::get(w);
     name = data.name;
