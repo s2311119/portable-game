@@ -165,6 +165,7 @@ public:
   Battle();
 
   void start(MUSIC &music, Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr);
+  std::optional<BattleResult> takeResult();
 
   void update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g);
   
@@ -172,6 +173,9 @@ public:
   void draw(Graphic* g);
   ~Battle() = default;
 private:
+  BattleKind currentBattleKind = BattleKind::NORMAL;
+  std::optional<BattleResult> pendingResult;
+
   std::optional<CombatantRef> refFor(CharacterState* combatant) const;
   CharacterState* resolveCombatant(const std::optional<CombatantRef>& ref);
   

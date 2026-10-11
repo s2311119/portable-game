@@ -1,5 +1,7 @@
 #pragma once
 
+#include "EncounterSpec.h"
+
 enum class CombatantSide {
   PLAYER,
   ALLY,
@@ -9,4 +11,15 @@ enum class CombatantSide {
 struct CombatantRef {
   CombatantSide side;
   int index;
+};
+
+enum class BattleOutcome {
+  VICTORY,
+  DEFEAT,
+  ESCAPE
+};
+
+struct BattleResult {
+  BattleOutcome outcome;
+  BattleKind kind;
 };

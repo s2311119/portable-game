@@ -298,6 +298,8 @@ Battle::Battle() {
 
 void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr) {
     if (inBattle) return;
+    pendingResult.reset();
+    currentBattleKind = spec.kind;
     inBattle = true;
     message = "敵が現れた！";
     isBossBattleMode = false; 
@@ -1789,6 +1791,13 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
       // 16. 戦闘終了 (旧 13)
       case STATE_BATTLE_END:
         if(bPressed || aPressed){
+          if (battleEndReason == BattleEndReason::VICTORY) {
+            pendingResult = BattleResult{BattleOutcome::VICTORY, currentBattleKind};
+          } else if (battleEndReason == BattleEndReason::DEFEAT) {
+            pendingResult = BattleResult{BattleOutcome::DEFEAT, currentBattleKind};
+          } else if (battleEndReason == BattleEndReason::ESCAPE) {
+            pendingResult = BattleResult{BattleOutcome::ESCAPE, currentBattleKind};
+          }
           bool actualBossDefeated =
             isBossBattleMode &&
             battleEndReason == BattleEndReason::VICTORY;
@@ -1861,6 +1870,10 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
       if (currentTarget != originalTarget) this->currentTarget = refFor(currentTarget);
     }
   }// update 終了
+
+std::optional<BattleResult> Battle::takeResult() {
+    return std::exchange(pendingResult, std::nullopt);
+}
 
 void Battle::draw(Graphic* g) { 
     if (!inBattle) return;
