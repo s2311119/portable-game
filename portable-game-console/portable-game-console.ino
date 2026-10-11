@@ -4206,7 +4206,7 @@ void applyFloorMapConfig(GameContext* ctx)
       ctx->floorManager.getConfig(ctx->progress);
 
   ctx->music->switchTrack(
-      config.bgmTrack,
+      config.type == Map::TYPE_TOWN ? 0 : 1,
       *ctx->sd
   );
 

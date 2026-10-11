@@ -7,7 +7,6 @@ struct FloorMapConfig {
   int width;
   int height;
   Map::MapType type;
-  int bgmTrack;
 };
 
 class FloorManager {

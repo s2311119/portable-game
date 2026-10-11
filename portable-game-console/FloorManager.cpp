@@ -24,8 +24,7 @@ FloorMapConfig FloorManager::getConfig(const WorldProgress& progress) const {
     return {
       0,
       0,
-      Map::TYPE_TOWN,
-      0
+      Map::TYPE_TOWN
     };
   }
 
@@ -38,16 +37,14 @@ FloorMapConfig FloorManager::getConfig(const WorldProgress& progress) const {
         return {
           5,
           5,
-          Map::TYPE_TOWN,
-          0
+          Map::TYPE_TOWN
         };
       }
 
       return {
         5,
         5,
-        Map::TYPE_BOSS_ROOM,
-        1
+        Map::TYPE_BOSS_ROOM
       };
     }
   }
@@ -56,7 +53,6 @@ FloorMapConfig FloorManager::getConfig(const WorldProgress& progress) const {
   return {
     20,
     20,
-    Map::TYPE_DUNGEON,
-    1
+    Map::TYPE_DUNGEON
   };
 }
