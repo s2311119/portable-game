@@ -1,6 +1,7 @@
 #include "CharacterState.h"
 #include "SkillLearnsetCatalog.h"
 #include "EvolutionCatalog.h"
+#include "EvolutionSystem.h"
 #include "CharacterCatalog.h"
 #include "SkillCatalog.h"
 
@@ -198,34 +199,15 @@ int CharacterState::gainXP(int amount) {
       bool evolvedAtThisLevel = false;
 
       while (true) {
-        bool evolutionFound = false;
-
-        for (int i = 0;
-            i < evolutionRuleCount;
-            i++)
-        {
-          const EvolutionRule& rule =
-              evolutionTable[i];
-
-          if (rule.before_who_id == this->who &&
-              rule.trigger_type == TRIGGER_LEVEL &&
-              progression.level() >= rule.trigger_value)
-          {
-            evolve(rule.after_who_id);
-
-            evolvedDuringGain = true;
-            evolvedAtThisLevel = true;
-            evolutionFound = true;
-
-            // who が変わったので、
-            // 新しい who でも進化条件があるか再確認する
-            break;
-          }
-        }
-
-        if (!evolutionFound) {
+        const int nextId = EvolutionSystem::nextLevelEvolutionId(*this);
+        if (nextId == -1) {
           break;
         }
+        evolve(nextId);
+
+        evolvedDuringGain = true;
+        evolvedAtThisLevel = true;
+        // who が変わったので、新しい who でも進化条件があるか再確認する
       }
 
       // evolve() 内ではステータス再計算と
@@ -267,8 +249,7 @@ void CharacterState::learnSkill(int skillId) {
 void CharacterState::evolve(int newWhoId) {
     // 1. 自分のIDを進化先のものに変更
     int oldLevel = progression.level();
-    this->who = newWhoId;
-    updateName();
+    EvolutionSystem::applyIdentity(*this, newWhoId);
     // 2. 既存のステータス再計算関数を呼び出す
     // (recalculateStats は新しい who ID を使って
     //  decide_MaxHP などを呼び出すので、これでステータスが更新される)

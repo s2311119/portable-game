@@ -13,6 +13,7 @@ class FsFile;
 
 class CharacterState{
 private:
+  friend class EvolutionSystem;
   CoreStats coreStats;
   Equipment equipment;
   StatusEffects statusEffects;
