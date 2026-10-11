@@ -1067,9 +1067,7 @@ public:
               int scrollId = 200 + skill.id;
               bool hasScroll = (inventory.countItem(scrollId) > 0);
               bool alreadyLearned = false;
-              for(const auto& s : hero.status->getLearnedSkills()){
-                  if(s.id == skill.id) { alreadyLearned = true; break; }
-              }
+              alreadyLearned = hero.status->skills().has(skill.id);
               uint16_t color = TFT_WHITE;
               if (i == listCursor) color = TFT_YELLOW;
               else if (alreadyLearned) color = TFT_GREEN;
@@ -1089,7 +1087,7 @@ public:
           g->lineSprite.setCursor(x + 20, y + 155);
           g->lineSprite.setTextColor(TFT_WHITE);
           bool isLearned = false;
-          for(const auto& s : hero.status->getLearnedSkills()){ if(s.id == targetSkillId) { isLearned = true; break; } }
+          isLearned = hero.status->skills().has(targetSkillId);
           if (isLearned) { g->lineSprite.setTextColor(TFT_GREEN); g->lineSprite.print("習得済みです"); } 
           else if (scrollCount > 0) { g->lineSprite.setTextColor(TFT_CYAN); g->lineSprite.printf("習得可能！ (所持: %d)", scrollCount); } 
           else { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.setTextSize(1); g->lineSprite.setCursor(x + 20, y + 160); g->lineSprite.printf("必要: %s", ItemCatalog::get(reqScrollId).name); }
@@ -1842,12 +1840,12 @@ public:
 
     // 先制技判定
     if (type == ActionType::SKILL && actor != nullptr) {
-      std::vector<Skill>& skills = actor->getLearnedSkills();
+      const SkillSet& skills = actor->skills();
 
       if (skillIndex >= 0 &&
-          skillIndex < static_cast<int>(skills.size()))
+          skillIndex < static_cast<int>(skills.count()))
       {
-        int skillId = skills[skillIndex].id;
+        int skillId = skills.skillIdAt(skillIndex);
 
         // 必ず先制
         if (skillId == 38 ||   // ソニックブレイド
@@ -2216,7 +2214,7 @@ public:
       
       // 3. 旋律（せんりつ）選択
       case STATE_SKILL_SELECT: {
-        int skillCount = currentActor->getLearnedSkills().size();
+        int skillCount = currentActor->skills().count();
         if (skillCount == 0) {
           message = "覚えている旋律がない！";
           if(aPressed) currentBattleState = STATE_COMMAND_SELECT;
@@ -2234,7 +2232,7 @@ public:
         }
 
         if (aPressed) {
-          Skill& skill = currentActor->getLearnedSkills()[skillSelected];
+          Skill skill = SkillCatalog::get(currentActor->skills().skillIdAt(skillSelected));
           
           if (currentActor->getTp() >= skill.tpCost) {
             music.playSE(0);
@@ -2324,12 +2322,12 @@ public:
         bool isReviveSkill = false;
 
         if (pendingActionType == ActionType::SKILL) {
-          std::vector<Skill>& skills = currentActor->getLearnedSkills();
+          const SkillSet& skills = currentActor->skills();
 
           if (pendingSkillIndex >= 0 &&
-              pendingSkillIndex < static_cast<int>(skills.size())) {
+              pendingSkillIndex < static_cast<int>(skills.count())) {
             isReviveSkill =
-                (skills[pendingSkillIndex].type ==
+                (SkillCatalog::get(skills.skillIdAt(pendingSkillIndex)).type ==
                 Skill::EffectType::REVIVE);
           }
         }
@@ -2502,9 +2500,9 @@ public:
         else currentTarget = playerSide[random(0, playerSide.size())];
 
         // 2. スキル選択ロジック
-        std::vector<Skill>& skills = currentActor->getLearnedSkills();
+        const SkillSet& skills = currentActor->skills();
         
-        if (!skills.empty() && currentActor->getSilencedTurns() <= 0) {
+        if (skills.count() != 0 && currentActor->getSilencedTurns() <= 0) {
           int who = currentActor->getWho();
           int curTP = currentActor->getTp();
           int curHP = currentActor->getHp();
@@ -2513,8 +2511,8 @@ public:
 
           // [ヘルパー] IDでスキルを探す
           auto findSkillIndex = [&](int id) -> int {
-            for(int i=0; i<skills.size(); i++) {
-              if(skills[i].id == id && skills[i].tpCost <= curTP) return i;
+            for(int i=0; i<skills.count(); i++) {
+              if(skills.skillIdAt(i) == id && SkillCatalog::get(skills.skillIdAt(i)).tpCost <= curTP) return i;
             }
             return -1;
           };
@@ -2578,10 +2576,10 @@ public:
               int bestHealPower = -1;
 
               for (int i = 0;
-                  i < static_cast<int>(skills.size());
+                  i < static_cast<int>(skills.count());
                   i++)
               {
-                const Skill& skill = skills[i];
+                Skill skill = SkillCatalog::get(skills.skillIdAt(i));
 
                 // 使用可能な回復スキルだけを対象にする
                 if (skill.type == Skill::EffectType::HEAL &&
@@ -2605,8 +2603,8 @@ public:
           // --- 汎用AI ---
           if (selectedSkillIndex == -1 && random(100) < 30) {
             std::vector<int> usableIndices;
-            for(int i=0; i<skills.size(); i++) {
-              if (skills[i].tpCost <= curTP) usableIndices.push_back(i);
+            for(int i=0; i<skills.count(); i++) {
+              if (SkillCatalog::get(skills.skillIdAt(i)).tpCost <= curTP) usableIndices.push_back(i);
             }
             if (!usableIndices.empty()) {
               selectedSkillIndex = usableIndices[random(0, usableIndices.size())];
@@ -2617,7 +2615,7 @@ public:
           if (selectedSkillIndex != -1) {
             pendingActionType = ActionType::SKILL;
             pendingSkillIndex = selectedSkillIndex;
-            Skill& s = skills[selectedSkillIndex];
+            Skill s = SkillCatalog::get(skills.skillIdAt(selectedSkillIndex));
             message = enemyName + " の " + s.name + "!";
             
             // ★★★ 重要: スキル範囲によるターゲットの強制変更 ★★★
@@ -2854,10 +2852,10 @@ public:
           }
         }
         else if (pendingActionType == ActionType::SKILL) {
-          std::vector<Skill>& skills = currentActor->getLearnedSkills();
+          const SkillSet& skills = currentActor->skills();
 
           if (pendingSkillIndex < 0 ||
-            pendingSkillIndex >= skills.size()) {
+            pendingSkillIndex >= skills.count()) {
 
             message = "スキル指定エラー";
             messageFlow = MessageFlow::END_TURN;
@@ -2865,7 +2863,7 @@ public:
             break;
           }
 
-          currentSkill = skills[pendingSkillIndex];
+          currentSkill = SkillCatalog::get(skills.skillIdAt(pendingSkillIndex));
 
           // --- 実行時ターゲット再確認 ---
 
@@ -3715,13 +3713,13 @@ public:
           if (currentActor &&
               pendingActionType == ActionType::SKILL) {
 
-            std::vector<Skill>& skills =
-                currentActor->getLearnedSkills();
+            const SkillSet& skills =
+                currentActor->skills();
 
             if (pendingSkillIndex >= 0 &&
-                pendingSkillIndex < static_cast<int>(skills.size())) {
+                pendingSkillIndex < static_cast<int>(skills.count())) {
               isReviveSkill =
-                  (skills[pendingSkillIndex].type ==
+                  (SkillCatalog::get(skills.skillIdAt(pendingSkillIndex)).type ==
                   Skill::EffectType::REVIVE);
             }
           }
@@ -3775,8 +3773,8 @@ public:
         } 
         else if (currentBattleState == STATE_SKILL_SELECT) {
           if (currentActor) {
-            std::vector<Skill>& skills = currentActor->getLearnedSkills();
-            int skillCount = skills.size();
+            const SkillSet& skills = currentActor->skills();
+            int skillCount = skills.count();
             // スクロール計算
             int itemsPerPage = 3;
             int startIdx = 0;
@@ -3791,7 +3789,7 @@ public:
               g->lineSprite.setTextColor(color);
               int relativeIndex = i - startIdx;
               g->lineSprite.setCursor(cmdX + 10, cmdY + 5 + (relativeIndex * 20)); 
-              g->lineSprite.printf("%s(%d)", skills[i].name, skills[i].tpCost);
+              g->lineSprite.printf("%s(%d)", SkillCatalog::get(skills.skillIdAt(i)).name, SkillCatalog::get(skills.skillIdAt(i)).tpCost);
             }
           }
         }
@@ -4756,12 +4754,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
 
           // ★ 1. すでに覚えているかチェック
           bool alreadyLearned = false;
-          for (const auto& s : hero.status->getLearnedSkills()) {
-            if (s.id == skillIdToLearn) {
-              alreadyLearned = true;
-              break;
-            }
-          }
+          alreadyLearned = hero.status->skills().has(skillIdToLearn);
 
           if (alreadyLearned) {
             music.playSE(1);

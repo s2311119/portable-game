@@ -3,6 +3,7 @@
 #include "Equipment.h"
 #include "StatusEffects.h"
 #include "Progression.h"
+#include "SkillSet.h"
 #include "EvolutionCatalog.h"
 
 #include "Skill.h"
@@ -18,7 +19,7 @@ private:
   Progression progression;
   int who;
   const char* name;
-  std::vector<Skill> learnedSkills; // 習得済みの旋律リスト
+  SkillSet skillSet; // 習得済みの旋律リスト
   int getPreEvolution(int currentId);
 public:
   int getPoisonLevel() const;
@@ -147,7 +148,7 @@ public:
 
   static const EvolutionRule* const evolutionTable;
   static const int evolutionRuleCount;
-  std::vector<Skill>& getLearnedSkills();
+  const SkillSet& skills() const;
 
   void forceLearnSkill(int skillId);
   Status(int level, int w);

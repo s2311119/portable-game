@@ -110,8 +110,8 @@ float Status::getEvasionBonus() {
     return statusEffects.evasionBonus();
   }
 
-std::vector<Skill>& Status::getLearnedSkills() {
-    return learnedSkills;
+const SkillSet& Status::skills() const {
+    return skillSet;
   }
 
 void Status::forceLearnSkill(int skillId) {
@@ -124,7 +124,7 @@ Status::Status(int level, int w){
     const CoreStatsData initialStats =
         CharacterCatalog::initialStatsFor(w, level);
     coreStats.initialize(initialStats);
-    learnedSkills.reserve(10);
+    skillSet.reserveInitialCapacity();
     updateName();
     unequip(EquipmentSlot::Weapon);
     unequip(EquipmentSlot::Armor);
@@ -828,14 +828,7 @@ void Status::addAttack(int amount) {
 }
 
 void Status::learnSkill(const Skill& newSkill) {
-    // (既に覚えていないかチェックしたほうが親切だが、今は省略)
-    for (const auto& s : learnedSkills) {
-      if (s.id == newSkill.id) {
-        return; // すでに覚えているなら何もしない
-      }
-    }
-    // 新しい技なら追加
-    learnedSkills.push_back(newSkill);
+    skillSet.learn(newSkill.id);
   }
 
 void Status::evolve(int newWhoId) {
@@ -919,9 +912,9 @@ void Status::saveTo(FsFile& file) {
     file.println(armorId());  // ★ 追加
     file.println(accessoryId());    // ★ 追加
     // 覚えているスキルの数とID
-    file.println(learnedSkills.size());
-    for (const auto& s : learnedSkills) {
-      file.println(s.id);
+    file.println(skillSet.count());
+    for (int i = 0; i < skillSet.count(); ++i) {
+      file.println(skillSet.skillIdAt(i));
     }
   }
 
@@ -959,13 +952,13 @@ void Status::loadFrom(FsFile& file) {
     // -------------------------
     // 習得済みスキル復元
     // -------------------------
-    learnedSkills.clear();
+    skillSet.clearForRestore();
 
     int skillCount = file.readStringUntil('\n').toInt();
 
     for (int i = 0; i < skillCount; i++) {
       int skillId = file.readStringUntil('\n').toInt();
-      learnedSkills.push_back(SkillCatalog::get(skillId));
+      skillSet.appendRestoredSkillId(skillId);
     }
 
     // レベル上は覚えているはずなのに、
@@ -982,8 +975,7 @@ void Status::clearPopups() {
   }
 
 Status::~Status() {
-    learnedSkills.clear();
-    std::vector<Skill>().swap(learnedSkills);
+    skillSet.releaseStorage();
     
     popupValues.clear();
     std::vector<PopupData>().swap(popupValues);
