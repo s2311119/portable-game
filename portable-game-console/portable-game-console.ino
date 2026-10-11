@@ -25,7 +25,7 @@
 #include "Map.h"
 #include "WorldProgress.h"
 #include "FloorManager.h"
-#include "Config.h"
+#include "Settings.h"
 #include "MemoryMonitor.h"
 #include <utility>
 
@@ -981,9 +981,9 @@ public:
     listCursor = 0;
   }
 
-  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib);
+  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
   
-  void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Config& config) {
+  void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, const Settings& settings) {
     if (!active) return;
 
     // ★ スプライト生成をやめて g->lineSprite を使う
@@ -1411,16 +1411,16 @@ public:
           g->lineSprite.print(value);
         };
 
-        // 1. BGM (引数の config を使用)
-        String bgmValStr = String(config.bgmVolume);
+        // 1. BGM (引数の settings を使用)
+        String bgmValStr = String(settings.getBgmVolume());
         drawItem(0, "BGM", bgmValStr);
 
-        // 2. SE (引数の config を使用)
-        String seValStr = String(config.seVolume);
+        // 2. SE (引数の settings を使用)
+        String seValStr = String(settings.getSeVolume());
         drawItem(1, "SE", seValStr);
 
-        // 3. 振動 (引数の config を使用)
-        String vibValStr = config.vibration ? "ON" : "OFF";
+        // 3. 振動 (引数の settings を使用)
+        String vibValStr = settings.isVibrationEnabled() ? "ON" : "OFF";
         drawItem(2, "振動", vibValStr);
 
         // 4. 戻る
@@ -4187,7 +4187,7 @@ struct GameContext {
   Vibration* vibration;
   ImageManager* imgMgr;
   MemoryMonitor memMonitor;
-  Config config;
+  Settings settings;
 };
 
 GameContext* ctx = nullptr;
@@ -4373,7 +4373,7 @@ void core1_main() {
   }
 }
 
-void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib) {
+void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib) {
   if (!active) return; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
@@ -4858,33 +4858,29 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
 
         // BGM音量
         if (listCursor == 0) {
-          config.bgmVolume += change; // ctx->config ではなく 引数の config を使う
-          if (config.bgmVolume < 0) config.bgmVolume = 0;
-          if (config.bgmVolume > 10) config.bgmVolume = 10;
+          settings.setBgmVolume(settings.getBgmVolume() + change);
           
           // 即座に反映 (ctx->music ではなく 引数の music を使う)
-          music.bgmVolume = (float)config.bgmVolume / 10.0f; 
+          music.bgmVolume = (float)settings.getBgmVolume() / 10.0f;
           valChanged = true;
         }
         // SE音量
         else if (listCursor == 1) {
-          config.seVolume += change;
-          if (config.seVolume < 0) config.seVolume = 0;
-          if (config.seVolume > 10) config.seVolume = 10;
-          music.setSeVolume(config.seVolume);
+          settings.setSeVolume(settings.getSeVolume() + change);
+          music.setSeVolume(settings.getSeVolume());
           // SE音量を反映 (MUSICクラスに変数を持たせるか、playSEで計算)
-          // music.setSeVolume(config.seVolume); // 推奨
+          // music.setSeVolume(settings.getSeVolume()); // 推奨
           
           valChanged = true;
           if(valChanged) music.playSE(0); // 音量確認
         }
         // 振動 ON/OFF
         else if (listCursor == 2) {
-          config.vibration = !config.vibration;
+          settings.setVibrationEnabled(!settings.isVibrationEnabled());
           valChanged = true;
-          vib.setEnabled(config.vibration);
+          vib.setEnabled(settings.isVibrationEnabled());
           // 振動確認 (ctx->vibration ではなく 引数の vib を使う)
-          if(config.vibration) vib.trigger(100); 
+          if(settings.isVibrationEnabled()) vib.trigger(100);
         }
       }
       
@@ -4927,8 +4923,8 @@ void setup() {
   ctx->vibration = new Vibration();
   ctx->vibration->init();
 
-  ctx->music->bgmVolume = (float)ctx->config.bgmVolume / 10.0f;
-  ctx->music->setSeVolume(ctx->config.seVolume);
+  ctx->music->bgmVolume = (float)ctx->settings.getBgmVolume() / 10.0f;
+  ctx->music->setSeVolume(ctx->settings.getSeVolume());
 
   multicore_launch_core1(core1_main);
   delay(200);
@@ -4962,7 +4958,7 @@ void setup() {
       ctx->music->playSE(0);
       if (titleCursor == 0) {
         startNewGame = true;
-        ctx->vibration->setEnabled(ctx->config.vibration);
+        ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
       } else {
         // ロード用の仮オブジェクト生成
         ctx->map = new Map(20, 20, Map::TYPE_TOWN, ctx->progress.floor());
@@ -4972,11 +4968,11 @@ void setup() {
         
         if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music, *ctx->map, ctx->progress, *ctx->hero, *ctx->party, ctx->storage, *ctx->inventory)) {
           loadSuccess = true;
-          ctx->vibration->setEnabled(ctx->config.vibration);
+          ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
         } else {
           ctx->music->playSE(1);
           startNewGame = true; // ロード失敗時は新規
-          ctx->vibration->setEnabled(ctx->config.vibration);
+          ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
         }
       }
     }
@@ -5102,7 +5098,7 @@ void loop() {
   auto& save = *ctx->saveManager;
   auto& vib = *ctx->vibration;
   auto& imgmgr = *ctx->imgMgr;
-  auto& conf = ctx->config;
+  auto& settings = ctx->settings;
   vib.update();
   if (state == STATE_GAME) {
     hero.oldX = hero.X;
@@ -5150,9 +5146,9 @@ void loop() {
 
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
-    menu.update(ctrl, inventory, hero, party, storage, map, ctx->progress, music, sd, save, conf, vib);
+    menu.update(ctrl, inventory, hero, party, storage, map, ctx->progress, music, sd, save, settings, vib);
     //g.screenSprite.fillScreen(TFT_BLACK);
-    menu.draw(&g, inventory, hero, party, storage, conf);
+    menu.draw(&g, inventory, hero, party, storage, settings);
     //g.screenSprite.pushSprite(0,0);
 
     if (!menu.active) {
