@@ -1,54 +1,60 @@
 #include "Party.h"
 #include "Automaton.h"
 
+#include <utility>
+
 Party::Party() {
-    members.reserve(MAX_MEMBERS); // メモリ予約
+    activeMembers.reserve(MAX_MEMBERS); // メモリ予約
     storage.reserve(20);
   }
 
-int Party::addMember(Automaton* newMember) {
-    if (members.size() < MAX_MEMBERS) {
-      members.push_back(newMember);
-      return 1; // パーティー加入
-    } else {
-      storage.push_back(newMember);
-      return 2; // 預かり所送還
-    }
+bool Party::addMember(Automaton&& newMember) {
+    if (activeMembers.size() >= MAX_MEMBERS) return false;
+    activeMembers.push_back(std::move(newMember));
+    return true;
   }
 
+void Party::appendRestoredMember(Automaton&& restoredMember) {
+    activeMembers.push_back(std::move(restoredMember));
+}
+
+void Party::clearMembers() { activeMembers.clear(); }
+
+const Automaton& Party::member(size_t index) const { return activeMembers[index]; }
+
+CharacterState& Party::memberState(size_t index) { return activeMembers[index].state(); }
+
+size_t Party::memberCount() const { return activeMembers.size(); }
+
 bool Party::swapMember(int memberIdx, int storageIdx) {
-    if (memberIdx < 0 || memberIdx >= members.size()) return false;
+    if (memberIdx < 0 || memberIdx >= activeMembers.size()) return false;
     if (storageIdx < 0 || storageIdx >= storage.size()) return false;
 
-    // ポインタを入れ替え
-    Automaton* temp = members[memberIdx];
-    members[memberIdx] = storage[storageIdx];
-    storage[storageIdx] = temp;
+    std::swap(activeMembers[memberIdx], *storage[storageIdx]);
     return true;
   }
 
 bool Party::depositMember(int memberIdx) {
-    if (memberIdx < 0 || memberIdx >= members.size()) return false;
+    if (memberIdx < 0 || memberIdx >= activeMembers.size()) return false;
     // 最後の1人は預けられない制約を入れても良い
-    // if (members.size() <= 1) return false; 
+    // if (activeMembers.size() <= 1) return false;
 
-    storage.push_back(members[memberIdx]);
-    members.erase(members.begin() + memberIdx);
+    storage.push_back(new Automaton(std::move(activeMembers[memberIdx])));
+    activeMembers.erase(activeMembers.begin() + memberIdx);
     return true;
   }
 
 bool Party::withdrawMember(int storageIdx) {
-    if (members.size() >= MAX_MEMBERS) return false; // 満員
+    if (activeMembers.size() >= MAX_MEMBERS) return false; // 満員
     if (storageIdx < 0 || storageIdx >= storage.size()) return false;
 
-    members.push_back(storage[storageIdx]);
+    activeMembers.push_back(std::move(*storage[storageIdx]));
+    delete storage[storageIdx];
     storage.erase(storage.begin() + storageIdx);
     return true;
   }
 
 Party::~Party() {
-    for (auto* m : members) delete m;
-    members.clear();
     for (auto* s : storage) delete s;
     storage.clear();
   }

@@ -124,7 +124,7 @@ public:
 
   int ApplyTurnEffects();
 
-  void saveTo(FsFile& file);
+  void saveTo(FsFile& file) const;
 
   void loadFrom(FsFile& file);
 

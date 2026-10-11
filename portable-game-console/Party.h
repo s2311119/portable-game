@@ -1,20 +1,25 @@
 #pragma once
 
-#include <vector>
+#include "Automaton.h"
 
-class Automaton;
+#include <cstddef>
+#include <vector>
 
 class Party {
 public:
-  // 仲間のポインタを保持するリスト
-  std::vector<Automaton*> members;
+  // 預かり所は次の独立化CommitでAutomatonStorageへ移す。
   std::vector<Automaton*> storage;
   static const int MAX_MEMBERS = 3; // (例: 主人公を除き3体まで)
 
   Party();
 
   // ★ 仲間を追加する関数
-  int addMember(Automaton* newMember);
+  bool addMember(Automaton&& newMember);
+  void appendRestoredMember(Automaton&& restoredMember);
+  void clearMembers();
+  const Automaton& member(size_t index) const;
+  CharacterState& memberState(size_t index);
+  size_t memberCount() const;
 
   bool swapMember(int memberIdx, int storageIdx);
 
@@ -27,4 +32,7 @@ public:
   bool withdrawMember(int storageIdx);
   ~Party();
   // (将来的に、仲間を外す関数などもここに追加)
+
+private:
+  std::vector<Automaton> activeMembers;
 };

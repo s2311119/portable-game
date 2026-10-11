@@ -201,7 +201,7 @@ int CharacterState::ApplyTurnEffects() {
     return value;
   }
 
-void CharacterState::saveTo(FsFile& file) {
+void CharacterState::saveTo(FsFile& file) const {
     file.println(who);
     file.println(progression.level());
     file.println(progression.xp());
