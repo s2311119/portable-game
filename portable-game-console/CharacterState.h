@@ -4,11 +4,10 @@
 #include "StatusEffects.h"
 #include "Progression.h"
 #include "SkillSet.h"
+#include "CharacterSaveData.h"
 
 #include "Skill.h"
 #include <vector>
-
-class FsFile;
 
 class CharacterState{
 private:
@@ -124,9 +123,8 @@ public:
 
   int ApplyTurnEffects();
 
-  void saveTo(FsFile& file) const;
-
-  void loadFrom(FsFile& file);
+  CharacterSaveData snapshotPersistentState() const;
+  void restorePersistentState(const CharacterSaveData& saved);
 
   void addPopup(int value, bool isCrit = false);
 

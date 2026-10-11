@@ -1,416 +1,370 @@
 #include "SaveManager.h"
-#include "Sd.h"
-#include "MUSIC.h"
-#include "Map.h"
-#include "WorldProgress.h"
-#include "Player.h"
-#include "Party.h"
-#include "AutomatonStorage.h"
-#include "Inventory.h"
+
 #include "Automaton.h"
+#include "AutomatonStorage.h"
+#include "GameSaveData.h"
+#include "GameSession.h"
+#include "Inventory.h"
+#include "MUSIC.h"
+#include "Party.h"
+#include "Player.h"
+#include "Sd.h"
+#include "WorldProgress.h"
+
+#include <cerrno>
+#include <climits>
+#include <cstdlib>
 #include <utility>
 
-  // ★ セーブ実行
-  bool SaveManager::saveGame(
-      Sd& sd,
-      MUSIC& music,
-      Map& map,
-      WorldProgress& progress,
-      Player& hero,
-      Party& party,
-      AutomatonStorage& storage,
-      Inventory& inventory
-  ) {
-    music.paused = true;
-    critical_section_enter_blocking(&sdLock);
+namespace {
 
-    FsFile file =
-        sd.sdfat.open(
-            SAVE_FILENAME,
-            O_WRITE | O_CREAT | O_TRUNC
-        );
+bool parseInteger(const String& line, int& value) {
+  if (line.length() == 0) return false;
+  errno = 0;
+  char* end = nullptr;
+  long parsed = strtol(line.c_str(), &end, 10);
+  if (errno == ERANGE || end == line.c_str() || *end != '\0' ||
+      parsed < INT_MIN || parsed > INT_MAX) {
+    return false;
+  }
+  value = (int)parsed;
+  return true;
+}
 
-    if (!file) {
-      critical_section_exit(&sdLock);
-      music.paused = false;
+bool readInteger(FsFile& file, int& value) {
+  if (!file.available()) return false;
+  String line = file.readStringUntil('\n');
+  line.trim();
+  return parseInteger(line, value);
+}
+
+bool readCharacter(FsFile& file, CharacterSaveData& data) {
+  int skillCount = 0;
+  if (!readInteger(file, data.characterId) ||
+      !readInteger(file, data.level) ||
+      !readInteger(file, data.xp) ||
+      !readInteger(file, data.hp) ||
+      !readInteger(file, data.tp) ||
+      !readInteger(file, data.weaponId) ||
+      !readInteger(file, data.armorId) ||
+      !readInteger(file, data.accessoryId) ||
+      !readInteger(file, skillCount) ||
+      skillCount < 0) {
+    return false;
+  }
+  for (int i = 0; i < skillCount; ++i) {
+    int skillId = 0;
+    if (!readInteger(file, skillId)) return false;
+    data.skillIds.push_back(skillId);
+  }
+  return true;
+}
+
+bool readInventory(FsFile& file, InventorySaveData& data) {
+  int count = 0;
+  if (!readInteger(file, data.money) ||
+      !readInteger(file, count) ||
+      count < 0) {
+    return false;
+  }
+  for (int i = 0; i < count; ++i) {
+    InventoryItemSaveData item;
+    if (!readInteger(file, item.itemId) ||
+        !readInteger(file, item.quantity)) {
+      return false;
+    }
+    data.items.push_back(item);
+  }
+  return true;
+}
+
+bool readCharacters(FsFile& file, std::vector<CharacterSaveData>& members) {
+  int count = 0;
+  if (!readInteger(file, count) || count < 0) return false;
+  for (int i = 0; i < count; ++i) {
+    CharacterSaveData member;
+    if (!readCharacter(file, member)) return false;
+    members.push_back(std::move(member));
+  }
+  return true;
+}
+
+bool readGameData(FsFile& file, GameSaveData& data, const char* magic) {
+  if (!file.available()) return false;
+  String firstLine = file.readStringUntil('\n');
+  firstLine.trim();
+
+  if (firstLine == magic) {
+    data.format = SaveFormat::PGSAVE2;
+    if (!readInteger(file, data.floor)) return false;
+  } else {
+    data.format = SaveFormat::LEGACY;
+    if (!parseInteger(firstLine, data.floor)) return false;
+  }
+
+  int rawMapType = 0;
+  if (!readInteger(file, rawMapType) ||
+      rawMapType < (int)Map::TYPE_MAZE ||
+      rawMapType > (int)Map::TYPE_BOSS_ROOM) {
+    return false;
+  }
+  data.mapType = static_cast<Map::MapType>(rawMapType);
+
+  if (data.format == SaveFormat::PGSAVE2) {
+    if (!readInteger(file, data.width) ||
+        !readInteger(file, data.height) ||
+        data.width <= 0 || data.height <= 0 ||
+        data.width > 64 || data.height > 64 ||
+        !readInteger(file, data.automatonWhoId) ||
+        !readInteger(file, data.playerX) ||
+        !readInteger(file, data.playerY) ||
+        !readInteger(file, data.playerDirection)) {
       return false;
     }
 
-    // -------------------------------------------------
-    // セーブ形式
-    // -------------------------------------------------
-    file.println(SAVE_MAGIC);
+    int tileCount = 0;
+    if (!readInteger(file, tileCount) ||
+        tileCount != data.width * data.height) {
+      return false;
+    }
 
-    // -------------------------------------------------
-    // 1. 現在のマップ状態
-    // -------------------------------------------------
-    file.println(progress.floor());
-    file.println((int)map.getType());
+    for (int i = 0; i < tileCount; ++i) {
+      int tile = 0;
+      if (!readInteger(file, tile) || tile < 0 || tile > 255) {
+        return false;
+      }
+      data.tiles.push_back((uint8_t)tile);
+    }
+  }
 
-    file.println(map.getMAP_WIDTH());
-    file.println(map.getMAP_HEIGHT());
+  if (!readCharacter(file, data.playerCharacter) ||
+      !readInventory(file, data.inventory) ||
+      !readCharacters(file, data.party) ||
+      !readCharacters(file, data.storage)) {
+    return false;
+  }
 
-    // マップ上の未回収オートマタの種類
-    file.println(map.getAutomatonWhoId());
+  for (int i = 0; i < 5; ++i) {
+    int rawFlag = 0;
+    if (!readInteger(file, rawFlag)) return false;
+    data.bossDefeated[i] = rawFlag != 0;
+  }
+  return true;
+}
 
-    // 主人公の現在位置・向き
-    file.println(hero.X);
-    file.println(hero.Y);
-    file.println((int)hero.direction);
+bool validateGameData(const GameSaveData& data) {
+  if (data.mapType < Map::TYPE_MAZE ||
+      data.mapType > Map::TYPE_BOSS_ROOM) {
+    return false;
+  }
+  if (data.format == SaveFormat::LEGACY) return true;
+  if (data.width <= 0 || data.height <= 0 ||
+      data.width > 64 || data.height > 64 ||
+      data.tiles.size() != (size_t)(data.width * data.height) ||
+      data.playerDirection < (int)Player::DIR_DOWN ||
+      data.playerDirection > (int)Player::DIR_RIGHT ||
+      data.playerX < 0 || data.playerY < 0 ||
+      data.playerX >= data.width * Map::TILE_SIZE ||
+      data.playerY >= data.height * Map::TILE_SIZE) {
+    return false;
+  }
+  return true;
+}
 
-    // マップそのもの
-    file.println(
-        map.getMAP_WIDTH() *
-        map.getMAP_HEIGHT()
-    );
+GameSaveData captureGameData(
+    const Map& map,
+    const WorldProgress& progress,
+    const Player& hero,
+    const Party& party,
+    const AutomatonStorage& storage,
+    const Inventory& inventory) {
+  GameSaveData data;
+  data.format = SaveFormat::PGSAVE2;
+  data.floor = progress.floor();
+  data.mapType = map.getType();
+  data.width = map.getMAP_WIDTH();
+  data.height = map.getMAP_HEIGHT();
+  data.automatonWhoId = map.getAutomatonWhoId();
+  data.playerX = hero.X;
+  data.playerY = hero.Y;
+  data.playerDirection = (int)hero.direction;
+  for (int y = 0; y < data.height; ++y) {
+    for (int x = 0; x < data.width; ++x) {
+      data.tiles.push_back(map.getTile(x, y));
+    }
+  }
+  data.playerCharacter = hero.state().snapshotPersistentState();
+  data.inventory = inventory.snapshotPersistentState();
+  for (size_t i = 0; i < party.memberCount(); ++i) {
+    data.party.push_back(party.member(i).state().snapshotPersistentState());
+  }
+  for (size_t i = 0; i < storage.memberCount(); ++i) {
+    data.storage.push_back(storage.member(i).state().snapshotPersistentState());
+  }
+  for (int i = 0; i < 5; ++i) {
+    data.bossDefeated[i] = progress.bosses().isDefeated(i);
+  }
+  return data;
+}
 
-    for (int y = 0; y < map.getMAP_HEIGHT(); y++) {
-      for (int x = 0; x < map.getMAP_WIDTH(); x++) {
-        file.println((int)map.getTile(x, y));
+void writeCharacter(FsFile& file, const CharacterSaveData& data) {
+  file.println(data.characterId);
+  file.println(data.level);
+  file.println(data.xp);
+  file.println(data.hp);
+  file.println(data.tp);
+  file.println(data.weaponId);
+  file.println(data.armorId);
+  file.println(data.accessoryId);
+  file.println(data.skillIds.size());
+  for (int skillId : data.skillIds) file.println(skillId);
+}
+
+void writeInventory(FsFile& file, const InventorySaveData& data) {
+  file.println(data.money);
+  file.println(data.items.size());
+  for (const auto& item : data.items) {
+    file.println(item.itemId);
+    file.println(item.quantity);
+  }
+}
+
+void writeGameData(FsFile& file, const GameSaveData& data, const char* magic) {
+  file.println(magic);
+  file.println(data.floor);
+  file.println((int)data.mapType);
+  file.println(data.width);
+  file.println(data.height);
+  file.println(data.automatonWhoId);
+  file.println(data.playerX);
+  file.println(data.playerY);
+  file.println(data.playerDirection);
+  file.println(data.width * data.height);
+  for (uint8_t tile : data.tiles) file.println((int)tile);
+
+  writeCharacter(file, data.playerCharacter);
+  writeInventory(file, data.inventory);
+
+  file.println(data.party.size());
+  for (const auto& member : data.party) writeCharacter(file, member);
+
+  file.println(data.storage.size());
+  for (const auto& member : data.storage) writeCharacter(file, member);
+
+  for (int i = 0; i < 5; ++i) file.println(data.bossDefeated[i]);
+}
+
+void applyGameData(const GameSaveData& data, GameSession& session) {
+  WorldProgress& progress = session.progress();
+  Map& map = session.map();
+  Player& hero = session.player();
+  Party& party = session.party();
+  AutomatonStorage& storage = session.storage();
+
+  progress.restoreFloor(data.floor);
+  if (data.format == SaveFormat::PGSAVE2) {
+    map.restoreAutomatonWhoId(data.automatonWhoId);
+    map.beginRestoreFromSave(data.mapType, data.width, data.height);
+    for (int y = 0; y < data.height; ++y) {
+      for (int x = 0; x < data.width; ++x) {
+        map.setTile(x, y, data.tiles[y * data.width + x]);
       }
     }
+  }
 
-    // -------------------------------------------------
-    // 2. 主人公
-    // -------------------------------------------------
-    hero.state().saveTo(file);
+  hero.state().restorePersistentState(data.playerCharacter);
+  session.inventory().restorePersistentState(data.inventory);
 
-    // -------------------------------------------------
-    // 3. インベントリ
-    // -------------------------------------------------
-    inventory.saveTo(file);
+  party.clearMembers();
+  for (const auto& member : data.party) {
+    Automaton ally(1, 0);
+    ally.state().restorePersistentState(member);
+    party.appendRestoredMember(std::move(ally));
+  }
 
-    // -------------------------------------------------
-    // 4. パーティー
-    // -------------------------------------------------
-    file.println(party.memberCount());
+  storage.clearForRestore();
+  for (const auto& member : data.storage) {
+    Automaton ally(1, 0);
+    ally.state().restorePersistentState(member);
+    storage.appendRestoredMember(std::move(ally));
+  }
 
-    for (size_t i = 0; i < party.memberCount(); ++i) {
-      party.member(i).state().saveTo(file);
-    }
+  for (int i = 0; i < 5; ++i) {
+    progress.restoreBossDefeated(i, data.bossDefeated[i]);
+  }
 
-    // -------------------------------------------------
-    // 5. 預かり所
-    // -------------------------------------------------
-    file.println(storage.memberCount());
+  if (data.format == SaveFormat::PGSAVE2) {
+    hero.X = data.playerX;
+    hero.Y = data.playerY;
+    hero.oldX = data.playerX;
+    hero.oldY = data.playerY;
+    hero.direction = (Player::Direction)data.playerDirection;
+    hero.moved = false;
+  }
+}
 
-    for (size_t i = 0; i < storage.memberCount(); ++i) {
-      storage.member(i).state().saveTo(file);
-    }
+} // namespace
 
-    // -------------------------------------------------
-    // 6. ボス撃破状態
-    // -------------------------------------------------
-    for (int i = 0; i < 5; i++) {
-      file.println(progress.bosses().isDefeated(i));
-    }
+bool SaveManager::saveGame(Sd& sd, MUSIC& music, const GameSession& session) {
+  return saveComponents(sd, music, session.map(), session.progress(),
+      session.player(), session.party(), session.storage(), session.inventory());
+}
 
-    file.close();
+bool SaveManager::saveGame(
+    Sd& sd,
+    MUSIC& music,
+    Map& map,
+    WorldProgress& progress,
+    Player& hero,
+    Party& party,
+    AutomatonStorage& storage,
+    Inventory& inventory) {
+  return saveComponents(sd, music, map, progress, hero, party, storage, inventory);
+}
 
+bool SaveManager::saveComponents(
+    Sd& sd,
+    MUSIC& music,
+    const Map& map,
+    const WorldProgress& progress,
+    const Player& hero,
+    const Party& party,
+    const AutomatonStorage& storage,
+    const Inventory& inventory) {
+  music.paused = true;
+  critical_section_enter_blocking(&sdLock);
+
+  FsFile file = sd.sdfat.open(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
+  if (!file) {
     critical_section_exit(&sdLock);
     music.paused = false;
-
-    return true;
+    return false;
   }
 
-  // ★ ロード実行
-  bool SaveManager::loadGame(
-      Sd& sd,
-      MUSIC& music,
-      Map& map,
-      WorldProgress& progress,
-      Player& hero,
-      Party& party,
-      AutomatonStorage& storage,
-      Inventory& inventory
-  ) {
-    FsFile file =
-        sd.sdfat.open(
-            SAVE_FILENAME,
-            O_READ
-        );
+  GameSaveData data = captureGameData(map, progress, hero, party, storage, inventory);
+  writeGameData(file, data, SAVE_MAGIC);
+  file.close();
 
-    if (!file) {
-      return false;
-    }
+  critical_section_exit(&sdLock);
+  music.paused = false;
+  return true;
+}
 
-    // ロード失敗時の共通終了処理
-    auto failLoad = [&]() -> bool {
-      file.close();
-      return false;
-    };
+LoadGameResult SaveManager::loadGame(Sd& sd, MUSIC& music, GameSession& session) {
+  (void)music; // load synchronization is owned by the top-level caller.
+  LoadGameResult failure = {false, false, Map::TYPE_DUNGEON};
+  FsFile file = sd.sdfat.open(SAVE_FILENAME, O_READ);
+  if (!file) return failure;
 
-    // -------------------------------------------------
-    // セーブ形式判定
-    // -------------------------------------------------
-    String firstLine =
-        file.readStringUntil('\n');
+  GameSaveData data;
+  const bool valid = readGameData(file, data, SAVE_MAGIC) && validateGameData(data);
+  file.close();
+  if (!valid) return failure;
 
-    firstLine.trim();
+  applyGameData(data, session);
+  return {true, data.format == SaveFormat::LEGACY, data.mapType};
+}
 
-    bool isNewFormat =
-        (firstLine == SAVE_MAGIC);
-
-    Map::MapType loadedType =
-        Map::TYPE_DUNGEON;
-
-    int savedHeroX = 0;
-    int savedHeroY = 0;
-    int savedDirection =
-        (int)Player::DIR_DOWN;
-
-    if (isNewFormat) {
-      // -------------------------------------------------
-      // PGSAVE2
-      // -------------------------------------------------
-      progress.restoreFloor(
-          file.readStringUntil('\n').toInt()
-      );
-
-      int typeVal =
-          file.readStringUntil('\n').toInt();
-
-      if (typeVal < (int)Map::TYPE_MAZE ||
-          typeVal > (int)Map::TYPE_BOSS_ROOM)
-      {
-        return failLoad();
-      }
-
-      loadedType =
-          static_cast<Map::MapType>(
-              typeVal
-          );
-
-      int savedWidth =
-          file.readStringUntil('\n').toInt();
-
-      int savedHeight =
-          file.readStringUntil('\n').toInt();
-
-      // 異常なセーブデータで巨大なvectorを確保しないための保護
-      if (savedWidth <= 0 ||
-          savedHeight <= 0 ||
-          savedWidth > 64 ||
-          savedHeight > 64)
-      {
-        return failLoad();
-      }
-
-      map.restoreAutomatonWhoId(
-          file.readStringUntil('\n').toInt()
-      );
-
-      savedHeroX =
-          file.readStringUntil('\n').toInt();
-
-      savedHeroY =
-          file.readStringUntil('\n').toInt();
-
-      savedDirection =
-          file.readStringUntil('\n').toInt();
-
-      if (savedDirection < (int)Player::DIR_DOWN ||
-          savedDirection > (int)Player::DIR_RIGHT)
-      {
-        return failLoad();
-      }
-
-      int mapDataCount =
-          file.readStringUntil('\n').toInt();
-
-      if (mapDataCount !=
-          savedWidth * savedHeight)
-      {
-        return failLoad();
-      }
-
-      if (savedHeroX < 0 ||
-          savedHeroY < 0 ||
-          savedHeroX >= savedWidth * Map::TILE_SIZE ||
-          savedHeroY >= savedHeight * Map::TILE_SIZE)
-      {
-        return failLoad();
-      }
-
-      map.beginRestoreFromSave(
-          loadedType,
-          savedWidth,
-          savedHeight
-      );
-
-      for (int i = 0;
-          i < mapDataCount;
-          i++)
-      {
-        int tile =
-            file.readStringUntil('\n').toInt();
-
-        if (tile < 0 || tile > 255) {
-          return failLoad();
-        }
-
-        int x = i % savedWidth;
-        int y = i / savedWidth;
-
-        map.setTile(
-            x,
-            y,
-            (uint8_t)tile
-        );
-      }
-    }
-    else {
-      // -------------------------------------------------
-      // 旧形式
-      //
-      // 旧セーブにはマップ本体がないため、
-      // 従来どおり階層とMapTypeだけ読み、
-      // 最後にマップを再生成する。
-      // -------------------------------------------------
-      progress.restoreFloor(
-          firstLine.toInt()
-      );
-
-      int typeVal =
-          file.readStringUntil('\n').toInt();
-
-      if (typeVal < (int)Map::TYPE_MAZE ||
-          typeVal > (int)Map::TYPE_BOSS_ROOM)
-      {
-        return failLoad();
-      }
-
-      loadedType =
-          static_cast<Map::MapType>(
-              typeVal
-          );
-    }
-
-    // -------------------------------------------------
-    // 主人公
-    // -------------------------------------------------
-    hero.state().loadFrom(file);
-
-    // -------------------------------------------------
-    // インベントリ
-    // -------------------------------------------------
-    inventory.loadFrom(file);
-
-    // -------------------------------------------------
-    // パーティー
-    // -------------------------------------------------
-    party.clearMembers();
-
-    int memberCount =
-        file.readStringUntil('\n').toInt();
-
-    for (int i = 0;
-        i < memberCount;
-        i++)
-    {
-      Automaton ally(1, 0);
-      ally.state().loadFrom(file);
-      party.appendRestoredMember(std::move(ally));
-    }
-
-    // -------------------------------------------------
-    // 預かり所
-    // -------------------------------------------------
-    storage.clearForRestore();
-
-    int storageCount =
-        file.readStringUntil('\n').toInt();
-
-    for (int i = 0;
-        i < storageCount;
-        i++)
-    {
-      Automaton ally(1, 0);
-      ally.state().loadFrom(file);
-      storage.appendRestoredMember(std::move(ally));
-    }
-
-    // -------------------------------------------------
-    // ボス撃破状態
-    // -------------------------------------------------
-    for (int i = 0; i < 5; i++) {
-      progress.restoreBossDefeated(i,
-          (
-            file.readStringUntil('\n').toInt()
-            != 0
-          ));
-    }
-
-    // -------------------------------------------------
-    // マップ・主人公位置の復元
-    // -------------------------------------------------
-    if (isNewFormat) {
-      // 新形式は保存したマップをそのまま使用する。
-      // regenerate() は絶対に呼ばない。
-
-      hero.X =
-          savedHeroX;
-
-      hero.Y =
-          savedHeroY;
-
-      hero.oldX =
-          savedHeroX;
-
-      hero.oldY =
-          savedHeroY;
-
-      hero.direction =
-          (Player::Direction)
-              savedDirection;
-
-      hero.moved = false;
-    }
-    else {
-      // 旧形式はマップ本体を持っていないので
-      // 従来どおり再生成する。
-
-      Map::MapType finalType =
-          loadedType;
-
-      // ボス階では撃破状態を優先
-      if (progress.floor() >= 10 &&
-          progress.floor() <= 50 &&
-          progress.floor() % 10 == 0)
-      {
-        int bossIndex =
-            (progress.floor() / 10) - 1;
-
-        if (bossIndex >= 0 &&
-            bossIndex < 5)
-        {
-          if (progress.bosses().isDefeated(bossIndex)) {
-            finalType =
-                Map::TYPE_TOWN;
-          }
-          else {
-            finalType =
-                Map::TYPE_BOSS_ROOM;
-          }
-        }
-      }
-
-      map.regenerate(
-          20,
-          20,
-          finalType,
-          progress.floor()
-      );
-
-      hero.reset(map);
-    }
-
-    file.close();
-
-    return true;
-  }
-
-  // ファイルが存在するかチェック
-  bool SaveManager::hasSaveFile(Sd& sd) {
-     return sd.sdfat.exists(SAVE_FILENAME);
-  }
+bool SaveManager::hasSaveFile(Sd& sd) {
+  return sd.sdfat.exists(SAVE_FILENAME);
+}

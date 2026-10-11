@@ -2,8 +2,7 @@
 
 #include <vector>
 #include "Item.h"
-
-class FsFile;
+#include "InventorySaveData.h"
 
 class Inventory {
 public:
@@ -24,7 +23,6 @@ public:
   bool removeItem(int id);
   void removeByIndex(int index);
   // (将来的に、アイテム一覧を表示する関数なども追加)
-  void saveTo(FsFile& file);
-
-  void loadFrom(FsFile& file);
+  InventorySaveData snapshotPersistentState() const;
+  void restorePersistentState(const InventorySaveData& saved);
 };

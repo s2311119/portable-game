@@ -2,8 +2,6 @@
 #include "CharacterProgressionSystem.h"
 #include "CharacterCatalog.h"
 
-#include <SdFat.h>
-
 
 void CharacterState::equip(EquipmentSlot slot, int itemId) { equipment.equip(slot, itemId); }
 
@@ -201,38 +199,28 @@ int CharacterState::ApplyTurnEffects() {
     return value;
   }
 
-void CharacterState::saveTo(FsFile& file) const {
-    file.println(who);
-    file.println(progression.level());
-    file.println(progression.xp());
-    file.println(coreStats.getHp());
-    file.println(coreStats.getTp());
-    file.println(equipmentState().weaponId()); // ★ 追加
-    file.println(equipmentState().armorId());  // ★ 追加
-    file.println(equipmentState().accessoryId());    // ★ 追加
-    // 覚えているスキルの数とID
-    file.println(skillSet.count());
+CharacterSaveData CharacterState::snapshotPersistentState() const {
+    CharacterSaveData saved;
+    saved.characterId = who;
+    saved.level = progression.level();
+    saved.xp = progression.xp();
+    saved.hp = coreStats.getHp();
+    saved.tp = coreStats.getTp();
+    saved.weaponId = equipmentState().weaponId();
+    saved.armorId = equipmentState().armorId();
+    saved.accessoryId = equipmentState().accessoryId();
     for (int i = 0; i < skillSet.count(); ++i) {
-      file.println(skillSet.skillIdAt(i));
+      saved.skillIds.push_back(skillSet.skillIdAt(i));
     }
+    return saved;
   }
 
-void CharacterState::loadFrom(FsFile& file) {
-    // -------------------------
-    // 保存値を読み込む
-    // -------------------------
-    who = file.readStringUntil('\n').toInt();
-    int savedLevel = file.readStringUntil('\n').toInt();
-    int savedXP = file.readStringUntil('\n').toInt();
-    progression.restore(savedLevel, savedXP);
-
-    // HP / TP は再計算で上書きされるので、一旦退避する
-    int savedHP = file.readStringUntil('\n').toInt();
-    int savedTP = file.readStringUntil('\n').toInt();
-
-    equip(EquipmentSlot::Weapon, file.readStringUntil('\n').toInt());
-    equip(EquipmentSlot::Armor, file.readStringUntil('\n').toInt());
-    equip(EquipmentSlot::Accessory, file.readStringUntil('\n').toInt());
+void CharacterState::restorePersistentState(const CharacterSaveData& saved) {
+    who = saved.characterId;
+    progression.restore(saved.level, saved.xp);
+    equip(EquipmentSlot::Weapon, saved.weaponId);
+    equip(EquipmentSlot::Armor, saved.armorId);
+    equip(EquipmentSlot::Accessory, saved.accessoryId);
 
     // -------------------------
     // レベル・種類に応じた基礎値を再構築
@@ -246,17 +234,14 @@ void CharacterState::loadFrom(FsFile& file) {
     // -------------------------
     // 保存時の現在HP / TPを復元
     // -------------------------
-    coreStats.restoreCurrentPoints(savedHP, savedTP);
+    coreStats.restoreCurrentPoints(saved.hp, saved.tp);
 
     // -------------------------
     // 習得済みスキル復元
     // -------------------------
     skillSet.clearForRestore();
 
-    int skillCount = file.readStringUntil('\n').toInt();
-
-    for (int i = 0; i < skillCount; i++) {
-      int skillId = file.readStringUntil('\n').toInt();
+    for (int skillId : saved.skillIds) {
       skillSet.appendRestoredSkillId(skillId);
     }
 

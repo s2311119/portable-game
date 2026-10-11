@@ -1,8 +1,6 @@
 #include "Inventory.h"
 #include "ItemCatalog.h"
 
-#include <SdFat.h>
-
 
 Inventory::Inventory() {
     // 起動時に std::vector のメモリを
@@ -53,25 +51,21 @@ void Inventory::removeByIndex(int index) {
       }
 }
 
-void Inventory::saveTo(FsFile& file) {
-    file.println(money);
-    file.println(items.size());
+InventorySaveData Inventory::snapshotPersistentState() const {
+    InventorySaveData saved;
+    saved.money = money;
     for (const auto& stack : items) {
-      file.println(stack.item.id);
-      file.println(stack.quantity);
+      saved.items.push_back({stack.item.id, stack.quantity});
     }
+    return saved;
 }
 
-void Inventory::loadFrom(FsFile& file) {
-    money = file.readStringUntil('\n').toInt();
-    int count = file.readStringUntil('\n').toInt();
-    
+void Inventory::restorePersistentState(const InventorySaveData& saved) {
+    money = saved.money;
     items.clear();
-    for (int i = 0; i < count; i++) {
-      int id = file.readStringUntil('\n').toInt();
-      int qty = file.readStringUntil('\n').toInt();
+    for (const auto& entry : saved.items) {
       // アイテム生成してリストに追加
-      Item item = ItemCatalog::get(id);
-      items.push_back({item, qty});
+      Item item = ItemCatalog::get(entry.itemId);
+      items.push_back({item, entry.quantity});
     }
 }

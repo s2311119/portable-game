@@ -16,11 +16,11 @@ Map::Map(int max_w, int max_h, MapType type, int floor)
     generateMapContent(type, floor);
   }
 
-int Map::getMAP_WIDTH(){
+int Map::getMAP_WIDTH() const {
     return MAP_WIDTH;
   }
 
-int Map::getMAP_HEIGHT(){
+int Map::getMAP_HEIGHT() const {
     return MAP_HEIGHT;
   }
 

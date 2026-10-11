@@ -4124,14 +4124,37 @@ void setup() {
 
         ctx->music->paused = true;
         critical_section_enter_blocking(&sdLock);
-        bool loaded = ctx->saveManager->loadGame(*ctx->sd, *ctx->music,
-            ctx->session->map(), ctx->session->progress(),
-            ctx->session->player(), ctx->session->party(),
-            ctx->session->storage(), ctx->session->inventory());
+        LoadGameResult loadResult = ctx->saveManager->loadGame(
+            *ctx->sd, *ctx->music, *ctx->session);
+
+        if (loadResult.success && loadResult.requiresMapRegeneration) {
+          Map::MapType finalType = loadResult.legacyMapType;
+          WorldProgress& progress = ctx->session->progress();
+
+          // ボス階では撃破状態を優先
+          if (progress.floor() >= 10 &&
+              progress.floor() <= 50 &&
+              progress.floor() % 10 == 0)
+          {
+            int bossIndex = (progress.floor() / 10) - 1;
+            if (bossIndex >= 0 && bossIndex < 5) {
+              if (progress.bosses().isDefeated(bossIndex)) {
+                finalType = Map::TYPE_TOWN;
+              } else {
+                finalType = Map::TYPE_BOSS_ROOM;
+              }
+            }
+          }
+
+          ctx->session->map().regenerate(
+              20, 20, finalType, progress.floor());
+          ctx->session->player().reset(ctx->session->map());
+        }
+
         critical_section_exit(&sdLock);
         ctx->music->paused = false;
 
-        if (loaded) {
+        if (loadResult.success) {
           loadSuccess = true;
           ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
         } else {

@@ -37,8 +37,8 @@ public:
 
   Map(int max_w, int max_h, MapType type, int floor);
 
-  int getMAP_WIDTH();
-  int getMAP_HEIGHT();
+  int getMAP_WIDTH() const;
+  int getMAP_HEIGHT() const;
 
   uint8_t getTile(int x, int y) const;
 
