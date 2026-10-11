@@ -1,0 +1,17 @@
+#include "Sd.h"
+
+// --- MUSIC::switchTrack 実装部（Sdの定義後） ---
+void MUSIC::switchTrack(int newId, Sd &sd) {
+  if (newId == currentTrack) return;
+
+  // --- 安全な切替要求 ---
+  paused = true;
+
+  // SDロックを取得（refileと競合しないようにする）
+  critical_section_enter_blocking(&sdLock);
+  sampleIndex = 0;
+  needs_refill = false;
+  critical_section_exit(&sdLock);
+
+  sd.requestSwitch(newId);
+}
