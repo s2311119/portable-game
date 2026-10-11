@@ -13,6 +13,7 @@
 #include "Graphic.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
+#include "Vibration.h"
 #include "Skill.h"
 #include "Inventory.h"
 #include "Map.h"
@@ -188,36 +189,6 @@ const int learnableSkillCount = sizeof(learnableSkillIDs) / sizeof(int);
 
 
 
-class Vibration {
-public:
-  // ★ 振動モーターを繋ぐピン (回路に合わせて変更してください)
-  static const int VIB_PIN = 7; 
-  unsigned long vibrationEndTime = 0;
-  bool _enabled = true;
-
-  void init() {
-    pinMode(VIB_PIN, OUTPUT);
-    digitalWrite(VIB_PIN, LOW);
-  }
-
-  // msミリ秒だけ振動させる
-  void trigger(int ms) {
-    if (!_enabled) return;
-    digitalWrite(VIB_PIN, HIGH);
-    vibrationEndTime = millis() + ms;
-  }
-
-  void setEnabled(bool enabled) {
-    _enabled = enabled;
-  }
-  // loop内で毎回呼ぶ
-  void update() {
-    if (vibrationEndTime > 0 && millis() > vibrationEndTime) {
-      digitalWrite(VIB_PIN, LOW);
-      vibrationEndTime = 0;
-    }
-  }
-};
 
 // -------------------------
 // AUDIO / SD (core1 に限定)
