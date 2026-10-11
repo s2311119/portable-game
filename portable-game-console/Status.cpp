@@ -6,9 +6,17 @@
 
 #include <Arduino.h>
 #include <SdFat.h>
-#include "Item.h"
-#include "ItemCatalog.h"
 
+
+void Status::equip(EquipmentSlot slot, int itemId) { equipment.equip(slot, itemId); }
+
+void Status::unequip(EquipmentSlot slot) { equipment.unequip(slot); }
+
+int Status::weaponId() const { return equipment.weaponId(); }
+
+int Status::armorId() const { return equipment.armorId(); }
+
+int Status::accessoryId() const { return equipment.accessoryId(); }
 
 int Status::getPreEvolution(int currentId) {
     const EvolutionCatalog::Lineage lineage = EvolutionCatalog::getLineage(currentId);
@@ -27,14 +35,7 @@ int Status::getMaxTp(){return coreStats.getMaxTp();}
 
 int Status::getAttack() {
     float finalValue = (float)coreStats.getAttack(); // 基礎ATK
-    // 武器の補正
-    if (equipWeaponId != -1) {
-      Item weapon = ItemCatalog::get(equipWeaponId);
-      finalValue += weapon.value; // 武器の攻撃力を足す
-    }
-    // アクセの補正 (例: パワーリング ID 500)
-    if (equipAccId == 500) finalValue += 10;
-    if (equipAccId == 599) finalValue += 500;
+    finalValue = equipment.applyAttackBonus(finalValue);
     // バフを適用 (例: 1.5倍 or 2.0倍)
     if (atkBuffTurns > 0) {
       finalValue *= atkBuffRate;
@@ -50,13 +51,7 @@ int Status::getAttack() {
 
 int Status::getDefense() {
     float finalValue = (float)coreStats.getDefense(); // 基礎DEF
-    // 防具の補正
-    if (equipArmorId != -1) {
-      Item armor = ItemCatalog::get(equipArmorId);
-      finalValue += armor.value;
-    }
-    if (equipAccId == 501) finalValue += 10;  // ガードリング
-    if (equipAccId == 599) finalValue += 500; // トリニティ・コア
+    finalValue = equipment.applyDefenseBonus(finalValue);
     if (defBuffTurns > 0) {
         finalValue *= defBuffRate;
     }
@@ -70,9 +65,7 @@ int Status::getDefense() {
 
 int Status::getSpeed() {
     float finalValue = (float)coreStats.getSpeed(); // 基礎SPD
-    // アクセ補正
-    if (equipAccId == 502) finalValue += 10;  // クイックブーツ
-    if (equipAccId == 599) finalValue += 500; // トリニティ・コア
+    finalValue = equipment.applySpeedBonus(finalValue);
     if (spdBuffTurns > 0) {
         finalValue *= spdBuffRate;
     }
@@ -86,9 +79,7 @@ int Status::getSpeed() {
 
 int Status::getSense() {
     float finalValue = (float)coreStats.getSense(); // 基礎SEN
-    // アクセ補正
-    if (equipAccId == 503) finalValue += 10;  // スナイパーレンズ
-    if (equipAccId == 599) finalValue += 500; // トリニティ・コア
+    finalValue = equipment.applySenseBonus(finalValue);
     if (senBuffTurns > 0) {
         finalValue *= senBuffRate;
     }
@@ -102,10 +93,7 @@ int Status::getSense() {
 
 int Status::getLuck() {
     float finalValue = (float)coreStats.getLuck(); // 基礎LCK
-    // アクセ補正
-    if (equipAccId == 504) finalValue += 50;  // ラッキーコイン
-    if (equipAccId == 599) finalValue += 500; // トリニティ・コア
-
+    finalValue = equipment.applyLuckBonus(finalValue);
     if (lckBuffTurns > 0) {
         finalValue *= lckBuffRate;
     }
@@ -172,9 +160,9 @@ Status::Status(int level, int w){
     nextLevelXP = calculateNextXP(Level);
     learnedSkills.reserve(10);
     updateName();
-    equipWeaponId = -1;
-    equipArmorId = -1;
-    equipAccId = -1;
+    unequip(EquipmentSlot::Weapon);
+    unequip(EquipmentSlot::Armor);
+    unequip(EquipmentSlot::Accessory);
     isDoubleAction = false;
     coverTurns = 0;
     physDamageOneTurns = 0;
@@ -1085,9 +1073,9 @@ void Status::saveTo(FsFile& file) {
     file.println(currentXP);
     file.println(coreStats.getHp());
     file.println(coreStats.getTp());
-    file.println(equipWeaponId); // ★ 追加
-    file.println(equipArmorId);  // ★ 追加
-    file.println(equipAccId);    // ★ 追加
+    file.println(weaponId()); // ★ 追加
+    file.println(armorId());  // ★ 追加
+    file.println(accessoryId());    // ★ 追加
     // 覚えているスキルの数とID
     file.println(learnedSkills.size());
     for (const auto& s : learnedSkills) {
@@ -1107,9 +1095,9 @@ void Status::loadFrom(FsFile& file) {
     int savedHP = file.readStringUntil('\n').toInt();
     int savedTP = file.readStringUntil('\n').toInt();
 
-    equipWeaponId = file.readStringUntil('\n').toInt();
-    equipArmorId = file.readStringUntil('\n').toInt();
-    equipAccId = file.readStringUntil('\n').toInt();
+    equip(EquipmentSlot::Weapon, file.readStringUntil('\n').toInt());
+    equip(EquipmentSlot::Armor, file.readStringUntil('\n').toInt());
+    equip(EquipmentSlot::Accessory, file.readStringUntil('\n').toInt());
 
     // -------------------------
     // レベル・種類に応じた基礎値を再構築

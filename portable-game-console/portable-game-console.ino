@@ -1243,9 +1243,9 @@ public:
         g->lineSprite.printf("装備 (%s)", s->getname()); 
         g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
 
-        String wName = (s->equipWeaponId == -1) ? "なし" : ItemCatalog::get(s->equipWeaponId).name;
-        String aName = (s->equipArmorId == -1) ? "なし" : ItemCatalog::get(s->equipArmorId).name;
-        String acName = (s->equipAccId == -1) ? "なし" : ItemCatalog::get(s->equipAccId).name;
+        String wName = (s->weaponId() == -1) ? "なし" : ItemCatalog::get(s->weaponId()).name;
+        String aName = (s->armorId() == -1) ? "なし" : ItemCatalog::get(s->armorId()).name;
+        String acName = (s->accessoryId() == -1) ? "なし" : ItemCatalog::get(s->accessoryId()).name;
 
         g->lineSprite.setTextColor(listCursor == 0 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.setCursor(x + 20, y + 60); g->lineSprite.printf("武器: %s", wName.c_str());
@@ -4824,18 +4824,18 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party&
           
           // 1. 外す (インベントリに戻す)
           int oldId = -1;
-          if (equipSlot == 0) oldId = s->equipWeaponId;
-          if (equipSlot == 1) oldId = s->equipArmorId;
-          if (equipSlot == 2) oldId = s->equipAccId;
+          if (equipSlot == 0) oldId = s->weaponId();
+          if (equipSlot == 1) oldId = s->armorId();
+          if (equipSlot == 2) oldId = s->accessoryId();
 
           if (oldId != -1) {
             inventory.addItem(ItemCatalog::get(oldId));
           }
 
           // 2. 装備する
-          if (equipSlot == 0) s->equipWeaponId = newItem.id;
-          if (equipSlot == 1) s->equipArmorId = newItem.id;
-          if (equipSlot == 2) s->equipAccId = newItem.id;
+          if (equipSlot == 0) s->equip(EquipmentSlot::Weapon, newItem.id);
+          if (equipSlot == 1) s->equip(EquipmentSlot::Armor, newItem.id);
+          if (equipSlot == 2) s->equip(EquipmentSlot::Accessory, newItem.id);
 
           // 3. 消費
           inventory.removeByIndex(invIndex);

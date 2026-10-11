@@ -1,5 +1,6 @@
 #pragma once
 #include "CoreStats.h"
+#include "Equipment.h"
 #include "EvolutionCatalog.h"
 
 #include "Skill.h"
@@ -10,6 +11,7 @@ class FsFile;
 class Status{
 private:
   CoreStats coreStats;
+  Equipment equipment;
   int Level;
   int who;
   const char* name;
@@ -18,9 +20,11 @@ private:
   std::vector<Skill> learnedSkills; // 習得済みの旋律リスト
   int getPreEvolution(int currentId);
 public:
-  int equipWeaponId = -1; // 武器
-  int equipArmorId = -1;  // 防具
-  int equipAccId = -1;    // アクセ
+  void equip(EquipmentSlot slot, int itemId);
+  void unequip(EquipmentSlot slot);
+  int weaponId() const;
+  int armorId() const;
+  int accessoryId() const;
   // --- 状態異常 ---
   int poisonTurns = 0;
   int poisonLevel = 0;   // 0: なし, 1: 毒, 2: 猛毒
