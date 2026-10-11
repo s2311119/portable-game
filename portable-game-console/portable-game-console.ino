@@ -1692,8 +1692,24 @@ void loop() {
 
   else if (state == STATE_BATTLE) {
     auto &battle = *ctx->battle;
-    battle.update(ctrl, music, sd, hero, inventory, vib, map, ctx->session->progress(), g);
+    battle.update(ctrl, music, sd, hero, inventory, vib, map);
     if (const std::optional<BattleResult> result = battle.takeResult()) {
+      if (result->outcome == BattleOutcome::VICTORY && result->kind != BattleKind::NORMAL) {
+        WorldProgress& progress = ctx->session->progress();
+        int bossIndex = (progress.floor() / 10) - 1;
+        if (bossIndex >= 0 && bossIndex < 5) {
+          progress.markBossDefeated(bossIndex);
+        }
+
+        map.regenerate(20, 20, Map::TYPE_TOWN, progress.floor());
+        hero.reset(map);
+
+        int cx = hero.X - Graphic::SCREEN_WIDTH/2;
+        int cy = hero.Y - Graphic::SCREEN_HEIGHT/2;
+        g.invalidateAndRedraw(map, hero, cx, cy);
+
+        music.switchTrack(0, sd);
+      }
       state = result->outcome == BattleOutcome::DEFEAT ? STATE_GAME_OVER : STATE_GAME;
     }
     battle.draw(&g);

@@ -398,7 +398,7 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
     currentBattleState = STATE_TURN_START;
   }
 
-void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g) {
+void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map) {
     if (!inBattle) return;
     CharacterState* currentActor = resolveCombatant(this->currentActor);
     CharacterState* currentTarget = resolveCombatant(this->currentTarget);
@@ -1825,32 +1825,14 @@ void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Invent
           // 4. 行動順リストの解放
           actorList.clear();
           std::vector<CombatantRef>().swap(actorList);
-          if (actualBossDefeated) {
-            // 撃破フラグを立てる
-            int bossIndex = (progress.floor() / 10) - 1;
-            if (bossIndex >= 0 && bossIndex < 5) {
-              progress.markBossDefeated(bossIndex);
+          if (!actualBossDefeated) {
+            if (battleEndReason == BattleEndReason::DEFEAT) {
+              music.switchTrack(99, sd);
+            }else {
+              // 通常戦闘終了後: BGMを戻す
+              if (map.isTown()) music.switchTrack(0, sd);
+              else music.switchTrack(1, sd);
             }
-
-            // マップを集落に作り変える
-            map.regenerate(20, 20, Map::TYPE_TOWN, progress.floor());
-            
-            // プレイヤー位置再配置
-            hero.reset(map); 
-            
-            // 画面全体を再描画 (Graphicクラス使用)
-            int cx = hero.X - Graphic::SCREEN_WIDTH/2;
-            int cy = hero.Y - Graphic::SCREEN_HEIGHT/2;
-            g.invalidateAndRedraw(map, hero, cx, cy);
-
-            // BGMを集落用に変更 (ID:0)
-            music.switchTrack(0, sd); 
-          }else if (battleEndReason == BattleEndReason::DEFEAT) {
-            music.switchTrack(99, sd);
-          }else {
-            // 通常戦闘終了後: BGMを戻す
-            if (map.isTown()) music.switchTrack(0, sd);
-            else music.switchTrack(1, sd);
           }
         }
         break;
