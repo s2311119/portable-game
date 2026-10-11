@@ -1,16 +1,9 @@
 #include "Enemy.h"
 #include "SkillLearnsetCatalog.h"
 
-#include <Arduino.h>
 #include "EnemyCatalog.h"
 
 namespace {
-
-int rollLevel(int floor) {
-  int level = floor + random(0, 3);
-  if (level < 1) level = 1;
-  return level;
-}
 
 int initialLevelFor(int requestedId, int rolledLevel) {
   if (EnemyCatalog::get(requestedId).id != requestedId) return 3;
@@ -22,7 +15,9 @@ int initialLevelFor(int requestedId, int rolledLevel) {
 
 } // namespace
 
-Enemy::Enemy(int w, int floor) : Enemy(w, rollLevel(floor), StateInitTag{}) {}
+Enemy Enemy::fromRolledLevel(int requestedId, int rolledLevel) {
+  return Enemy(requestedId, rolledLevel, StateInitTag{});
+}
 
 Enemy::Enemy(Enemy&&) noexcept = default;
 

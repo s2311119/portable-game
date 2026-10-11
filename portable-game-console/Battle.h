@@ -18,6 +18,7 @@
 #include "ImageManager.h"
 #include "LegacyGameTypes.h"
 #include "Skill.h"
+#include "EncounterSpec.h"
 
 class Battle {
 private:
@@ -161,7 +162,7 @@ public:
 
   Battle();
 
-  void start(MUSIC &music, Sd &sd, Player& hero, Party& party, int floor, ImageManager &imgMgr, Map& map);
+  void start(MUSIC &music, Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr);
 
   void update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g);
   

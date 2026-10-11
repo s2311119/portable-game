@@ -1652,7 +1652,11 @@ void loop() {
       if (!eventOccurred && encounterManager.onStep(map, encounterRandom)) {
         vib.trigger(300);
         state = STATE_BATTLE;
-        ctx->battle->start(music, sd, hero, party, ctx->session->progress().floor(), imgmgr, map);
+        if (!ctx->battle->inBattle) {
+          EncounterSpec spec = encounterManager.createEncounter(
+              ctx->session->progress().floor(), map, encounterRandom);
+          ctx->battle->start(music, sd, hero, party, spec, imgmgr);
+        }
       }
     }
 
@@ -1778,15 +1782,14 @@ void loop() {
 
         state = STATE_BATTLE;
 
-        ctx->battle->start(
-            music,
-            sd,
-            hero,
-            party,
-            ctx->session->progress().floor(),
-            imgmgr,
-            map
-        );
+        if (!ctx->battle->inBattle) {
+          EncounterRandom encounterRandom = {nullptr,
+                                             field_random_adapter::drawMax,
+                                             field_random_adapter::drawRange};
+          EncounterSpec spec = encounterManager.createBossEncounter(
+              ctx->session->progress().floor(), map, encounterRandom);
+          ctx->battle->start(music, sd, hero, party, spec, imgmgr);
+        }
 
         currentEvent.type = FieldEventType::NONE;
         break;

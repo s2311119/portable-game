@@ -263,7 +263,7 @@ Battle::Battle() {
     }
   }
 
-void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, int floor, ImageManager &imgMgr, Map& map) {
+void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr) {
     if (inBattle) return;
     inBattle = true;
     message = "敵が現れた！";
@@ -294,24 +294,15 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, int floor, 
     partyRef = &party;
     activeEnemies.clear();
     activeEnemies.reserve(4);
-    if (floor >= 10 &&
-        floor <= 50 &&
-        floor % 10 == 0 &&
-        !map.isTown())
-    {
+    if (spec.kind != BattleKind::NORMAL) {
       isBossBattleMode = true;
-      int bossId = 0;
-      if (floor == 10) bossId = 80;
-      else if (floor == 20) bossId = 81;
-      else if (floor == 30) bossId = 82;
-      else if (floor == 40) bossId = 83;
-      else if (floor == 50) bossId = 84;
-
-      activeEnemies.emplace_back(bossId, 1);
+      for (const EnemySpawnSpec& spawn : spec.enemies) {
+        activeEnemies.push_back(Enemy::fromRolledLevel(spawn.enemyId, spawn.level));
+      }
       Enemy& boss = activeEnemies.back();
       boss.name = boss.state().name();
       critical_section_enter_blocking(&sdLock);
-      String imgName = "/e_" + String(bossId) + ".bin";
+      String imgName = "/e_" + String(spec.enemies[0].enemyId) + ".bin";
       activeImages[0] = imgMgr.load(0, imgName, sd);
 
       // 他のスロットは空にする
@@ -319,68 +310,17 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, int floor, 
       critical_section_exit(&sdLock);
 
       // 3. ボス戦BGM (ID 3:ボス, ID 4:ラスボス)
-      int bgmId = (floor == 50) ? 4 : 3;
+      int bgmId = (spec.kind == BattleKind::FINAL_BOSS) ? 4 : 3;
       music.switchTrack(bgmId, sd);
     }else{
-      std::vector<int> candidates;
-      bool rare_36_appears = false; 
-      bool rare_37_appears = false;
-      if (floor <= 10) {
-        // 0~4 (基本) + 22 (オーバーロード:強敵)
-        candidates = {0, 1, 2, 3, 4}; 
-      }else if (floor <= 20) {
-        // 5~9 (1段階) + 22 (オーバーロード)
-        candidates = {5, 6, 7, 8, 9};
-      }else if (floor <= 30) {
-        // 10~14 (2段階)
-        candidates = {10, 11, 12, 13, 14};
-        rare_36_appears = true; // 21階〜: はぐれノイズ解禁
-      }else if (floor <= 40) {
-        // 15, 17, 19, 20, 21 (3段階) + 24 (ゼロ・ブレード)
-        // ※ 除外: 16(スワッシュ), 18(イージス)
-        candidates = {15, 17, 19, 20, 21};
-        rare_36_appears = true;
-        rare_37_appears = true; // 31階〜: ノイズ・キング解禁
-      }else { // 41階〜50階 (それ以降含む)
-        // 22, 24, 26, 28, 30, 32, 34 (4段階)
-        // ※ 除外: 23, 25, 27, 29, 31, 33
-        candidates = {22, 24, 26, 28, 30, 32, 34};
-        rare_36_appears = true;
-        rare_37_appears = true;
-      }
-      int enemyCount = random(1, 5);
-      for (int i = 0; i < enemyCount; i++) {
-        int who = 0;
-        int r = random(100);
-        
-        // 1. まずレア敵の抽選 (メタルスライム枠)
-        if (rare_37_appears && r < 3) { // 3%
-          who = 37; // ノイズ・キング
-        } else if (rare_36_appears && r < 8) { // 5%
-          who = 36; // はぐれノイズ
-        } else if (floor <= 20 && random(100) < 3) { 
-          who = 22; // オーバーロード出現！(2%の確率)
-        }else if(floor <= 40 && floor > 20 && random(100) < 3) {
-          who = 24;
-        }
-        // 2. 通常敵の抽選 (リストからランダム)
-        else {
-          if (!candidates.empty()) {
-            int idx = random(0, candidates.size());
-            who = candidates[idx];
-          } else {
-            who = 0; // 万が一リストが空ならストライカー
-          }
-        }
-        
-        // 敵の生成
-        activeEnemies.emplace_back(who, floor);
+      for (const EnemySpawnSpec& spawn : spec.enemies) {
+        activeEnemies.push_back(Enemy::fromRolledLevel(spawn.enemyId, spawn.level));
         Enemy& newEnemy = activeEnemies.back();
-      
+
         newEnemy.state().clearBattleEffects();
         newEnemy.name = newEnemy.state().name();
       }
-      
+
       // 画像ロード処理
       critical_section_enter_blocking(&sdLock);
       for (int i = 0; i < 4; i++) {
@@ -392,7 +332,7 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, int floor, 
         }
       }
       critical_section_exit(&sdLock);
-      
+
       music.switchTrack(2, sd);
     }
     

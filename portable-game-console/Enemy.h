@@ -9,7 +9,9 @@ public:
   int dropRatePercent;
   int xpYield;
 
-  Enemy(int w, int floor);
+  // rolledLevel is the already-drawn level for XP; rare/Boss state presets
+  // continue to use their existing initial levels.
+  static Enemy fromRolledLevel(int requestedId, int rolledLevel);
   Enemy(const Enemy&) = delete;
   Enemy& operator=(const Enemy&) = delete;
   Enemy(Enemy&&) noexcept;
