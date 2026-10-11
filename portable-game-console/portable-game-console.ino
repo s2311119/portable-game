@@ -1692,7 +1692,10 @@ void loop() {
 
   else if (state == STATE_BATTLE) {
     auto &battle = *ctx->battle;
-    battle.update(ctrl, state, music, sd, hero, inventory, vib, map, ctx->session->progress(), g);
+    battle.update(ctrl, music, sd, hero, inventory, vib, map, ctx->session->progress(), g);
+    if (const std::optional<BattleResult> result = battle.takeResult()) {
+      state = result->outcome == BattleOutcome::DEFEAT ? STATE_GAME_OVER : STATE_GAME;
+    }
     battle.draw(&g);
     //g.screenSprite.pushSprite(0, 0);
   }

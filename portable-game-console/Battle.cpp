@@ -398,7 +398,7 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
     currentBattleState = STATE_TURN_START;
   }
 
-void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g) {
+void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, WorldProgress& progress, Graphic &g) {
     if (!inBattle) return;
     CharacterState* currentActor = resolveCombatant(this->currentActor);
     CharacterState* currentTarget = resolveCombatant(this->currentTarget);
@@ -1802,14 +1802,8 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
             isBossBattleMode &&
             battleEndReason == BattleEndReason::VICTORY;
           inBattle = false;
-          if (battleEndReason == BattleEndReason::DEFEAT) {
-            state = STATE_GAME_OVER;
-          }
-          else{
-            state = STATE_GAME;
-            if (!actualBossDefeated) {
-              music.switchTrack(1, sd);
-            }
+          if (battleEndReason != BattleEndReason::DEFEAT && !actualBossDefeated) {
+            music.switchTrack(1, sd);
           }
           
           // 戦闘終了時にステータスをリセット
