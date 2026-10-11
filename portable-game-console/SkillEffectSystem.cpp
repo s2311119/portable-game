@@ -1,4 +1,6 @@
 #include "SkillEffectSystem.h"
+#include "CombatCalculator.h"
+#include "Skill.h"
 #include "CharacterState.h"
 #include <Arduino.h>
 
@@ -341,4 +343,314 @@ void SkillEffectSystem::boostMaxHp(CharacterState& target) {
       const int increasedHp = (int)(target.stats().getHp() * 1.5);
       target.applyMaxHpIncrease(increasedMaxHp, increasedHp); // 現在HPも割合で増やす
     }
+  }
+
+SkillEffectResult SkillEffectSystem::execute(Skill& skill, CharacterState* user, CharacterState* target, SkillAudioCue audio) {
+    SkillEffectResult result;
+    if (target == nullptr) return result;
+
+    int value = 0;
+    int actualDamage = 0;
+    bool isCrit = false;
+    DamageResult damageResult = {};
+    HealResult healResult = {};
+    switch (skill.type) {
+
+      case Skill::EffectType::DAMAGE:
+        // (user->getSense() と target->getSense() でバフ/デバフが反映された値を取得)
+        damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+        isCrit = damageResult.critical;
+        value = damageResult.damage;
+        if (isCrit) audio.play(4); // 会心
+        else {
+          if (skill.id == 0) audio.play(3); // 通常攻撃
+          else if (skill.category == Skill::Category::PHYSICAL) {
+            if (skill.scope == Skill::TargetScope::ALL_ENEMIES) audio.play(6); // 物理全体
+            else audio.play(5); // 物理単体
+          } else {
+            if (skill.scope == Skill::TargetScope::ALL_ENEMIES) audio.play(8); // センス全体
+            else audio.play(7); // センス単体
+          }
+        }
+        actualDamage =
+            target->takeDamage(value, skill.category);
+
+        target->addPopup(actualDamage, isCrit);
+        result.lastDamageDelta += actualDamage;
+        break;
+
+      case Skill::EffectType::HEAL:
+        // ★ isCrit を渡す
+        audio.play(7);
+        healResult = CombatCalculator::calculateHealAmount(*user, skill);
+        isCrit = healResult.critical;
+        value = healResult.amount;
+        target->heal(value);
+        target->addPopup(-value, isCrit); // ★ 結果をポップアップへ (回復も赤字/強調表示される)
+        result.lastDamageDelta -= value;
+        break;
+
+      case Skill::EffectType::MULTI_HIT_DAMAGE:
+        {
+          int hits = 1;
+          if (skill.id == 23 || skill.id == 74 || skill.id == 76) hits = 2;
+          if (skill.id == 36) hits = 3;
+
+          for(int i=0; i<hits; i++) {
+            isCrit = false; // 毎回リセット
+            // ★ isCrit を渡す
+            damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+            isCrit = damageResult.critical;
+            value = damageResult.damage;
+            if (isCrit) audio.play(4);
+            else {
+              // 物理/センス判定
+              if (skill.category == Skill::Category::PHYSICAL) audio.play(5);
+              else audio.play(7);
+            }
+            actualDamage =
+                target->takeDamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+            result.lastDamageDelta += actualDamage;
+          }
+        }
+        break;
+
+      case Skill::EffectType::BUFF:
+        SkillEffectSystem::applyBuff(skill.id, *target);
+        audio.play(7);
+        result.actionMessage = "能力UP!"; // 短く
+        break;
+      case Skill::EffectType::DEBUFF:
+        if(SkillEffectSystem::applyDebuff(skill.id, *target, user)){
+          audio.play(7);
+          result.actionMessage = "能力DOWN!";
+        }else {
+          // ★ 失敗時
+          result.actionMessage = "レジスト！"; // または "かからなかった！"
+        }
+        break;
+      case Skill::EffectType::CURE_STATUS:
+        target->CureStatus(skill.id == 91);
+        audio.play(7);
+        result.actionMessage = "治った！";
+        break;
+      case Skill::EffectType::REVIVE:
+        if (skill.id == 98) target->revive(100);
+        else target->revive(50);
+        audio.play(7);
+        result.actionMessage = "復活！";
+        break;
+
+      case Skill::EffectType::SPECIAL:
+        if (skill.id == 100) {
+          audio.play(7);
+          target->restoreTP(skill.power);
+          result.actionMessage = "TP回復";
+        } // 2. アサシネイト (即死)
+        else if (skill.id == 42) {
+          int chance = 30 + (user->luck() - target->luck()); // 基本30%
+          if (random(0, 100) < chance) {
+            audio.play(4);
+            int dmg = target->stats().getHp();
+
+            actualDamage =
+                target->takeDamage(dmg, skill.category);
+
+            target->addPopup(actualDamage, true);
+
+            if (target->stats().getHp() <= 0) {
+              result.actionMessage = "急所を突いた! 即死!";
+            }
+            else {
+              // バリア、アダマン・ボディ、ラストスタンドなどで
+              // 即死を防がれた場合
+              result.actionMessage = "急所を突いた!";
+            }
+          } else {
+            // 失敗時は通常ダメージの半分
+            audio.play(5);
+            damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+            isCrit = damageResult.critical;
+            value = damageResult.damage / 2;
+            if(value<1) value=1;
+            actualDamage =
+                target->takeDamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+            result.actionMessage = "急所を外した...";
+          }
+        }
+
+        // 3. ペインサイクル / TPドレイン (吸収)
+        else if (skill.id == 44 || skill.id == 111) {
+          if (skill.id == 44) { // HP吸収
+            audio.play(5);
+            damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+            isCrit = damageResult.critical;
+            value = damageResult.damage;
+
+            actualDamage =
+                target->takeDamage(value, skill.category);
+
+            target->addPopup(actualDamage, isCrit);
+
+            // 実際に与えたダメージ分だけ吸収
+            user->heal(actualDamage);
+            user->addPopup(-actualDamage, false);
+            result.actionMessage = "体力を奪い取った!";
+          } else { // TP吸収
+            audio.play(7);
+            int drain = 30;
+            target->restoreTP(-drain);
+            user->restoreTP(drain);
+            result.actionMessage = "TPを奪い取った!";
+          }
+        }
+
+        // 4. 攻撃 + 状態異常 (ポイズン、ヴォイドショック、ディザスターなど)
+        // (ID: 105, 45, 110, 114)
+        else if (skill.id == 105 ||
+          skill.id == 45 ||
+          skill.id == 110 ||
+          skill.id == 114 ||
+          skill.id == 122)
+        {
+          // まず攻撃の命中・ダメージ判定
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
+
+          actualDamage =
+              target->takeDamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          // ダメージ計算結果が0なら攻撃自体が失敗したので、
+          // 追加の状態異常も発生させない
+          if (value <= 0) {
+            result.actionMessage = "ミス！";
+          }
+          else {
+            bool success =
+                SkillEffectSystem::applyDebuff(skill.id, *target, user);
+
+            if (skill.id == 105 && success) {
+              result.actionMessage = "毒を与えた!";
+              audio.play(7);
+            }
+            else if (skill.id == 110 && success) {
+              result.actionMessage = "猛毒を与えた!";
+              audio.play(7);
+            }
+            else if (skill.id == 45 && success) {
+              result.actionMessage = "麻痺を与えた!";
+              audio.play(5);
+            }
+            else if (skill.id == 114 && success) {
+              result.actionMessage = "厄災を与えた!";
+              audio.play(7);
+            }
+            else if (skill.id == 122 && success) {
+              result.actionMessage = "敵をかく乱した!";
+              audio.play(7);
+            }
+          }
+        }
+
+        // 5. かばう / カウンター / 挑発 (自分にバフ)
+        else if (skill.id == 27 || skill.id == 53 || skill.id == 49) {
+          SkillEffectSystem::applyBuff(skill.id, *target);
+          audio.play(5);
+          if (skill.id == 27) result.actionMessage = "身代わりの構え!";
+          else if (skill.id == 53) result.actionMessage = "反撃の構え!";
+          else result.actionMessage = "挑発した!";
+        }
+
+        // 6. タービュランス (全体風属性+SPDダウン)
+        else if (skill.id == 87) {
+          audio.play(6);
+
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
+
+          actualDamage =
+              target->takeDamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          if (value <= 0) {
+            result.actionMessage = "ミス！";
+          }
+          else {
+            SkillEffectSystem::applyDebuff(skill.id, *target, user);
+            result.actionMessage = "風が切り刻む!";
+          }
+        }
+
+        else if (skill.id == 32) {
+          // Status::AddBuff(32) で reflectAllTurns = 1 がセットされます
+          SkillEffectSystem::applyBuff(skill.id, *target);
+          audio.play(7); // バフ音
+          result.actionMessage = "物理と旋律を跳ね返す！";
+        }
+
+        else if (skill.id == 24) {
+          audio.play(5);
+
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
+
+          actualDamage =
+              target->takeDamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          if (value <= 0) {
+            result.actionMessage = "ミス！";
+          }
+          else {
+            if (SkillEffectSystem::applyDebuff(skill.id, *target, user)) {
+              result.actionMessage = "装甲を破壊した！";
+            }
+          }
+        }
+
+        else if (skill.id == 47) {
+          audio.play(5);
+
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
+
+          actualDamage =
+              target->takeDamage(value, skill.category);
+
+          target->addPopup(actualDamage, isCrit);
+
+          if (value <= 0) {
+            result.actionMessage = "ミス！";
+          }
+          else {
+            if (SkillEffectSystem::applyDebuff(skill.id, *target, user)) {
+              result.actionMessage = "気絶させた！";
+            }
+          }
+        }
+
+        // その他 (未実装)
+        else {
+          result.actionMessage = "しかし何も起こらなかった。";
+        }
+        break;
+
+      default:
+        result.actionMessage = "ミス！";
+        target->addPopup(0, false); // ★ 0はミス扱い
+        break;
+    }
+    return result;
   }
