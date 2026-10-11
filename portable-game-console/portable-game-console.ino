@@ -25,6 +25,7 @@
 #include "Map.h"
 #include "WorldProgress.h"
 #include "FloorManager.h"
+#include "Config.h"
 #include "MemoryMonitor.h"
 #include <utility>
 
@@ -930,13 +931,6 @@ public:
   bool hasSaveFile(Sd& sd) {
      return sd.sdfat.exists(SAVE_FILENAME);
   }
-};
-
-// main.ino (1001行目あたり)
-struct Config {
-  int bgmVolume = 10; // 0〜10 (初期値5)
-  int seVolume = 10;  // 0〜10 (初期値5)
-  bool vibration = true; // ON/OFF
 };
 
 class Menu {
