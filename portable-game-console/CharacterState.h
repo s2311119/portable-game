@@ -129,10 +129,6 @@ public:
 
   int caclatedamage(int Attack, int Defense, int ASpeed, int DSpeed, int ALuck, int DLuck, bool &retIsCrit);
 
-  int caclulateSkillDamage(CharacterState* target, Skill& skill, bool &retIsCrit);
-
-  int calculateHealAmount(Skill& skill, bool &retIsCrit);
-
   bool isPlayer();
 
   void addAttack(int amount);

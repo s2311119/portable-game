@@ -7,6 +7,7 @@
 #include "Item.h"
 #include "ItemCatalog.h"
 #include "CharacterState.h"
+#include "CombatCalculator.h"
 #include "Automaton.h"
 #include "Party.h"
 #include "Enemy.h"
@@ -3822,11 +3823,15 @@ private:
     int value = 0;
     int actualDamage = 0;
     bool isCrit = false;
+    DamageResult damageResult = {};
+    HealResult healResult = {};
     switch (skill.type) {
       
       case Skill::EffectType::DAMAGE:
         // (user->getSense() と target->getSense() でバフ/デバフが反映された値を取得)
-        value = user->caclulateSkillDamage(target, skill, isCrit);
+        damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+        isCrit = damageResult.critical;
+        value = damageResult.damage;
         if (isCrit) music.playSE(4); // 会心
         else {
           if (skill.id == 0) music.playSE(3); // 通常攻撃
@@ -3848,7 +3853,9 @@ private:
       case Skill::EffectType::HEAL:
         // ★ isCrit を渡す
         music.playSE(7);
-        value = user->calculateHealAmount(skill, isCrit);
+        healResult = CombatCalculator::calculateHealAmount(*user, skill);
+        isCrit = healResult.critical;
+        value = healResult.amount;
         target->heal(value);
         target->addPopup(-value, isCrit); // ★ 結果をポップアップへ (回復も赤字/強調表示される)
         lastDamage -= value; 
@@ -3863,7 +3870,9 @@ private:
           for(int i=0; i<hits; i++) {
             isCrit = false; // 毎回リセット
             // ★ isCrit を渡す
-            value = user->caclulateSkillDamage(target, skill, isCrit);
+            damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+            isCrit = damageResult.critical;
+            value = damageResult.damage;
             if (isCrit) music.playSE(4);
             else {
               // 物理/センス判定
@@ -3933,7 +3942,9 @@ private:
           } else {
             // 失敗時は通常ダメージの半分
             music.playSE(5);
-            value = user->caclulateSkillDamage(target, skill, isCrit) / 2;
+            damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+            isCrit = damageResult.critical;
+            value = damageResult.damage / 2;
             if(value<1) value=1;
             actualDamage =
                 target->takeDamage(value, skill.category);
@@ -3947,12 +3958,9 @@ private:
         else if (skill.id == 44 || skill.id == 111) {
           if (skill.id == 44) { // HP吸収
             music.playSE(5);
-            value =
-                user->caclulateSkillDamage(
-                    target,
-                    skill,
-                    isCrit
-                );
+            damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+            isCrit = damageResult.critical;
+            value = damageResult.damage;
 
             actualDamage =
                 target->takeDamage(value, skill.category);
@@ -3981,12 +3989,9 @@ private:
           skill.id == 122)
         {
           // まず攻撃の命中・ダメージ判定
-          value =
-              user->caclulateSkillDamage(
-                  target,
-                  skill,
-                  isCrit
-              );
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
 
           actualDamage =
               target->takeDamage(value, skill.category);
@@ -4038,12 +4043,9 @@ private:
         else if (skill.id == 87) {
           music.playSE(6);
 
-          value =
-              user->caclulateSkillDamage(
-                  target,
-                  skill,
-                  isCrit
-              );
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
 
           actualDamage =
               target->takeDamage(value, skill.category);
@@ -4069,12 +4071,9 @@ private:
         else if (skill.id == 24) {
           music.playSE(5);
 
-          value =
-              user->caclulateSkillDamage(
-                  target,
-                  skill,
-                  isCrit
-              );
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
 
           actualDamage =
               target->takeDamage(value, skill.category);
@@ -4094,12 +4093,9 @@ private:
         else if (skill.id == 47) {
           music.playSE(5);
 
-          value =
-              user->caclulateSkillDamage(
-                  target,
-                  skill,
-                  isCrit
-              );
+          damageResult = CombatCalculator::calculateSkillDamage(*user, *target, skill);
+          isCrit = damageResult.critical;
+          value = damageResult.damage;
 
           actualDamage =
               target->takeDamage(value, skill.category);
