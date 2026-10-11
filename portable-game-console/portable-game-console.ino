@@ -6,6 +6,7 @@
 #include "bmp.h"
 #include "Item.h"
 #include "Skill.h"
+#include "Inventory.h"
 #include "Map.h"
 #include "MemoryMonitor.h"
 
@@ -157,87 +158,7 @@ Item createItemById(int id) {
 }
 // main.ino の Item クラスの後に追加
 
-class Inventory {
-public:
-  // 所持品リスト
-  struct ItemStack {
-    Item item;
-    int quantity;
-  };
-  std::vector<ItemStack> items;
-  int money = 0;
-  Inventory() {
-    // 起動時に std::vector のメモリを
-    // ある程度確保しておくと、後々の追加処理が高速になります
-    items.reserve(20); // とりあえず20個分
-  }
 
-  // ★アイテムを追加する関数
-  void addItem(const Item& newItem) {
-    // 既に持っているか探す
-    for (auto& stack : items) {
-      if (stack.item.id == newItem.id) {
-        stack.quantity++; // あったら個数を増やす
-        return;
-      }
-    }
-    // なかったら新しく追加 (個数1)
-    items.push_back({newItem, 1});
-  }
-
-  int countItem(int id) {
-    for (const auto& stack : items) {
-      if (stack.item.id == id) {
-        return stack.quantity;
-      }
-    }
-    return 0;
-  }
-
-  bool removeItem(int id) {
-    for (auto it = items.begin(); it != items.end(); ++it) {
-      if (it->item.id == id) {
-        it->quantity--;
-        if (it->quantity <= 0) {
-          items.erase(it); // 0個になったらリストから消す
-        }
-        return true;
-      }
-    }
-    return false; // 見つからなかった
-  }
-  void removeByIndex(int index) {
-      if (index < 0 || index >= items.size()) return;
-      
-      items[index].quantity--;
-      if (items[index].quantity <= 0) {
-          items.erase(items.begin() + index);
-      }
-  }
-  // (将来的に、アイテム一覧を表示する関数なども追加)
-  void saveTo(FsFile& file) {
-    file.println(money);
-    file.println(items.size());
-    for (const auto& stack : items) {
-      file.println(stack.item.id);
-      file.println(stack.quantity);
-    }
-  }
-
-  void loadFrom(FsFile& file) {
-    money = file.readStringUntil('\n').toInt();
-    int count = file.readStringUntil('\n').toInt();
-    
-    items.clear();
-    for (int i = 0; i < count; i++) {
-      int id = file.readStringUntil('\n').toInt();
-      int qty = file.readStringUntil('\n').toInt();
-      // アイテム生成してリストに追加
-      Item item = createItemById(id);
-      items.push_back({item, qty});
-    }
-  }
-};
 
 const int learnableSkillIDs[] = {
   // --- 攻撃系 ---
