@@ -216,6 +216,40 @@ bool Battle::executeHostileSkillOnTarget(
     return defender->stats().getHp() <= 0;
   }
 
+std::optional<CombatantRef> Battle::refFor(CharacterState* combatant) const {
+    if (combatant == nullptr) return std::nullopt;
+
+    if (combatant == &heroRef->state()) {
+      return CombatantRef{CombatantSide::PLAYER, 0};
+    }
+    for (size_t i = 0; i < partyRef->memberCount(); ++i) {
+      if (combatant == &partyRef->memberState(i)) {
+        return CombatantRef{CombatantSide::ALLY, static_cast<int>(i)};
+      }
+    }
+    for (size_t i = 0; i < activeEnemies.size(); ++i) {
+      if (combatant == &activeEnemies[i].state()) {
+        return CombatantRef{CombatantSide::ENEMY, static_cast<int>(i)};
+      }
+    }
+    return std::nullopt;
+  }
+
+CharacterState* Battle::resolveCombatant(
+    const std::optional<CombatantRef>& ref) {
+    if (!ref) return nullptr;
+
+    switch (ref->side) {
+      case CombatantSide::PLAYER:
+        return &heroRef->state();
+      case CombatantSide::ALLY:
+        return &partyRef->memberState(ref->index);
+      case CombatantSide::ENEMY:
+        return &activeEnemies[ref->index].state();
+    }
+    return nullptr;
+  }
+
 Battle::BattleAction Battle::createBattleAction(
       CharacterState* actor,
       ActionType type,
@@ -223,10 +257,10 @@ Battle::BattleAction Battle::createBattleAction(
       CharacterState* target) {
     BattleAction action;
 
-    action.actor = actor;
+    action.actor = refFor(actor);
     action.type = type;
     action.skillIndex = skillIndex;
-    action.target = target;
+    action.target = refFor(target);
 
     if (actor != nullptr) {
       action.speedSnapshot = actor->speed();
@@ -1032,7 +1066,7 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
         currentBattleAction =
             plannedActions[currentPlannedActionIndex];
 
-        currentActor = currentBattleAction.actor;
+        currentActor = resolveCombatant(currentBattleAction.actor);
 
         // nullptrならスキップ
         if (currentActor == nullptr) {
@@ -1055,7 +1089,7 @@ void Battle::update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Pl
         // 予約していた行動を既存実行系へ戻す
         pendingActionType = currentBattleAction.type;
         pendingSkillIndex = currentBattleAction.skillIndex;
-        currentTarget = currentBattleAction.target;
+        currentTarget = resolveCombatant(currentBattleAction.target);
 
         // 毒・麻痺・混乱などの状態異常を処理
         currentBattleState = STATE_PRE_ACTION_EFFECTS;

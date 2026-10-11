@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <optional>
 #include <vector>
 
 #include "CharacterState.h"
@@ -19,6 +20,7 @@
 #include "LegacyGameTypes.h"
 #include "Skill.h"
 #include "EncounterSpec.h"
+#include "BattleTypes.h"
 
 class Battle {
 private:
@@ -101,10 +103,10 @@ public:
   };
 
   struct BattleAction {
-    CharacterState* actor = nullptr;          // 行動するキャラ
+    std::optional<CombatantRef> actor;          // 行動するキャラ
     ActionType type = ActionType::NONE;
     int skillIndex = -1;             // SKILLの場合のみ使用
-    CharacterState* target = nullptr;         // 単体対象。全体技などではnullptr可
+    std::optional<CombatantRef> target;         // 単体対象。全体技などでは対象なし可
 
     ActionPriority priority = ActionPriority::NORMAL;
     int speedSnapshot = 0;           // 行動決定時点のSPD
@@ -170,6 +172,8 @@ public:
   void draw(Graphic* g);
   ~Battle() = default;
 private:
+  std::optional<CombatantRef> refFor(CharacterState* combatant) const;
+  CharacterState* resolveCombatant(const std::optional<CombatantRef>& ref);
   
   void ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, MUSIC& music);
 
