@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "LegacyGameTypes.h"
 
-class Caractor;
+class Player;
 class Map;
 
 class Controller {
@@ -27,10 +27,10 @@ public:
   bool pressedDebounced(int pin);
   
   // --- キャラ移動 ---
-  void update_cara_point(Caractor &c);
+  void update_cara_point(Player &c);
 
   // --- 壁判定 ---
-  void check_wall(Caractor &hero, Map &map);
+  void check_wall(Player &hero, Map &map);
 
-  bool check_event(Caractor &hero, Map &map, GameState &state, EventType &currentEvent);
+  bool check_event(Player &hero, Map &map, GameState &state, EventType &currentEvent);
 };

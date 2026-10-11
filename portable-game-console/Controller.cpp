@@ -1,6 +1,6 @@
 #include "Controller.h"
 #include <Arduino.h>
-#include "Caractor.h"
+#include "Player.h"
 #include "Map.h"
 
 Controller::Controller() {
@@ -33,7 +33,7 @@ bool Controller::pressedDebounced(int pin) {
     return false;
   }
 
-void Controller::update_cara_point(Caractor &c) {
+void Controller::update_cara_point(Player &c) {
     uint32_t now = millis();
     if (now - lastMoveTime < moveIntervalMs) return; // まだ移動周期に達していない
     // 1ステップだけ進める（長押しで連続移動だが、moveIntervalMsで抑止）
@@ -44,7 +44,7 @@ void Controller::update_cara_point(Caractor &c) {
     lastMoveTime = now;
   }
 
-void Controller::check_wall(Caractor &hero, Map &map) {
+void Controller::check_wall(Player &hero, Map &map) {
     int hitbox_offset = 1;
 
     int centerX =
@@ -96,7 +96,7 @@ void Controller::check_wall(Caractor &hero, Map &map) {
     }
   }
 
-bool Controller::check_event(Caractor &hero, Map &map, GameState &state, EventType &currentEvent) {
+bool Controller::check_event(Player &hero, Map &map, GameState &state, EventType &currentEvent) {
     // 1. プレイヤーの現在タイル座標を取得
     int heroTileX =
         (hero.X + Map::TILE_SIZE / 2) /

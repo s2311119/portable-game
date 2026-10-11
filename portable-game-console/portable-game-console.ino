@@ -13,7 +13,7 @@
 #include "Automaton.h"
 #include "Party.h"
 #include "Enemy.h"
-#include "Caractor.h"
+#include "Player.h"
 #include "Graphic.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
@@ -517,7 +517,7 @@ public:
       Sd& sd,
       MUSIC& music,
       Map& map,
-      Caractor& hero,
+      Player& hero,
       Party& party,
       Inventory& inventory,
       bool* bossFlags
@@ -619,7 +619,7 @@ public:
       Sd& sd,
       MUSIC& music,
       Map& map,
-      Caractor& hero,
+      Player& hero,
       Party& party,
       Inventory& inventory,
       bool* bossFlags
@@ -664,7 +664,7 @@ public:
     int savedHeroX = 0;
     int savedHeroY = 0;
     int savedDirection =
-        (int)Caractor::DIR_DOWN;
+        (int)Player::DIR_DOWN;
 
     if (isNewFormat) {
       // -------------------------------------------------
@@ -716,8 +716,8 @@ public:
       savedDirection =
           file.readStringUntil('\n').toInt();
 
-      if (savedDirection < (int)Caractor::DIR_DOWN ||
-          savedDirection > (int)Caractor::DIR_RIGHT)
+      if (savedDirection < (int)Player::DIR_DOWN ||
+          savedDirection > (int)Player::DIR_RIGHT)
       {
         return failLoad();
       }
@@ -882,7 +882,7 @@ public:
           savedHeroY;
 
       hero.direction =
-          (Caractor::Direction)
+          (Player::Direction)
               savedDirection;
 
       hero.moved = false;
@@ -994,9 +994,9 @@ public:
     listCursor = 0;
   }
 
-  void update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party& party, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags);
+  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags);
   
-  void draw(Graphic* g, Inventory& inventory, Caractor& hero, Party& party, Config& config) {
+  void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, Config& config) {
     if (!active) return;
 
     // ★ スプライト生成をやめて g->lineSprite を使う
@@ -1797,7 +1797,7 @@ public:
   String message = "";
   //Enemy* currentEnemy = nullptr;
   std::vector<Enemy*> activeEnemies;
-  Caractor* heroRef = nullptr; // 戦闘中の主人公への参照
+  Player* heroRef = nullptr; // 戦闘中の主人公への参照
   Party* partyRef = nullptr;   // 戦闘中の仲間パーティーへの参照
 
   //bool shouldReturncs = false;
@@ -1872,7 +1872,7 @@ public:
     }
   }
 
-  void start(MUSIC &music, Sd &sd, Caractor& hero, Party& party, int floor, ImageManager &imgMgr, Map& map) {
+  void start(MUSIC &music, Sd &sd, Player& hero, Party& party, int floor, ImageManager &imgMgr, Map& map) {
     if (inBattle) return;
     inBattle = true;
     message = "敵が現れた！";
@@ -2037,7 +2037,7 @@ public:
     currentBattleState = STATE_TURN_START;
   }
 
-  void update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Caractor &hero, Inventory &inventory, Vibration &vibration, Map &map, Graphic &g, bool* bossFlags) {
+  void update(Controller &ctrl, GameState &state, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map, Graphic &g, bool* bossFlags) {
     if (!inBattle) return;
     Party& party = *partyRef; 
 
@@ -3506,7 +3506,7 @@ public:
     // ★ ここでスプライトを作るのをやめる！
     // 代わりに g->lineSprite を使う
 
-    Caractor& hero = *heroRef;
+    Player& hero = *heroRef;
     Party& party = *partyRef;
 
     // --- 分割描画ループ ---
@@ -4198,7 +4198,7 @@ private:
 
 struct GameContext {
   Map* map;
-  Caractor* hero;
+  Player* hero;
   Graphic* graphic;
   Controller* controller;
   MUSIC* music;
@@ -4461,7 +4461,7 @@ void core1_main() {
   }
 }
 
-void Menu::update(Controller &ctrl, Inventory& inventory, Caractor& hero, Party& party, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags) {
+void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags) {
   if (!active) return; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
@@ -5054,7 +5054,7 @@ void setup() {
       } else {
         // ロード用の仮オブジェクト生成
         ctx->map = new Map(20, 20, Map::TYPE_TOWN); 
-        ctx->hero = new Caractor(*ctx->map, 1, 38); 
+        ctx->hero = new Player(*ctx->map, 1, 38); 
         ctx->inventory = new Inventory();
         ctx->party = new Party();
         
@@ -5107,7 +5107,7 @@ void setup() {
     if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
     ctx->map = new Map(20, 20, Map::TYPE_TOWN);
     
-    ctx->hero = new Caractor(*ctx->map, 1, 38);
+    ctx->hero = new Player(*ctx->map, 1, 38);
 
     Map::ObjectPos startPos =
         ctx->map->getPlayerStartPos();
@@ -5194,10 +5194,10 @@ void loop() {
 
     int prevX = hero.X, prevY = hero.Y;
     ctrl.update_cara_point(hero);
-    if (ctrl.pressed(ctrl.BTN_UP))    hero.direction = Caractor::DIR_UP;
-    if (ctrl.pressed(ctrl.BTN_DOWN))  hero.direction = Caractor::DIR_DOWN;
-    if (ctrl.pressed(ctrl.BTN_LEFT))  hero.direction = Caractor::DIR_LEFT;
-    if (ctrl.pressed(ctrl.BTN_RIGHT)) hero.direction = Caractor::DIR_RIGHT;
+    if (ctrl.pressed(ctrl.BTN_UP))    hero.direction = Player::DIR_UP;
+    if (ctrl.pressed(ctrl.BTN_DOWN))  hero.direction = Player::DIR_DOWN;
+    if (ctrl.pressed(ctrl.BTN_LEFT))  hero.direction = Player::DIR_LEFT;
+    if (ctrl.pressed(ctrl.BTN_RIGHT)) hero.direction = Player::DIR_RIGHT;
     ctrl.check_wall(hero, map);
 
     bool eventOccurred = false;

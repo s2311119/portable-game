@@ -58,15 +58,15 @@ const uint16_t* Graphic::tileBitmapFor(int tileType){
 
 const uint16_t* Graphic::getHeroImage(int dir) {
     switch(dir) {
-      case Caractor::DIR_UP:    return (const uint16_t*)hero_up;
-      case Caractor::DIR_LEFT:  return (const uint16_t*)hero_left;
-      case Caractor::DIR_RIGHT: return (const uint16_t*)hero_right;
-      case Caractor::DIR_DOWN:  
+      case Player::DIR_UP:    return (const uint16_t*)hero_up;
+      case Player::DIR_LEFT:  return (const uint16_t*)hero_left;
+      case Player::DIR_RIGHT: return (const uint16_t*)hero_right;
+      case Player::DIR_DOWN:  
       default:                  return (const uint16_t*)hero_down;
     }
   }
 
-void Graphic::drawFullBackground(Map &map, const Caractor &hero, int cameraX_in, int cameraY_in){
+void Graphic::drawFullBackground(Map &map, const Player &hero, int cameraX_in, int cameraY_in){
     // カメラ位置計算
     int maxCameraX = map.getMAP_WIDTH() * Map::TILE_SIZE - SCREEN_WIDTH;
     int maxCameraY = map.getMAP_HEIGHT() * Map::TILE_SIZE - SCREEN_HEIGHT;
@@ -203,7 +203,7 @@ void Graphic::restoreRectDirect(Map &map, int sx, int sy) {
      lcd.endWrite();
   }
 
-void Graphic::smartRender(Map &map, const Caractor &hero, int desiredCameraX, int desiredCameraY){
+void Graphic::smartRender(Map &map, const Player &hero, int desiredCameraX, int desiredCameraY){
     // カメラ計算 (drawFullBackgroundと同じロジック)
     int maxCameraX = map.getMAP_WIDTH() * Map::TILE_SIZE - SCREEN_WIDTH;
     int maxCameraY = map.getMAP_HEIGHT() * Map::TILE_SIZE - SCREEN_HEIGHT;
@@ -247,7 +247,7 @@ void Graphic::smartRender(Map &map, const Caractor &hero, int desiredCameraX, in
     prevHeroDirection = hero.direction;
   }
 
-void Graphic::invalidateAndRedraw(Map &map, const Caractor &hero, int desiredCameraX, int desiredCameraY){
+void Graphic::invalidateAndRedraw(Map &map, const Player &hero, int desiredCameraX, int desiredCameraY){
     startTileX = -1; // フラグを立てる
     drawFullBackground(map, hero, desiredCameraX, desiredCameraY); // ★ hero を渡す
   }

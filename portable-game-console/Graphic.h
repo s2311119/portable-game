@@ -1,7 +1,7 @@
 #pragma once
 
 #include "LGFX_RP2040_ILI9341.hpp"
-#include "Caractor.h"
+#include "Player.h"
 
 class Map;
 
@@ -23,7 +23,7 @@ public:
   // 前フレームのヒーロー矩形（画面座標）
   int prevHeroScreenX = -1;
   int prevHeroScreenY = -1;
-  Caractor::Direction prevHeroDirection = Caractor::DIR_DOWN;
+  Player::Direction prevHeroDirection = Player::DIR_DOWN;
   
   // 強制再描画フラグ
   int startTileX = -1; 
@@ -45,7 +45,7 @@ public:
   const uint16_t* getHeroImage(int dir);
 
   // ★ ラインバッファを使って背景全体を描画 (hero を引数に追加)
-  void drawFullBackground(Map &map, const Caractor &hero, int cameraX_in, int cameraY_in);
+  void drawFullBackground(Map &map, const Player &hero, int cameraX_in, int cameraY_in);
 
   // 指定した矩形範囲(32x32)の背景をLCDに直接復元するヘルパー
   // (restorePrevHeroArea の代わり)
@@ -53,8 +53,8 @@ public:
 
   // smartRender (部分更新)
   // ヒーローが動いた時だけ、ヒーロー周辺だけを描き直す
-  void smartRender(Map &map, const Caractor &hero, int desiredCameraX, int desiredCameraY);
+  void smartRender(Map &map, const Player &hero, int desiredCameraX, int desiredCameraY);
 
   // 外部から強制再描画を要求するときに呼ぶ
-  void invalidateAndRedraw(Map &map, const Caractor &hero, int desiredCameraX, int desiredCameraY);
+  void invalidateAndRedraw(Map &map, const Player &hero, int desiredCameraX, int desiredCameraY);
 };

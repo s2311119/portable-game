@@ -1,9 +1,9 @@
-#include "Caractor.h"
+#include "Player.h"
 
 #include "Map.h"
 #include "CharacterState.h"
 
-Caractor::Caractor(Map& map, int level, int who) {
+Player::Player(Map& map, int level, int who) {
     status = new CharacterState(level, who);
     bool positionFound = false;
     // 最初の草タイル(TILE_GRASS)を探す
@@ -29,7 +29,7 @@ Caractor::Caractor(Map& map, int level, int who) {
     }
 }
 
-void Caractor::reset(Map& map) {
+void Player::reset(Map& map) {
     // Mapが決めた開始位置を使用
     Map::ObjectPos startPos =
         map.getPlayerStartPos();
@@ -41,7 +41,7 @@ void Caractor::reset(Map& map) {
     oldY = Y;
 }
 
-Caractor::~Caractor() {
+Player::~Player() {
     if (status != nullptr) {
       delete status;
       status = nullptr;
