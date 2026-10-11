@@ -19,6 +19,7 @@
 #include "LegacyGameTypes.h"
 #include "Controller.h"
 #include "Encounter.h"
+#include "EncounterSpec.h"
 #include "Exploration.h"
 #include "FieldEventHandler.h"
 #include "Vibration.h"
