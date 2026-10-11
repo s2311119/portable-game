@@ -9,6 +9,7 @@
 #include "Party.h"
 #include "Player.h"
 #include "Sd.h"
+#include "Settings.h"
 #include "WorldProgress.h"
 
 #include <cerrno>
@@ -363,6 +364,54 @@ LoadGameResult SaveManager::loadGame(Sd& sd, MUSIC& music, GameSession& session)
 
   applyGameData(data, session);
   return {true, data.format == SaveFormat::LEGACY, data.mapType};
+}
+
+bool SaveManager::saveSettings(Sd& sd, MUSIC& music, const Settings& settings) {
+  music.paused = true;
+  critical_section_enter_blocking(&sdLock);
+
+  FsFile file = sd.sdfat.open(SETTINGS_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
+  if (!file) {
+    critical_section_exit(&sdLock);
+    music.paused = false;
+    return false;
+  }
+
+  file.println(SETTINGS_MAGIC);
+  file.println(settings.getBgmVolume());
+  file.println(settings.getSeVolume());
+  file.println(settings.isVibrationEnabled() ? 1 : 0);
+  file.close();
+
+  critical_section_exit(&sdLock);
+  music.paused = false;
+  return true;
+}
+
+bool SaveManager::loadSettings(Sd& sd, Settings& settings) {
+  FsFile file = sd.sdfat.open(SETTINGS_FILENAME, O_READ);
+  if (!file) return false;
+
+  String magic = file.readStringUntil('\n');
+  magic.trim();
+  int bgmVolume = 0;
+  int seVolume = 0;
+  int vibration = 0;
+  const bool valid = magic == SETTINGS_MAGIC &&
+      readInteger(file, bgmVolume) &&
+      readInteger(file, seVolume) &&
+      readInteger(file, vibration) &&
+      bgmVolume >= 0 && bgmVolume <= 10 &&
+      seVolume >= 0 && seVolume <= 10 &&
+      (vibration == 0 || vibration == 1) &&
+      !file.available();
+  file.close();
+  if (!valid) return false;
+
+  settings.setBgmVolume(bgmVolume);
+  settings.setSeVolume(seVolume);
+  settings.setVibrationEnabled(vibration == 1);
+  return true;
 }
 
 bool SaveManager::hasSaveFile(Sd& sd) {

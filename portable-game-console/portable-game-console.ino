@@ -191,6 +191,12 @@ public:
   }
 
   void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
+
+  bool takeSettingsSaveRequest() {
+    bool requested = settingsSaveRequested;
+    settingsSaveRequested = false;
+    return requested;
+  }
   
   void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, const Settings& settings) {
     if (!active) return;
@@ -644,6 +650,9 @@ public:
     }
     
   }
+
+private:
+  bool settingsSaveRequested = false;
 };
 
 // -------------------------
@@ -3561,6 +3570,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       active = false; // 宿屋を出る
     }else if (currentMenuState == STATE_EQUIP_SLOT||currentMenuState == STATE_EVOLVE || currentMenuState == STATE_SKILL || currentMenuState == STATE_ITEM || currentMenuState == STATE_CONFIG) {
       // 進化・旋律画面でBを押したらメインに戻る
+      if (currentMenuState == STATE_CONFIG) settingsSaveRequested = true;
       currentMenuState = STATE_MAIN;
     } else if (currentMenuState == STATE_MAIN) {
       // メインメニューでBを押したらメニューを閉じる
@@ -4046,6 +4056,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       // Aボタン or Bボタンで戻る
       if (aPressed && listCursor == 3) {
         music.playSE(1);
+        settingsSaveRequested = true;
         currentMenuState = STATE_MAIN;
       }
       break;
@@ -4082,8 +4093,10 @@ void setup() {
   ctx->vibration = new Vibration();
   ctx->vibration->init();
 
+  ctx->saveManager->loadSettings(*ctx->sd, ctx->settings);
   ctx->music->bgmVolume = (float)ctx->settings.getBgmVolume() / 10.0f;
   ctx->music->setSeVolume(ctx->settings.getSeVolume());
+  ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
 
   multicore_launch_core1(core1_main);
   delay(200);
@@ -4326,6 +4339,9 @@ void loop() {
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
     menu.update(ctrl, inventory, hero, party, storage, map, ctx->session->progress(), music, sd, save, settings, vib);
+    if (menu.takeSettingsSaveRequest()) {
+      save.saveSettings(sd, music, settings);
+    }
     //g.screenSprite.fillScreen(TFT_BLACK);
     menu.draw(&g, inventory, hero, party, storage, settings);
     //g.screenSprite.pushSprite(0,0);

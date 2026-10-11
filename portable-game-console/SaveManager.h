@@ -10,6 +10,7 @@ class Party;
 class AutomatonStorage;
 class Inventory;
 class GameSession;
+class Settings;
 
 struct LoadGameResult {
   bool success;
@@ -26,6 +27,9 @@ public:
 
   LoadGameResult loadGame(Sd& sd, MUSIC& music, GameSession& session);
 
+  bool saveSettings(Sd& sd, MUSIC& music, const Settings& settings);
+  bool loadSettings(Sd& sd, Settings& settings);
+
   // Menuからの一時的なmigration bridge。MenuFlow移行時に除去する。
   bool saveGame(
       Sd& sd,
@@ -41,6 +45,9 @@ public:
   bool hasSaveFile(Sd& sd);
 
 private:
+  const char* SETTINGS_FILENAME = "/settings.dat";
+  const char* SETTINGS_MAGIC = "PGSET1";
+
   bool saveComponents(
       Sd& sd,
       MUSIC& music,
