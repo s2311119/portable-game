@@ -11,6 +11,7 @@
 #include "CombatCalculator.h"
 #include "SkillEffectSystem.h"
 #include "Automaton.h"
+#include "AutomatonStorage.h"
 #include "Party.h"
 #include "Enemy.h"
 #include "Player.h"
@@ -520,6 +521,7 @@ public:
       Map& map,
       Player& hero,
       Party& party,
+      AutomatonStorage& storage,
       Inventory& inventory,
       bool* bossFlags
   ) {
@@ -594,10 +596,10 @@ public:
     // -------------------------------------------------
     // 5. 預かり所
     // -------------------------------------------------
-    file.println(party.storage.size());
+    file.println(storage.memberCount());
 
-    for (auto* member : party.storage) {
-      member->state().saveTo(file);
+    for (size_t i = 0; i < storage.memberCount(); ++i) {
+      storage.member(i).state().saveTo(file);
     }
 
     // -------------------------------------------------
@@ -622,6 +624,7 @@ public:
       Map& map,
       Player& hero,
       Party& party,
+      AutomatonStorage& storage,
       Inventory& inventory,
       bool* bossFlags
   ) {
@@ -824,11 +827,7 @@ public:
     // -------------------------------------------------
     // 預かり所
     // -------------------------------------------------
-    for (auto* member : party.storage) {
-      delete member;
-    }
-
-    party.storage.clear();
+    storage.clearForRestore();
 
     int storageCount =
         file.readStringUntil('\n').toInt();
@@ -837,12 +836,9 @@ public:
         i < storageCount;
         i++)
     {
-      Automaton* ally =
-          new Automaton(1, 0);
-
-      ally->state().loadFrom(file);
-
-      party.storage.push_back(ally);
+      Automaton ally(1, 0);
+      ally.state().loadFrom(file);
+      storage.appendRestoredMember(std::move(ally));
     }
 
     // -------------------------------------------------
@@ -988,9 +984,9 @@ public:
     listCursor = 0;
   }
 
-  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags);
+  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags);
   
-  void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, Config& config) {
+  void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Config& config) {
     if (!active) return;
 
     // ★ スプライト生成をやめて g->lineSprite を使う
@@ -1169,12 +1165,12 @@ public:
               g->lineSprite.setCursor(40, 130 - drawY);
               g->lineSprite.printf("パーティー: %d/%d人", party.memberCount(), Party::MAX_MEMBERS);
               g->lineSprite.setCursor(40, 150 - drawY);
-              g->lineSprite.printf("預かり所: %d人", party.storage.size());
+              g->lineSprite.printf("預かり所: %d人", storage.memberCount());
           }
           else if (storageMode == 1) {
               g->lineSprite.setCursor(10, 35 - drawY); g->lineSprite.print("誰を引き出しますか？");
               if (party.memberCount() >= Party::MAX_MEMBERS) { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.print(" (満員)"); }
-              int count = party.storage.size();
+              int count = storage.memberCount();
               if (count == 0) { g->lineSprite.setCursor(30, 60 - drawY); g->lineSprite.setTextColor(TFT_LIGHTGREY); g->lineSprite.print("誰もいません"); }
               
               int itemsPerPage = 6; 
@@ -1188,8 +1184,8 @@ public:
                   g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
                   g->lineSprite.printf(
                       "%s Lv%d",
-                      party.storage[i]->state().name(),
-                      party.storage[i]->state().progress().level()
+                      storage.member(i).state().name(),
+                      storage.member(i).state().progress().level()
                   );
               }
           }
@@ -4202,6 +4198,7 @@ struct GameContext {
   Encounter* encounter;
   Inventory* inventory;
   Party* party;
+  AutomatonStorage storage;
   GameState state;
   EventType currentEvent = EVENT_NONE;
   SaveManager* saveManager;
@@ -4456,7 +4453,7 @@ void core1_main() {
   }
 }
 
-void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags) {
+void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, MUSIC& music, Sd& sd, SaveManager& saveMgr, Config& config, Vibration& vib, bool* bossFlags) {
   if (!active) return; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
@@ -4523,7 +4520,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           listCursor = 0; 
         }else if (mainSelected == 4) { // 「記録」
           saveSucceeded =
-              saveMgr.saveGame(sd, music, map, hero, party, inventory, bossFlags);
+              saveMgr.saveGame(sd, music, map, hero, party, storage, inventory, bossFlags);
 
           currentMenuState = STATE_SAVE_RESULT;
         }else if (mainSelected == 5) {
@@ -4616,7 +4613,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
         }
       }
       else if (storageMode == 1) { // 引き出す (Storage -> Party)
-        int sCount = party.storage.size();
+        int sCount = storage.memberCount();
         if (sCount > 0) {
           if (upPressed){
             listCursor = (listCursor - 1 + sCount) % sCount;
@@ -4629,7 +4626,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           
           if (aPressed) {
             if (party.memberCount() < Party::MAX_MEMBERS) {
-              party.withdrawMember(listCursor);
+              storage.withdrawMember(listCursor, party);
               listCursor = 0; // リセット
               music.playSE(0);
             }else{
@@ -4650,7 +4647,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
             music.playSE(2);
           }
           if (aPressed) {
-            party.depositMember(listCursor);
+            party.depositMember(listCursor, storage);
             if (listCursor >= party.memberCount()) listCursor = 0;
             music.playSE(0);
           }
@@ -5053,7 +5050,7 @@ void setup() {
         ctx->inventory = new Inventory();
         ctx->party = new Party();
         
-        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music, *ctx->map, *ctx->hero, *ctx->party, *ctx->inventory, ctx->bossDefeated)) {
+        if (ctx->saveManager->loadGame(*ctx->sd, *ctx->music, *ctx->map, *ctx->hero, *ctx->party, ctx->storage, *ctx->inventory, ctx->bossDefeated)) {
           loadSuccess = true;
           ctx->vibration->setEnabled(ctx->config.vibration);
         } else {
@@ -5100,6 +5097,7 @@ void setup() {
     if (ctx->hero) delete ctx->hero;
     if (ctx->inventory) delete ctx->inventory;
     if (ctx->party) delete ctx->party; // (中でAutomaton->Statusも消える)
+    ctx->storage.clearForRestore();
     ctx->map = new Map(20, 20, Map::TYPE_TOWN);
     
     ctx->hero = new Player(*ctx->map, 1, 38);
@@ -5175,6 +5173,7 @@ void loop() {
   auto& encounter = *ctx->encounter;
   auto& inventory = *ctx->inventory;
   auto& party = *ctx->party;
+  auto& storage = ctx->storage;
   auto& state = ctx->state;
   auto& music = *ctx->music;
   auto& sd = *ctx->sd;
@@ -5230,9 +5229,9 @@ void loop() {
 
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
-    menu.update(ctrl, inventory, hero, party, map, music, sd, save, conf, vib, ctx->bossDefeated);
+    menu.update(ctrl, inventory, hero, party, storage, map, music, sd, save, conf, vib, ctx->bossDefeated);
     //g.screenSprite.fillScreen(TFT_BLACK);
-    menu.draw(&g, inventory, hero, party, conf);
+    menu.draw(&g, inventory, hero, party, storage, conf);
     //g.screenSprite.pushSprite(0,0);
 
     if (!menu.active) {
@@ -5374,7 +5373,8 @@ void loop() {
             delete newAlly;
             result = 1;
         } else {
-            party.storage.push_back(newAlly);
+            storage.store(std::move(*newAlly));
+            delete newAlly;
             result = 2;
         }
         
