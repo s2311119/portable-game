@@ -209,7 +209,7 @@ void end(void* context) {
 // -------------------------
 
 
-struct GameContext {
+struct Game {
   GameSession* session = nullptr;
   Graphic* graphic;
   WorldRenderer worldRenderer;
@@ -245,13 +245,13 @@ struct GameContext {
 };
 
 struct LoadGameOperation {
-  GameContext* context;
+  Game* context;
   LoadGameResult result;
 };
 
 void loadGameAndRegenerateLegacy(void* rawOperation) {
   LoadGameOperation& operation = *static_cast<LoadGameOperation*>(rawOperation);
-  GameContext* ctx = operation.context;
+  Game* ctx = operation.context;
   operation.result = ctx->saveManager->loadGame(
       *ctx->sd, *ctx->session);
 
@@ -281,9 +281,9 @@ void loadGameAndRegenerateLegacy(void* rawOperation) {
   }
 }
 
-GameContext* ctx = nullptr;
+Game* ctx = nullptr;
 
-void drawMenuFlow(GameContext& context) {
+void drawMenuFlow(Game& context) {
   const MenuFlow& menu = *context.menu;
   if (!menu.isActive()) return;
 
@@ -326,7 +326,7 @@ void drawMenuFlow(GameContext& context) {
   }
 }
 
-void startBattleEncounter(GameContext& context, const EncounterSpec& spec,
+void startBattleEncounter(Game& context, const EncounterSpec& spec,
                           const BattleBgmHooks& bgm) {
   Battle& battle = *context.battle;
   if (battle.inBattle) return;
@@ -359,9 +359,9 @@ void startBattleEncounter(GameContext& context, const EncounterSpec& spec,
   battle.finishStart();
 }
 
-void applyFloorMapConfig(GameContext* ctx);
+void applyFloorMapConfig(Game* ctx);
 
-void applyFloorMapConfig(GameContext* ctx)
+void applyFloorMapConfig(Game* ctx)
 {
   FloorMapConfig config =
       ctx->floorManager.getConfig(ctx->session->progress());
@@ -554,7 +554,7 @@ void setup() {
   }
   randomSeed(seed);
   // 1. 基本オブジェクトの生成
-  ctx = new GameContext();
+  ctx = new Game();
   ctx->graphic = new Graphic();
   ctx->controller = new Controller();
   ctx->music = new AudioManager();
