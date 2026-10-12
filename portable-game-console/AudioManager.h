@@ -8,7 +8,7 @@ static const int DAC_SCK_PIN  = 9;  // ソフトSPIクロック
 static const int DAC_MOSI_PIN = 8;  // ソフトSPI MOSI
 
 class Sd;
-class MUSIC {
+class AudioManager {
 public:
   static const int BUF_SIZE = 4096;
   static const int TRACK_COUNT = 100;  // 例: 0=nocturne, 1=gekkou
@@ -46,7 +46,7 @@ public:
     if (vol > 10) vol = 10;
     masterSeVol = vol;
   }
-  MUSIC() {
+  AudioManager() {
     // DAC ピン初期化（core1 でもやるがここで safe）
     pinMode(DAC_CS_PIN, OUTPUT);
     pinMode(DAC_SCK_PIN, OUTPUT);
@@ -60,7 +60,7 @@ public:
     seVol = 0;
     seVolDecay = 0;
   }
-  // MUSIC クラス内
+  // AudioManager クラス内
 
   void playSE(int id) {
       sePhase = 0;

@@ -1,5 +1,5 @@
 #pragma once
-#include "MUSIC.h"
+#include "AudioManager.h"
 #include "pico/sync.h"
 #include <algorithm>
 #include <cstring>
@@ -23,14 +23,14 @@ public:
     pinMode(SD_MISO_PIN, INPUT_PULLUP);
   }
   void resetRefillOffset() { refillOffset = 0; }
-  void init(MUSIC &music) {
+  void init(AudioManager &music) {
     if (!sdfat.begin(SD_CS_PIN, SD_SCK_MHZ(20))) {
       //Serial.println("SD init failed!");
       while (1);
     }
 
-    const char* paths[MUSIC::TRACK_COUNT];
-    for(int i=0; i<MUSIC::TRACK_COUNT; i++) paths[i] = "";
+    const char* paths[AudioManager::TRACK_COUNT];
+    for(int i=0; i<AudioManager::TRACK_COUNT; i++) paths[i] = "";
     paths[0] = "/bgm_0.raw"; // 集落
     paths[1] = "/bgm_1.raw"; // ダンジョン
     paths[2] = "/bgm_2.raw"; // 通常戦闘
@@ -38,7 +38,7 @@ public:
     paths[4] = "/bgm_4.raw"; // ラスボス
     paths[9] = "/bgm_9.raw"; // タイトル
     paths[99] = "/bgm_99.raw";
-    for (int i = 0; i < MUSIC::TRACK_COUNT; ++i) {
+    for (int i = 0; i < AudioManager::TRACK_COUNT; ++i) {
       music.musicFiles[i] = sdfat.open(paths[i], FILE_READ);
       if (!music.musicFiles[i]) {
         //Serial.printf("Failed to open %s\n", paths[i]);
@@ -49,8 +49,8 @@ public:
     // 初期曲データ読み込み
     FsFile& f = music.musicFiles[music.currentTrack];
     f.seek(0);
-    size_t n0 = f.read((void*)music.buffer0, MUSIC::BUF_SIZE);
-    size_t n1 = f.read((void*)music.buffer1, MUSIC::BUF_SIZE);
+    size_t n0 = f.read((void*)music.buffer0, AudioManager::BUF_SIZE);
+    size_t n1 = f.read((void*)music.buffer1, AudioManager::BUF_SIZE);
     noInterrupts();
     music.playBuf = music.buffer0;
     music.fillBuf = music.buffer1;
@@ -71,7 +71,7 @@ public:
   }
 
   // core1ループで実行
-  void performPendingSwitch(MUSIC &music) {
+  void performPendingSwitch(AudioManager &music) {
     if (!pendingSwitch) return;
 
     // --- 競合防止ロック ---
@@ -86,8 +86,8 @@ public:
     music.paused = true;
 
     // --- バッファ完全リセット ---
-    memset((void*)music.buffer0, 0, MUSIC::BUF_SIZE);
-    memset((void*)music.buffer1, 0, MUSIC::BUF_SIZE);
+    memset((void*)music.buffer0, 0, AudioManager::BUF_SIZE);
+    memset((void*)music.buffer1, 0, AudioManager::BUF_SIZE);
     music.sampleIndex = 0;
     music.playBytes = 0;
     music.fillBytes = 0;
@@ -99,8 +99,8 @@ public:
     file.seek(0);
 
     // --- 新しいデータをロード ---
-    size_t n0 = file.read((void*)music.buffer0, MUSIC::BUF_SIZE);
-    size_t n1 = file.read((void*)music.buffer1, MUSIC::BUF_SIZE);
+    size_t n0 = file.read((void*)music.buffer0, AudioManager::BUF_SIZE);
+    size_t n1 = file.read((void*)music.buffer1, AudioManager::BUF_SIZE);
 
     // --- 原子的にスイッチ ---
     noInterrupts();
@@ -120,7 +120,7 @@ public:
     music.paused = false;
   }
 
-  void refile(MUSIC &music) {
+  void refile(AudioManager &music) {
     // 補充要求がないなら何もしない
     if (!music.needs_refill) {
       return;
@@ -144,10 +144,10 @@ public:
     // 2048 byteずつ裏バッファへ補充する
     const size_t CHUNK = 2048;
 
-    if (refillOffset < MUSIC::BUF_SIZE) {
+    if (refillOffset < AudioManager::BUF_SIZE) {
 
       size_t remaining =
-          MUSIC::BUF_SIZE - refillOffset;
+          AudioManager::BUF_SIZE - refillOffset;
 
       size_t toRead =
           min(CHUNK, remaining);
@@ -173,12 +173,12 @@ public:
     critical_section_exit(&sdLock);
 
     // 裏バッファ1個分が完成したら再生側へ公開
-    if (refillOffset >= MUSIC::BUF_SIZE) {
+    if (refillOffset >= AudioManager::BUF_SIZE) {
 
       noInterrupts();
 
       music.fillBytes =
-          MUSIC::BUF_SIZE;
+          AudioManager::BUF_SIZE;
 
       music.needs_refill =
           false;

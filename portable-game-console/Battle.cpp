@@ -90,7 +90,7 @@ bool Battle::executeHostileSkillOnTarget(
       Skill& skill,
       CharacterState* attacker,
       CharacterState* originalTarget,
-      MUSIC& music,
+      AudioManager& music,
       bool allowTargetRedirect) {
     if (attacker == nullptr ||
         originalTarget == nullptr ||
@@ -358,7 +358,7 @@ void Battle::finishStart() {
     currentBattleState = STATE_TURN_START;
   }
 
-void Battle::update(Controller &ctrl, MUSIC &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm) {
+void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm) {
     if (!inBattle) return;
     CharacterState* currentActor = resolveCombatant(this->currentActor);
     CharacterState* currentTarget = resolveCombatant(this->currentTarget);
@@ -1850,10 +1850,10 @@ std::vector<const CharacterState*> Battle::targetableAlliesForRender(
     return allies;
 }
 
-void Battle::ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, MUSIC& music) {
+void Battle::ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, AudioManager& music) {
     if (target == nullptr) return;
     const SkillAudioCue audio{&music, [](void* context, int seId) {
-        static_cast<MUSIC*>(context)->playSE(seId);
+        static_cast<AudioManager*>(context)->playSE(seId);
     }};
     const SkillEffectResult result = SkillEffectSystem::execute(skill, user, target, audio);
     lastDamage += result.lastDamageDelta;

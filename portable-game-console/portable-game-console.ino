@@ -33,7 +33,7 @@
 #include "WorldProgress.h"
 #include "FloorManager.h"
 #include "Settings.h"
-#include "MUSIC.h"
+#include "AudioManager.h"
 #include "Sd.h"
 #include "SaveManager.h"
 #include "ImageManager.h"
@@ -140,7 +140,7 @@ long drawRange(void*, long min, long max) { return random(min, max); }
 // Phase 9 bridge: keep the existing track mapping until AudioManager owns it.
 namespace battle_bgm_adapter {
 struct Context {
-  MUSIC* music;
+  AudioManager* music;
   Sd* sd;
   Map* map;
 };
@@ -169,7 +169,7 @@ void onEvent(void* rawContext, BattleBgmEvent event, BattleKind kind) {
 
 namespace menu_feedback_adapter {
 struct Context {
-  MUSIC* music;
+  AudioManager* music;
   Vibration* vibration;
 };
 
@@ -210,7 +210,7 @@ struct GameContext {
   TitleRenderer titleRenderer;
   GameOverRenderer gameOverRenderer;
   Controller* controller;
-  MUSIC* music;
+  AudioManager* music;
   Sd* sd;
   MenuFlow* menu;
   MainMenuRenderer mainMenuRenderer;
@@ -345,7 +345,7 @@ void applyFloorMapConfig(GameContext* ctx)
 // タイマー割り込み関数
 
 bool audio_timer_callback(struct repeating_timer *t) {
-  MUSIC* music = ctx->music;
+  AudioManager* music = ctx->music;
   
   // BGM停止中でもSEは鳴らす
   int32_t mixedSample = 0;
@@ -402,20 +402,20 @@ bool audio_timer_callback(struct repeating_timer *t) {
   }
 
   // --- 2. SE (シンセサイザー生成) ★ここが変わった！ ---
-  if (music->seType != MUSIC::OFF) {
+  if (music->seType != AudioManager::OFF) {
     int16_t seWave = 0;
 
     // 音量の減衰
     music->seVol -= music->seVolDecay;
     if (music->seVol <= 0) {
-      music->seType = MUSIC::OFF; // 音量0で終了
+      music->seType = AudioManager::OFF; // 音量0で終了
       music->seVol = 0;
     } else {
       // 周波数の変化 (スライド)
       music->seFreq += music->seFreqSlide;
       
       // 波形生成
-      if (music->seType == MUSIC::SQUARE) {
+      if (music->seType == AudioManager::SQUARE) {
         // 矩形波: 位相を進めて High/Low を切り替え
         // 16000Hz動作なので、位相は Freq / 16000 ずつ進む
         music->sePhase += music->seFreq / 16000.0f;
@@ -423,7 +423,7 @@ bool audio_timer_callback(struct repeating_timer *t) {
         
         seWave = (music->sePhase < 0.5f) ? (int16_t)music->seVol : (int16_t)-music->seVol;
       } 
-      else if (music->seType == MUSIC::NOISE) {
+      else if (music->seType == AudioManager::NOISE) {
         // ノイズ: 乱数
         // (高速化のため簡易的な乱数生成)
         static uint16_t lfsr = 0xACE1;
@@ -515,7 +515,7 @@ void setup() {
   ctx = new GameContext();
   ctx->graphic = new Graphic();
   ctx->controller = new Controller();
-  ctx->music = new MUSIC();
+  ctx->music = new AudioManager();
   ctx->sd = new Sd();
   ctx->imgMgr = new ImageManager(*ctx->sd);
   // Graphic, SD の初期化

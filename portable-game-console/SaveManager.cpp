@@ -5,7 +5,7 @@
 #include "GameSaveData.h"
 #include "GameSession.h"
 #include "Inventory.h"
-#include "MUSIC.h"
+#include "AudioManager.h"
 #include "Party.h"
 #include "Player.h"
 #include "Sd.h"
@@ -306,14 +306,14 @@ void applyGameData(const GameSaveData& data, GameSession& session) {
 
 } // namespace
 
-bool SaveManager::saveGame(Sd& sd, MUSIC& music, const GameSession& session) {
+bool SaveManager::saveGame(Sd& sd, AudioManager& music, const GameSession& session) {
   return saveComponents(sd, music, session.map(), session.progress(),
       session.player(), session.party(), session.storage(), session.inventory());
 }
 
 bool SaveManager::saveComponents(
     Sd& sd,
-    MUSIC& music,
+    AudioManager& music,
     const Map& map,
     const WorldProgress& progress,
     const Player& hero,
@@ -339,7 +339,7 @@ bool SaveManager::saveComponents(
   return true;
 }
 
-LoadGameResult SaveManager::loadGame(Sd& sd, MUSIC& music, GameSession& session) {
+LoadGameResult SaveManager::loadGame(Sd& sd, AudioManager& music, GameSession& session) {
   (void)music; // load synchronization is owned by the top-level caller.
   LoadGameResult failure = {false, false, Map::TYPE_DUNGEON};
   FsFile file = sd.sdfat.open(SAVE_FILENAME, O_READ);
@@ -354,7 +354,7 @@ LoadGameResult SaveManager::loadGame(Sd& sd, MUSIC& music, GameSession& session)
   return {true, data.format == SaveFormat::LEGACY, data.mapType};
 }
 
-bool SaveManager::saveSettings(Sd& sd, MUSIC& music, const Settings& settings) {
+bool SaveManager::saveSettings(Sd& sd, AudioManager& music, const Settings& settings) {
   music.paused = true;
   critical_section_enter_blocking(&sdLock);
 

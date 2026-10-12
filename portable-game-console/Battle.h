@@ -9,7 +9,7 @@
 #include "Player.h"
 #include "Party.h"
 #include "Controller.h"
-#include "MUSIC.h"
+#include "AudioManager.h"
 #include "Inventory.h"
 #include "Vibration.h"
 #include "Skill.h"
@@ -28,7 +28,7 @@ private:
       Skill& skill,
       CharacterState* attacker,
       CharacterState* originalTarget,
-      MUSIC& music,
+      AudioManager& music,
       bool allowTargetRedirect);
 
 public:
@@ -161,7 +161,7 @@ public:
   const CharacterState* currentActorState() const;
   std::vector<const CharacterState*> targetableAlliesForRender(bool revive) const;
 
-  void update(Controller &ctrl, MUSIC &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm);
+  void update(Controller &ctrl, AudioManager &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm);
   ~Battle() = default;
 private:
   BattleKind currentBattleKind = BattleKind::NORMAL;
@@ -170,7 +170,7 @@ private:
   std::optional<CombatantRef> refFor(CharacterState* combatant) const;
   CharacterState* resolveCombatant(const std::optional<CombatantRef>& ref);
   
-  void ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, MUSIC& music);
+  void ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, AudioManager& music);
 
   // 生きている味方のリストを取得する
   std::vector<CharacterState*> getAliveAllies();

@@ -1,7 +1,7 @@
 #include "Sd.h"
 
-// --- MUSIC::switchTrack 実装部（Sdの定義後） ---
-void MUSIC::switchTrack(int newId, Sd &sd) {
+// --- AudioManager::switchTrack 実装部（Sdの定義後） ---
+void AudioManager::switchTrack(int newId, Sd &sd) {
   if (newId == currentTrack) return;
 
   // --- 安全な切替要求 ---
