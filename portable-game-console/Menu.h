@@ -33,6 +33,7 @@
 #include "ShopMenu.h"
 #include "ShopRenderer.h"
 #include "InnMenu.h"
+#include "InnRenderer.h"
 
 class Menu {
 public:
@@ -190,22 +191,7 @@ public:
       }else if (currentMenuState == STATE_EQUIP) {
         equipmentRenderer.drawLine(equipmentMenu, inventory, hero, *g, drawY);
       }else if (currentMenuState == STATE_INN) {
-        int x = 60, y = 80 + yOffset;
-        g->lineSprite.fillRect(x, y, 200, 100, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, 200, 100, TFT_WHITE);
-
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 20);
-        g->lineSprite.print("一泊 10G です");
-
-        g->lineSprite.setCursor(x + 40, y + 50);
-        g->lineSprite.setTextColor(innMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.print("泊まる");
-
-        g->lineSprite.setCursor(x + 40, y + 75);
-        g->lineSprite.setTextColor(innMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.print("やめる");
+        innRenderer.drawLine(innMenu, *g, drawY);
       }else if (currentMenuState == STATE_SHOP_CHOICE ||
                  currentMenuState == STATE_SHOP_BUY ||
                  currentMenuState == STATE_SHOP_SELL) {
@@ -272,5 +258,6 @@ private:
   ShopMenu shopMenu;
   ShopRenderer shopRenderer;
   InnMenu innMenu;
+  InnRenderer innRenderer;
   bool settingsSaveRequested = false;
 };
