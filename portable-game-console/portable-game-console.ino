@@ -16,6 +16,7 @@
 #include "Enemy.h"
 #include "Player.h"
 #include "Graphic.h"
+#include "WorldRenderer.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
 #include "EncounterManager.h"
@@ -203,6 +204,7 @@ void settingsChanged(void* rawContext, SettingsMenuChange change,
 struct GameContext {
   GameSession* session = nullptr;
   Graphic* graphic;
+  WorldRenderer worldRenderer;
   Controller* controller;
   MUSIC* music;
   Sd* sd;
@@ -322,7 +324,7 @@ void applyFloorMapConfig(GameContext* ctx)
       *ctx->sd
   );
 
-  ctx->graphic->setFloor(
+  ctx->worldRenderer.setFloor(
       ctx->session->progress().floor()
   );
 
@@ -662,13 +664,13 @@ void setup() {
   ctx->encounterManager = new EncounterManager();
   ctx->battle = new Battle();
 
-  // Graphicクラスへ階層通知
-  ctx->graphic->setFloor(ctx->session->progress().floor());
+  // WorldRendererへ階層通知
+  ctx->worldRenderer.setFloor(ctx->session->progress().floor());
 
-  // 初回描画 (ここもGraphicクラスに任せるので安全)
+  // 初回のフィールド描画
   int camX = ctx->session->player().X - Graphic::SCREEN_WIDTH / 2;
   int camY = ctx->session->player().Y - Graphic::SCREEN_HEIGHT / 2;
-  ctx->graphic->drawFullBackground(ctx->session->map(), ctx->session->player(), camX, camY);
+  ctx->worldRenderer.drawFullBackground(*ctx->graphic, ctx->session->map(), ctx->session->player(), camX, camY);
   if (ctx->session->map().isTown()) {
     // 集落なら bgm_0.raw
     ctx->music->switchTrack(0, *ctx->sd); 
@@ -692,16 +694,17 @@ void loop() {
     ctx->session->map().regenerate(20, 20, Map::TYPE_DUNGEON, ctx->session->progress().floor());
     ctx->session->player().reset(ctx->session->map());
 
-    ctx->graphic->setFloor(ctx->session->progress().floor());
+    ctx->worldRenderer.setFloor(ctx->session->progress().floor());
 
     int cameraX = ctx->session->player().X - Graphic::SCREEN_WIDTH / 2;
     int cameraY = ctx->session->player().Y - Graphic::SCREEN_HEIGHT / 2;
-    ctx->graphic->invalidateAndRedraw(ctx->session->map(), ctx->session->player(), cameraX, cameraY);
+    ctx->worldRenderer.invalidateAndRedraw(*ctx->graphic, ctx->session->map(), ctx->session->player(), cameraX, cameraY);
     interrupts();
   }
   static GameState prevState = STATE_GAME;
   static int gameOverCursor = 0;
   auto& g = *ctx->graphic;
+  auto& worldRenderer = ctx->worldRenderer;
   auto& map = ctx->session->map();
   auto& hero = ctx->session->player();
   auto& ctrl = *ctx->controller;
@@ -761,7 +764,7 @@ void loop() {
     int cameraX = hero.X - Graphic::SCREEN_WIDTH / 2;
     int cameraY = hero.Y - Graphic::SCREEN_HEIGHT / 2;
     // map が再生成されたときは drawFullBackground を呼んでいるので通常は smartRender だけでOK
-    g.smartRender(map, hero, cameraX, cameraY);
+    worldRenderer.smartRender(g, map, hero, cameraX, cameraY);
 
 
     if (ctrl.pressed(ctrl.BTN_X)) {
@@ -812,7 +815,7 @@ void loop() {
 
         int cx = hero.X - Graphic::SCREEN_WIDTH/2;
         int cy = hero.Y - Graphic::SCREEN_HEIGHT/2;
-        g.invalidateAndRedraw(map, hero, cx, cy);
+        worldRenderer.invalidateAndRedraw(g, map, hero, cx, cy);
 
         music.switchTrack(0, sd);
       }
@@ -972,12 +975,11 @@ void loop() {
       // メニュー／戦闘等からゲーム画面に戻った：背景を一括再描画してヒーローを正常復帰
       int cameraX = hero.X - Graphic::SCREEN_WIDTH / 2;
       int cameraY = hero.Y - Graphic::SCREEN_HEIGHT / 2;
-      g.invalidateAndRedraw(map, hero, cameraX, cameraY);
+      worldRenderer.invalidateAndRedraw(g, map, hero, cameraX, cameraY);
     } else {
       // メニュー／戦闘へ入るときは「画面を上書きする」ので
       // prevHero を無効化して、restore が誤動作しないようにする
-      g.prevHeroScreenX = -1;
-      g.prevHeroScreenY = -1;
+      worldRenderer.invalidatePreviousHero();
     }
     prevState = state;
   }
