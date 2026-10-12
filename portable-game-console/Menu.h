@@ -36,6 +36,7 @@
 #include "InnRenderer.h"
 #include "StorageMenu.h"
 #include "StorageRenderer.h"
+#include "SettingsMenu.h"
 
 class Menu {
 public:
@@ -165,7 +166,7 @@ public:
 
         // 項目描画ヘルパー
         auto drawItem = [&](int idx, String label, String value) {
-          if (listCursor == idx) g->lineSprite.setTextColor(TFT_YELLOW);
+          if (settingsMenu.cursor() == idx) g->lineSprite.setTextColor(TFT_YELLOW);
           else g->lineSprite.setTextColor(TFT_WHITE);
           g->lineSprite.setCursor(x + 20, y + 55 + idx * 25);
           g->lineSprite.print(label);
@@ -186,7 +187,7 @@ public:
         drawItem(2, "振動", vibValStr);
 
         // 4. 戻る
-        if (listCursor == 3) g->lineSprite.setTextColor(TFT_YELLOW);
+        if (settingsMenu.cursor() == 3) g->lineSprite.setTextColor(TFT_YELLOW);
         else g->lineSprite.setTextColor(TFT_WHITE);
         g->lineSprite.setCursor(x + 60, y + 130);
         g->lineSprite.print("戻る");
@@ -216,5 +217,6 @@ private:
   InnRenderer innRenderer;
   StorageMenu storageMenu;
   StorageRenderer storageRenderer;
+  SettingsMenu settingsMenu;
   bool settingsSaveRequested = false;
 };

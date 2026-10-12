@@ -41,7 +41,9 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       if (innMenu.cancel() == InnMenuResult::CLOSE) active = false;
     }else if (currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
       // 進化・旋律画面でBを押したらメインに戻る
-      if (currentMenuState == STATE_CONFIG) settingsSaveRequested = true;
+      if (currentMenuState == STATE_CONFIG &&
+          settingsMenu.cancel() == SettingsMenuResult::BACK)
+        settingsSaveRequested = true;
       currentMenuState = STATE_MAIN;
     } else if (currentMenuState == STATE_MAIN) {
       // メインメニューでBを押したらメニューを閉じる
@@ -93,7 +95,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
             break;
           case MainMenuResult::OPEN_SETTINGS:
             currentMenuState = STATE_CONFIG;
-            listCursor = 0;
+            settingsMenu.open();
             break;
           case MainMenuResult::NONE:
           case MainMenuResult::CLOSE:
@@ -366,45 +368,23 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_CONFIG: {
-      // 項目: 0:BGM, 1:SE, 2:振動, 3:戻る
-      if (upPressed)   { listCursor = (listCursor - 1 + 4) % 4; music.playSE(2);}
-      if (downPressed) { listCursor = (listCursor + 1) % 4; music.playSE(2);}
+      if (upPressed)   { settingsMenu.moveUp(); music.playSE(2); }
+      if (downPressed) { settingsMenu.moveDown(); music.playSE(2); }
 
-      // 左右キーで値を変更
       if (leftPressed || rightPressed) {
-        int change = rightPressed ? 1 : -1;
-        bool valChanged = false;
-
-        // BGM音量
-        if (listCursor == 0) {
-          settings.setBgmVolume(settings.getBgmVolume() + change);
-
-          // 即座に反映 (ctx->music ではなく 引数の music を使う)
+        SettingsMenuChange change = settingsMenu.change(settings, rightPressed);
+        if (change == SettingsMenuChange::BGM_CHANGED) {
           music.bgmVolume = (float)settings.getBgmVolume() / 10.0f;
-          valChanged = true;
-        }
-        // SE音量
-        else if (listCursor == 1) {
-          settings.setSeVolume(settings.getSeVolume() + change);
+        } else if (change == SettingsMenuChange::SE_CHANGED) {
           music.setSeVolume(settings.getSeVolume());
-          // SE音量を反映 (MUSICクラスに変数を持たせるか、playSEで計算)
-          // music.setSeVolume(settings.getSeVolume()); // 推奨
-
-          valChanged = true;
-          if(valChanged) music.playSE(0); // 音量確認
-        }
-        // 振動 ON/OFF
-        else if (listCursor == 2) {
-          settings.setVibrationEnabled(!settings.isVibrationEnabled());
-          valChanged = true;
+          music.playSE(0);
+        } else if (change == SettingsMenuChange::VIBRATION_CHANGED) {
           vib.setEnabled(settings.isVibrationEnabled());
-          // 振動確認 (ctx->vibration ではなく 引数の vib を使う)
-          if(settings.isVibrationEnabled()) vib.trigger(100);
+          if (settings.isVibrationEnabled()) vib.trigger(100);
         }
       }
 
-      // Aボタン or Bボタンで戻る
-      if (aPressed && listCursor == 3) {
+      if (aPressed && settingsMenu.confirm() == SettingsMenuResult::BACK) {
         music.playSE(1);
         settingsSaveRequested = true;
         currentMenuState = STATE_MAIN;
