@@ -1,5 +1,6 @@
 #include "Battle.h"
 
+#include "CharacterCatalog.h"
 #include "CharacterProgressionSystem.h"
 #include "ItemCatalog.h"
 #include "SkillCatalog.h"
@@ -1739,8 +1740,10 @@ void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Invent
               if (allyRes.newLevel > allyRes.oldLevel) resultMessages.push_back(String(ally.name()) + "はLv" + String(ally.progress().level()) + "になった!");
               if (allyRes.evolved) {
                 resultMessages.push_back(
-                    String(ally.name()) +
-                    "は進化した!"
+                    String(CharacterCatalog::nameFor(allyRes.oldCharacterId)) +
+                    "は" +
+                    String(CharacterCatalog::nameFor(allyRes.newCharacterId)) +
+                    "に進化した!"
                 );
               }
             }
