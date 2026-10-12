@@ -36,11 +36,14 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
 
   // --- Bボタン（キャンセル）処理 ---
   if (bPressed) {
-    music.playSE(1);
-    if (currentMenuState == STATE_ITEM_TARGET) {
-      currentMenuState = STATE_ITEM; // 対象選択から道具一覧へ戻る
+    if (currentMenuState == STATE_ITEM) {
+      ItemMenuResult result = itemMenu.cancel();
+      music.playSE(1);
+      if (result.type == ItemMenuResultType::BACK) currentMenuState = STATE_MAIN;
       return;
-    }else if (currentMenuState == STATE_STORAGE) {
+    }
+    music.playSE(1);
+    if (currentMenuState == STATE_STORAGE) {
       if (storageMode != 0) storageMode = 0; // モード選択に戻る
       else active = false; // メニューを閉じる (イベント終了)
       return;
@@ -52,7 +55,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       active = false; // 店を出る
     }else if (currentMenuState == STATE_INN) {
       active = false; // 宿屋を出る
-    }else if (currentMenuState == STATE_EQUIP_SLOT||currentMenuState == STATE_EVOLVE || currentMenuState == STATE_SKILL || currentMenuState == STATE_ITEM || currentMenuState == STATE_CONFIG) {
+    }else if (currentMenuState == STATE_EQUIP_SLOT||currentMenuState == STATE_EVOLVE || currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
       // 進化・旋律画面でBを押したらメインに戻る
       if (currentMenuState == STATE_CONFIG) settingsSaveRequested = true;
       currentMenuState = STATE_MAIN;
@@ -82,6 +85,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           case MainMenuResult::OPEN_ITEM:
             currentMenuState = STATE_ITEM;
             listCursor = 0;
+            itemMenu.open();
             break;
           case MainMenuResult::OPEN_SKILL:
             currentMenuState = STATE_SKILL;
@@ -112,69 +116,51 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_ITEM: {
-      // 全アイテムを対象にする
-      int itemCount = inventory.items.size();
-
-      if (itemCount > 0) {
+      if (itemMenu.state() == ItemMenu::State::ITEM_LIST) {
+        int itemCount = inventory.items.size();
+        if (itemCount > 0) {
+          if (upPressed){
+            itemMenu.moveUp(itemCount);
+            music.playSE(2);
+          }
+          if (downPressed){
+            itemMenu.moveDown(itemCount);
+            music.playSE(2);
+          }
+          if (aPressed) {
+            int id = inventory.items[itemMenu.cursor()].item.id;
+            ItemMenuResult result = itemMenu.selectItem(id >= 100 && id < 200);
+            music.playSE(result.type == ItemMenuResultType::REJECT ? 1 : 0);
+          }
+        }
+      } else {
+        int totalTargets = 1 + party.memberCount();
         if (upPressed){
-          listCursor = (listCursor - 1 + itemCount) % itemCount;
+          itemMenu.moveUp(totalTargets);
           music.playSE(2);
         }
         if (downPressed){
-          listCursor = (listCursor + 1) % itemCount;
+          itemMenu.moveDown(totalTargets);
           music.playSE(2);
         }
         if (aPressed) {
-          // カーソル位置のアイテムIDを確認
-          int id = inventory.items[listCursor].item.id;
+          ItemMenuResult result = itemMenu.requestUse();
+          music.playSE(0);
+          CharacterState* targetStatus = nullptr;
+          if (result.useRequest.targetIndex == 0) targetStatus = &hero.state();
+          else targetStatus = &party.memberState(result.useRequest.targetIndex - 1);
 
-          // ★ 消費アイテム (100〜199) の場合のみ使用可能
-          if (id >= 100 && id < 200) {
-            music.playSE(0);
-            selectedItemIndex = listCursor; // そのままインデックスとして保存
-            currentMenuState = STATE_ITEM_TARGET;
-            listCursor = 0; // ターゲット選択のカーソル初期化
-          } else {
-            music.playSE(1);
-            // 使えないアイテムは何もしない
-          }
+          // Item effects and inventory consumption remain in Menu until ItemUseSystem.
+          int itemId = inventory.items[result.useRequest.itemIndex].item.id;
+          if (itemId == 100) targetStatus->heal(50);
+          else if (itemId == 101) targetStatus->heal(200);
+          else if (itemId == 102) targetStatus->heal(9999);
+          else if (itemId == 103) targetStatus->restoreTP(20);
+          else if (itemId == 104) targetStatus->CureStatus(true);
+
+          inventory.removeByIndex(result.useRequest.itemIndex);
+          itemMenu.completeUse();
         }
-      }
-      break;
-    }
-    case STATE_ITEM_TARGET: {
-      // 対象リスト: [0]主人公, [1~]仲間
-      int totalTargets = 1 + party.memberCount();
-
-      if (upPressed){
-        listCursor = (listCursor - 1 + totalTargets) % totalTargets;
-        music.playSE(2);
-      }
-      if (downPressed){
-        listCursor = (listCursor + 1) % totalTargets;
-        music.playSE(2);
-      }
-
-      if (aPressed) {
-        music.playSE(0);
-        // 対象のStatus特定
-        CharacterState* targetStatus = nullptr;
-        if (listCursor == 0) targetStatus = &hero.state();
-        else targetStatus = &party.memberState(listCursor - 1);
-
-        // アイテム効果適用
-        int itemId = inventory.items[selectedItemIndex].item.id;
-
-        if (itemId == 100) targetStatus->heal(50);
-        else if (itemId == 101) targetStatus->heal(200);
-        else if (itemId == 102) targetStatus->heal(9999);
-        else if (itemId == 103) targetStatus->restoreTP(20);
-        else if (itemId == 104) targetStatus->CureStatus(true);
-
-        // 消費して戻る
-        inventory.removeByIndex(selectedItemIndex);
-        currentMenuState = STATE_ITEM;
-        listCursor = 0;
       }
       break;
     }

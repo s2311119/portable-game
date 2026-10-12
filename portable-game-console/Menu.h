@@ -21,6 +21,7 @@
 #include "Vibration.h"
 #include "MainMenu.h"
 #include "MainMenuRenderer.h"
+#include "ItemMenu.h"
 
 extern const int learnableSkillIDs[];
 extern const int learnableSkillCount;
@@ -33,7 +34,6 @@ public:
     STATE_EVOLVE,    // ★ 「進化」画面
     STATE_SKILL,
     STATE_ITEM,
-    STATE_ITEM_TARGET, // ★ 道具の対象選択
     STATE_STORAGE, // ★ 預かり所画面
     STATE_SAVE_RESULT,
     // --- 装備用 ---
@@ -53,7 +53,6 @@ public:
   bool active = false;
   bool saveSucceeded = false;
   std::vector<int> shopItemList;
-  int selectedItemIndex = -1; // 選択中の道具のインデックス保存用
   int storageMode = 0; // 0:メニュー選択, 1:引き出す, 2:預ける
 
   int equipSlot = 0;        // 0:武器, 1:防具, 2:装飾
@@ -165,7 +164,8 @@ public:
           else if (scrollCount > 0) { g->lineSprite.setTextColor(TFT_CYAN); g->lineSprite.printf("習得可能！ (所持: %d)", scrollCount); }
           else { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.setTextSize(1); g->lineSprite.setCursor(x + 20, y + 160); g->lineSprite.printf("必要: %s", ItemCatalog::get(reqScrollId).name); }
 
-      } else if (currentMenuState == STATE_ITEM) {
+      } else if (currentMenuState == STATE_ITEM &&
+                 itemMenu.state() == ItemMenu::State::ITEM_LIST) {
         int x = 10, y = 40 - drawY;
         int w = 300, h = 190;
         g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
@@ -182,7 +182,7 @@ public:
         } else {
           int itemsPerPage = 5;
           int startIdx = 0;
-          if (listCursor >= itemsPerPage) startIdx = listCursor - (itemsPerPage - 1);
+          if (itemMenu.cursor() >= itemsPerPage) startIdx = itemMenu.cursor() - (itemsPerPage - 1);
           int endIdx = startIdx + itemsPerPage;
           if (endIdx > itemCount) endIdx = itemCount;
 
@@ -190,7 +190,7 @@ public:
             int id = inventory.items[i].item.id;
             bool isUsable = (id >= 100 && id < 200);
             uint16_t color = TFT_WHITE;
-            if (i == listCursor) color = TFT_YELLOW;
+            if (i == itemMenu.cursor()) color = TFT_YELLOW;
             else if (!isUsable) color = TFT_LIGHTGREY;
 
             g->lineSprite.setTextColor(color);
@@ -205,7 +205,8 @@ public:
           }
         }
 
-      } else if (currentMenuState == STATE_ITEM_TARGET) {
+      } else if (currentMenuState == STATE_ITEM &&
+                 itemMenu.state() == ItemMenu::State::TARGET_SELECT) {
           int x = 10, y = 40 - drawY;
           int w = 300, h = 190;
           g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
@@ -216,13 +217,13 @@ public:
           g->lineSprite.print("誰に使いますか？");
           g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
 
-          uint16_t color = (listCursor == 0) ? TFT_YELLOW : TFT_WHITE;
+          uint16_t color = (itemMenu.cursor() == 0) ? TFT_YELLOW : TFT_WHITE;
           g->lineSprite.setTextColor(color);
           g->lineSprite.setCursor(x + 20, y + 55);
           g->lineSprite.printf("調律師 HP:%d/%d", hero.state().stats().getHp(), hero.state().stats().getMaxHp());
 
           for (int i = 0; i < party.memberCount(); i++) {
-            color = (listCursor == i + 1) ? TFT_YELLOW : TFT_WHITE;
+            color = (itemMenu.cursor() == i + 1) ? TFT_YELLOW : TFT_WHITE;
             g->lineSprite.setTextColor(color);
             g->lineSprite.setCursor(x + 20, y + 55 + (i + 1) * 28);
             const auto* s = &party.member(i).state();
@@ -522,5 +523,6 @@ public:
 private:
   MainMenu mainMenu;
   MainMenuRenderer mainMenuRenderer;
+  ItemMenu itemMenu;
   bool settingsSaveRequested = false;
 };
