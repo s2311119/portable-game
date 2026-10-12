@@ -8,7 +8,6 @@
 #include "Enemy.h"
 #include "Player.h"
 #include "Party.h"
-#include "Graphic.h"
 #include "Controller.h"
 #include "MUSIC.h"
 #include "Inventory.h"
@@ -181,11 +180,10 @@ public:
   void start(Player& hero, Party& party, const EncounterSpec& spec,
              const BattleImageHooks& images, const BattleBgmHooks& bgm);
   std::optional<BattleResult> takeResult();
+  const CharacterState* currentActorState() const;
+  std::vector<const CharacterState*> targetableAlliesForRender(bool revive) const;
 
   void update(Controller &ctrl, MUSIC &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm);
-  
-  // ★ 引数を Graphic* に変更
-  void draw(Graphic* g);
   ~Battle() = default;
 private:
   BattleKind currentBattleKind = BattleKind::NORMAL;

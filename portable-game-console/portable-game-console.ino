@@ -36,6 +36,7 @@
 #include "ImageManager.h"
 #include "GameSession.h"
 #include "Battle.h"
+#include "BattleRenderer.h"
 #include "MemoryMonitor.h"
 #include <utility>
 
@@ -757,6 +758,7 @@ struct GameContext {
   FieldEvent currentEvent = {FieldEventType::NONE, 0, 0};
   SaveManager* saveManager;
   Battle* battle;
+  BattleRenderer battleRenderer;
   bool requestRegenerate;
   Vibration* vibration;
   ImageManager* imgMgr;
@@ -1792,7 +1794,7 @@ void loop() {
       }
       state = result->outcome == BattleOutcome::DEFEAT ? STATE_GAME_OVER : STATE_GAME;
     }
-    battle.draw(&g);
+    ctx->battleRenderer.draw(battle, hero, party, imgmgr, g);
     //g.screenSprite.pushSprite(0, 0);
   }
 
