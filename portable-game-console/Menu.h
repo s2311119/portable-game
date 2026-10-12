@@ -27,6 +27,7 @@
 #include "SkillMenu.h"
 #include "SkillRenderer.h"
 #include "EquipmentMenu.h"
+#include "EquipmentRenderer.h"
 
 class Menu {
 public:
@@ -194,73 +195,8 @@ public:
         else {
           g->lineSprite.print("記録に失敗しました");
         }
-      }else if (currentMenuState == STATE_EQUIP &&
-                 equipmentMenu.state() == EquipmentMenu::State::SLOT) {
-        int x = 10, y = 40 + yOffset;
-        int w = 300, h = 190;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-
-        CharacterState* s = &hero.state(); // 主人公固定
-
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.printf("装備 (%s)", s->name());
-        g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-        String wName = (s->equipmentState().weaponId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().weaponId()).name;
-        String aName = (s->equipmentState().armorId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().armorId()).name;
-        String acName = (s->equipmentState().accessoryId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().accessoryId()).name;
-
-        g->lineSprite.setTextColor(equipmentMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 60); g->lineSprite.printf("武器: %s", wName.c_str());
-
-        g->lineSprite.setTextColor(equipmentMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 90); g->lineSprite.printf("防具: %s", aName.c_str());
-
-        g->lineSprite.setTextColor(equipmentMenu.cursor() == 2 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 120); g->lineSprite.printf("装飾: %s", acName.c_str());
-
-        g->lineSprite.setTextColor(TFT_CYAN);
-        g->lineSprite.setCursor(x + 20, y + 160);
-        g->lineSprite.printf("ATK:%d DEF:%d", s->attack(), s->defense());
-      }else if (currentMenuState == STATE_EQUIP &&
-                 equipmentMenu.state() == EquipmentMenu::State::CANDIDATE) {
-        int x = 10, y = 40 + yOffset;
-        int w = 300, h = 190;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.print("装備するアイテム");
-        g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-        std::vector<int> equippableIndices = equipmentMenu.candidateIndices(inventory);
-
-        if (equippableIndices.empty()) {
-          g->lineSprite.setCursor(x + 20, y + 55); g->lineSprite.print("装備できるものがありません");
-        } else {
-          int itemsPerPage = 5;
-          int startIdx = 0;
-          if (equipmentMenu.cursor() >= itemsPerPage) startIdx = equipmentMenu.cursor() - (itemsPerPage - 1);
-          int endIdx = min(startIdx + itemsPerPage, (int)equippableIndices.size());
-
-          for (int i = startIdx; i < endIdx; i++) {
-            int idx = equippableIndices[i];
-            Item& it = inventory.items[idx].item;
-
-            g->lineSprite.setTextColor(equipmentMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
-            g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
-
-            String valStr = "";
-            if (it.type == Item::ITEM_WEAPON) valStr = "ATK+" + String(it.value);
-            else if (it.type == Item::ITEM_ARMOR) valStr = "DEF+" + String(it.value);
-
-            g->lineSprite.printf("%s (%s)", it.name, valStr.c_str());
-          }
-        }
+      }else if (currentMenuState == STATE_EQUIP) {
+        equipmentRenderer.drawLine(equipmentMenu, inventory, hero, *g, drawY);
       }else if (currentMenuState == STATE_INN) {
         int x = 60, y = 80 + yOffset;
         g->lineSprite.fillRect(x, y, 200, 100, TFT_DARKGREY);
@@ -415,5 +351,6 @@ private:
   SkillMenu skillMenu;
   SkillRenderer skillRenderer;
   EquipmentMenu equipmentMenu;
+  EquipmentRenderer equipmentRenderer;
   bool settingsSaveRequested = false;
 };
