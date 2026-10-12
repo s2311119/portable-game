@@ -1,30 +1,6 @@
 #include "Menu.h"
 #include "CharacterProgressionSystem.h"
 
-const int learnableSkillIDs[] = {
-  // --- 攻撃系 ---
-  1,  // ノイズ・ブラスト (TP:12)
-  2,  // レゾナンス・ウェイブ (TP:25, 全体)
-  3,  // ディソナンス (TP:20)
-
-  // --- 回復・治療系 ---
-  4,  // ファースト・エイド (TP:8)
-  5,  // ピュリファイ (TP:10, 治療)
-  6,  // ヒーリング・サークル (TP:30, 全体回復)
-
-  // --- 補助・妨害系 ---
-  7,  // チューニング・アタック (TP:15, ATK↑)
-  8,  // チューニング・ガード (TP:15, DEF↑)
-  9,  // アレグロ (TP:15, 全体SPD↑)
-  10, // ラレンタンド (TP:12, 敵SPD↓)
-  11, // ノイズ・ジャミング (TP:18, 全体ATK↓)
-
-  // --- 奥義 (コスト高め) ---
-  12, // グランド・シンフォニー (TP:60, 全体特大)
-  13  // 完全調律 (TP:80, 全体全快)
-};
-const int learnableSkillCount = sizeof(learnableSkillIDs) / sizeof(int);
-
 void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib) {
   if (!active) return; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
@@ -90,6 +66,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           case MainMenuResult::OPEN_SKILL:
             currentMenuState = STATE_SKILL;
             listCursor = 0;
+            skillMenu.open();
             break;
           case MainMenuResult::OPEN_EVOLUTION:
             currentMenuState = STATE_EVOLVE;
@@ -253,42 +230,18 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_SKILL: {
-      // --- ★ 旋律画面の操作 ★ ---
-      if (learnableSkillCount > 0) {
-        // カーソル移動
+      if (skillMenu.skillCount() > 0) {
         if (upPressed) {
-          listCursor = (listCursor - 1 + learnableSkillCount) % learnableSkillCount;
+          skillMenu.moveUp();
           music.playSE(2);
         }
         if (downPressed){
-          listCursor = (listCursor + 1) % learnableSkillCount;
+          skillMenu.moveDown();
           music.playSE(2);
         }
-
-        // Aボタン（決定）
         if (aPressed) {
-          int skillIdToLearn = learnableSkillIDs[listCursor];
-          int requiredScrollId = 200 + skillIdToLearn; // 巻物のID
-
-          // ★ 1. すでに覚えているかチェック
-          bool alreadyLearned = false;
-          alreadyLearned = hero.state().skills().has(skillIdToLearn);
-
-          if (alreadyLearned) {
-            music.playSE(1);
-            // すでに覚えているなら何もしない (SEを鳴らすならここ)
-          }
-          // ★ 2. 持っているかチェック
-          else if (inventory.countItem(requiredScrollId) > 0) {
-              // 消費して習得
-              inventory.removeItem(requiredScrollId);
-              hero.state().learnSkill(skillIdToLearn);
-              music.playSE(0);
-              // (※ここで「覚えた！」というフラグを立てて、draw側でメッセージを出すと親切です)
-          } else {
-              // (巻物がない)
-              music.playSE(1);
-          }
+          SkillMenuResult result = skillMenu.confirm(inventory, hero);
+          music.playSE(result == SkillMenuResult::LEARNED ? 0 : 1);
         }
       }
       break;

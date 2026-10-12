@@ -24,9 +24,7 @@
 #include "ItemMenu.h"
 #include "ItemRenderer.h"
 #include "ItemUseSystem.h"
-
-extern const int learnableSkillIDs[];
-extern const int learnableSkillCount;
+#include "SkillMenu.h"
 
 class Menu {
 public:
@@ -132,18 +130,18 @@ public:
 
           int itemsPerPage = 3;
           int startIdx = 0;
-          if (listCursor >= itemsPerPage) startIdx = listCursor - (itemsPerPage - 1);
+          if (skillMenu.cursor() >= itemsPerPage) startIdx = skillMenu.cursor() - (itemsPerPage - 1);
           int endIdx = startIdx + itemsPerPage;
-          if (endIdx > learnableSkillCount) endIdx = learnableSkillCount;
+          if (endIdx > skillMenu.skillCount()) endIdx = skillMenu.skillCount();
 
           for (int i = startIdx; i < endIdx; i++) {
-              Skill skill = SkillCatalog::get(learnableSkillIDs[i]);
+              Skill skill = SkillCatalog::get(skillMenu.skillIdAt(i));
               int scrollId = 200 + skill.id;
               bool hasScroll = (inventory.countItem(scrollId) > 0);
               bool alreadyLearned = false;
               alreadyLearned = hero.state().skills().has(skill.id);
               uint16_t color = TFT_WHITE;
-              if (i == listCursor) color = TFT_YELLOW;
+              if (i == skillMenu.cursor()) color = TFT_YELLOW;
               else if (alreadyLearned) color = TFT_GREEN;
               else if (!hasScroll) color = TFT_LIGHTGREY;
 
@@ -155,7 +153,7 @@ public:
           }
 
           g->lineSprite.drawLine(x, y + 140, x + w, y + 140, TFT_WHITE);
-          int targetSkillId = learnableSkillIDs[listCursor];
+          int targetSkillId = skillMenu.skillIdAt(skillMenu.cursor());
           int reqScrollId = 200 + targetSkillId;
           int scrollCount = inventory.countItem(reqScrollId);
           g->lineSprite.setCursor(x + 20, y + 155);
@@ -465,5 +463,6 @@ private:
   ItemMenu itemMenu;
   ItemRenderer itemRenderer;
   ItemUseSystem itemUseSystem;
+  SkillMenu skillMenu;
   bool settingsSaveRequested = false;
 };
