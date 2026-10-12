@@ -5,7 +5,6 @@
 #include "GameSaveData.h"
 #include "GameSession.h"
 #include "Inventory.h"
-#include "AudioManager.h"
 #include "Party.h"
 #include "Player.h"
 #include "Storage.h"
@@ -306,25 +305,25 @@ void applyGameData(const GameSaveData& data, GameSession& session) {
 
 } // namespace
 
-bool SaveManager::saveGame(Storage& sd, AudioManager& music, const GameSession& session) {
-  return saveComponents(sd, music, session.map(), session.progress(),
-      session.player(), session.party(), session.storage(), session.inventory());
+bool SaveManager::saveGame(Storage& sd, const GameSession& session, SaveSyncHooks sync) {
+  return saveComponents(sd, session.map(), session.progress(),
+      session.player(), session.party(), session.storage(), session.inventory(), sync);
 }
 
 bool SaveManager::saveComponents(
     Storage& sd,
-    AudioManager& music,
     const Map& map,
     const WorldProgress& progress,
     const Player& hero,
     const Party& party,
     const AutomatonStorage& storage,
-    const Inventory& inventory) {
-  music.beginStorageOperation();
+    const Inventory& inventory,
+    SaveSyncHooks sync) {
+  sync.begin(sync.context);
 
   FsFile file = sd.openFile(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
-    music.endStorageOperation();
+    sync.end(sync.context);
     return false;
   }
 
@@ -332,12 +331,11 @@ bool SaveManager::saveComponents(
   writeGameData(file, data, SAVE_MAGIC);
   file.close();
 
-  music.endStorageOperation();
+  sync.end(sync.context);
   return true;
 }
 
-LoadGameResult SaveManager::loadGame(Storage& sd, AudioManager& music, GameSession& session) {
-  (void)music; // load synchronization is owned by the top-level caller.
+LoadGameResult SaveManager::loadGame(Storage& sd, GameSession& session) {
   LoadGameResult failure = {false, false, Map::TYPE_DUNGEON};
   FsFile file = sd.openFile(SAVE_FILENAME, O_READ);
   if (!file) return failure;
@@ -351,12 +349,12 @@ LoadGameResult SaveManager::loadGame(Storage& sd, AudioManager& music, GameSessi
   return {true, data.format == SaveFormat::LEGACY, data.mapType};
 }
 
-bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings& settings) {
-  music.beginStorageOperation();
+bool SaveManager::saveSettings(Storage& sd, const Settings& settings, SaveSyncHooks sync) {
+  sync.begin(sync.context);
 
   FsFile file = sd.openFile(SETTINGS_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
-    music.endStorageOperation();
+    sync.end(sync.context);
     return false;
   }
 
@@ -366,7 +364,7 @@ bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings&
   file.println(settings.isVibrationEnabled() ? 1 : 0);
   file.close();
 
-  music.endStorageOperation();
+  sync.end(sync.context);
   return true;
 }
 

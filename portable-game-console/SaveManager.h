@@ -3,7 +3,6 @@
 #include "Map.h"
 
 class Storage;
-class AudioManager;
 class WorldProgress;
 class Player;
 class Party;
@@ -18,16 +17,22 @@ struct LoadGameResult {
   Map::MapType legacyMapType;
 };
 
+struct SaveSyncHooks {
+  void* context;
+  void (*begin)(void*);
+  void (*end)(void*);
+};
+
 class SaveManager {
 public:
   const char* SAVE_FILENAME = "/save.dat";
   const char* SAVE_MAGIC = "PGSAVE2";
 
-  bool saveGame(Storage& sd, AudioManager& music, const GameSession& session);
+  bool saveGame(Storage& sd, const GameSession& session, SaveSyncHooks sync);
 
-  LoadGameResult loadGame(Storage& sd, AudioManager& music, GameSession& session);
+  LoadGameResult loadGame(Storage& sd, GameSession& session);
 
-  bool saveSettings(Storage& sd, AudioManager& music, const Settings& settings);
+  bool saveSettings(Storage& sd, const Settings& settings, SaveSyncHooks sync);
   bool loadSettings(Storage& sd, Settings& settings);
 
   bool hasSaveFile(Storage& sd);
@@ -38,12 +43,12 @@ private:
 
   bool saveComponents(
       Storage& sd,
-      AudioManager& music,
       const Map& map,
       const WorldProgress& progress,
       const Player& hero,
       const Party& party,
       const AutomatonStorage& storage,
-      const Inventory& inventory
+      const Inventory& inventory,
+      SaveSyncHooks sync
   );
 };

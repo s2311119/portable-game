@@ -190,6 +190,15 @@ void settingsChanged(void* rawContext, SettingsMenuChange change,
 }
 } // namespace menu_feedback_adapter
 
+namespace save_sync_adapter {
+void begin(void* context) {
+  static_cast<AudioManager*>(context)->beginStorageOperation();
+}
+void end(void* context) {
+  static_cast<AudioManager*>(context)->endStorageOperation();
+}
+} // namespace save_sync_adapter
+
 // ---------
 // saveクラス
 // ---------
@@ -245,7 +254,7 @@ void loadGameAndRegenerateLegacy(void* rawOperation) {
   LoadGameOperation& operation = *static_cast<LoadGameOperation*>(rawOperation);
   GameContext* ctx = operation.context;
   operation.result = ctx->saveManager->loadGame(
-      *ctx->sd, *ctx->music, *ctx->session);
+      *ctx->sd, *ctx->session);
 
   const LoadGameResult& loadResult = operation.result;
   if (loadResult.success && loadResult.requiresMapRegeneration) {
@@ -775,11 +784,13 @@ void loop() {
     MenuFlowResult menuResult = menu.update(
         ctrl, inventory, hero, party, storage,
         ctx->session->progress(), settings, feedback);
+    const SaveSyncHooks saveSync{&music, save_sync_adapter::begin,
+                                 save_sync_adapter::end};
     if (menuResult == MenuFlowResult::REQUEST_SAVE) {
-      menu.finishSave(save.saveGame(sd, music, *ctx->session));
+      menu.finishSave(save.saveGame(sd, *ctx->session, saveSync));
     }
     if (menuResult == MenuFlowResult::SAVE_SETTINGS) {
-      save.saveSettings(sd, music, settings);
+      save.saveSettings(sd, settings, saveSync);
     }
     //g.screenSprite.fillScreen(TFT_BLACK);
     drawMenuFlow(*ctx);
