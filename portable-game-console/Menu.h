@@ -31,6 +31,7 @@
 #include "EvolutionMenu.h"
 #include "EvolutionRenderer.h"
 #include "ShopMenu.h"
+#include "ShopRenderer.h"
 
 class Menu {
 public:
@@ -198,87 +199,10 @@ public:
         g->lineSprite.setCursor(x + 40, y + 75);
         g->lineSprite.setTextColor(listCursor == 1 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.print("やめる");
-      }else if (currentMenuState == STATE_SHOP_CHOICE) {
-        int x = 60, y = 80 + yOffset;
-        g->lineSprite.fillRect(x, y, 200, 120, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, 200, 120, TFT_WHITE);
-
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 10);
-        g->lineSprite.print("いらっしゃい");
-
-        g->lineSprite.setCursor(x + 40, y + 40);
-        g->lineSprite.setTextColor(shopMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.print("買う");
-
-        g->lineSprite.setCursor(x + 40, y + 65);
-        g->lineSprite.setTextColor(shopMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.print("売る");
-
-        g->lineSprite.setCursor(x + 40, y + 90);
-        g->lineSprite.setTextColor(shopMenu.cursor() == 2 ? TFT_YELLOW : TFT_WHITE);
-        g->lineSprite.print("出る");
-      }else if (currentMenuState == STATE_SHOP_BUY) {
-        int x = 10, y = 40 + yOffset;
-        int w = 300, h = 190;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.printf("買う (所持金:%dG)", inventory.money);
-        g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-        const int shopItems[] = {100, 101, 103, 104, 300, 301, 400, 401, 500};
-        int itemCount = shopMenu.stockCount();
-
-        // スクロール
-        int itemsPerPage = 5;
-        int startIdx = 0;
-        if (shopMenu.cursor() >= itemsPerPage) startIdx = shopMenu.cursor() - (itemsPerPage - 1);
-        int endIdx = min(startIdx + itemsPerPage, itemCount);
-
-        for (int i = startIdx; i < endIdx; i++) {
-          // リストからID取得
-          int itemId = shopMenu.stockItemIdAt(i);
-          Item it = ItemCatalog::get(itemId);
-
-          g->lineSprite.setTextColor(shopMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
-          g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
-          g->lineSprite.printf("%s (%dG)", it.name, it.price);
-        }
-      }else if (currentMenuState == STATE_SHOP_SELL) {
-        int x = 10, y = 40 + yOffset;
-        int w = 300, h = 190;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.printf("売る (所持金:%dG)", inventory.money);
-        g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-        int itemCount = inventory.items.size();
-        if (itemCount == 0) {
-          g->lineSprite.setCursor(x + 20, y + 55); g->lineSprite.print("売れるものがありません");
-        } else {
-          int itemsPerPage = 5;
-          int startIdx = 0;
-          if (shopMenu.cursor() >= itemsPerPage) startIdx = shopMenu.cursor() - (itemsPerPage - 1);
-          int endIdx = min(startIdx + itemsPerPage, itemCount);
-
-          for (int i = startIdx; i < endIdx; i++) {
-            Item& it = inventory.items[i].item;
-            int sellPrice = it.price / 2;
-
-            g->lineSprite.setTextColor(shopMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
-            g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
-            g->lineSprite.printf("%s x%d (%dG)", it.name, inventory.items[i].quantity, sellPrice);
-          }
-        }
+      }else if (currentMenuState == STATE_SHOP_CHOICE ||
+                 currentMenuState == STATE_SHOP_BUY ||
+                 currentMenuState == STATE_SHOP_SELL) {
+        shopRenderer.drawLine(shopMenu, inventory, *g, drawY);
       }else if (currentMenuState == STATE_CONFIG) {
         int x = 60, y = 40 + yOffset;
         int w = 200, h = 160;
@@ -339,5 +263,6 @@ private:
   EvolutionMenu evolutionMenu;
   EvolutionRenderer evolutionRenderer;
   ShopMenu shopMenu;
+  ShopRenderer shopRenderer;
   bool settingsSaveRequested = false;
 };
