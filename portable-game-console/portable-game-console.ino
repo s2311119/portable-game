@@ -240,6 +240,43 @@ struct GameContext {
   Settings settings;
 };
 
+struct LoadGameOperation {
+  GameContext* context;
+  LoadGameResult result;
+};
+
+void loadGameAndRegenerateLegacy(void* rawOperation) {
+  LoadGameOperation& operation = *static_cast<LoadGameOperation*>(rawOperation);
+  GameContext* ctx = operation.context;
+  operation.result = ctx->saveManager->loadGame(
+      *ctx->sd, *ctx->music, *ctx->session);
+
+  const LoadGameResult& loadResult = operation.result;
+  if (loadResult.success && loadResult.requiresMapRegeneration) {
+    Map::MapType finalType = loadResult.legacyMapType;
+    WorldProgress& progress = ctx->session->progress();
+
+    // ボス階では撃破状態を優先
+    if (progress.floor() >= 10 &&
+        progress.floor() <= 50 &&
+        progress.floor() % 10 == 0)
+    {
+      int bossIndex = (progress.floor() / 10) - 1;
+      if (bossIndex >= 0 && bossIndex < 5) {
+        if (progress.bosses().isDefeated(bossIndex)) {
+          finalType = Map::TYPE_TOWN;
+        } else {
+          finalType = Map::TYPE_BOSS_ROOM;
+        }
+      }
+    }
+
+    ctx->session->map().regenerate(
+        20, 20, finalType, progress.floor());
+    ctx->session->player().reset(ctx->session->map());
+  }
+}
+
 GameContext* ctx = nullptr;
 
 void drawMenuFlow(GameContext& context) {
@@ -570,37 +607,10 @@ void setup() {
         // ロード用の仮オブジェクト生成
         ctx->session = new GameSession();
 
-        ctx->music->paused = true;
-        critical_section_enter_blocking(&sdLock);
-        LoadGameResult loadResult = ctx->saveManager->loadGame(
-            *ctx->sd, *ctx->music, *ctx->session);
-
-        if (loadResult.success && loadResult.requiresMapRegeneration) {
-          Map::MapType finalType = loadResult.legacyMapType;
-          WorldProgress& progress = ctx->session->progress();
-
-          // ボス階では撃破状態を優先
-          if (progress.floor() >= 10 &&
-              progress.floor() <= 50 &&
-              progress.floor() % 10 == 0)
-          {
-            int bossIndex = (progress.floor() / 10) - 1;
-            if (bossIndex >= 0 && bossIndex < 5) {
-              if (progress.bosses().isDefeated(bossIndex)) {
-                finalType = Map::TYPE_TOWN;
-              } else {
-                finalType = Map::TYPE_BOSS_ROOM;
-              }
-            }
-          }
-
-          ctx->session->map().regenerate(
-              20, 20, finalType, progress.floor());
-          ctx->session->player().reset(ctx->session->map());
-        }
-
-        critical_section_exit(&sdLock);
-        ctx->music->paused = false;
+        LoadGameOperation loadOperation{ctx, {false, false, Map::TYPE_DUNGEON}};
+        ctx->sd->runWhileAudioPaused(
+            *ctx->music, &loadOperation, loadGameAndRegenerateLegacy);
+        const LoadGameResult& loadResult = loadOperation.result;
 
         if (loadResult.success) {
           loadSuccess = true;
