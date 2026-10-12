@@ -17,6 +17,7 @@
 #include "Player.h"
 #include "Graphic.h"
 #include "WorldRenderer.h"
+#include "TitleRenderer.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
 #include "EncounterManager.h"
@@ -205,6 +206,7 @@ struct GameContext {
   GameSession* session = nullptr;
   Graphic* graphic;
   WorldRenderer worldRenderer;
+  TitleRenderer titleRenderer;
   Controller* controller;
   MUSIC* music;
   Sd* sd;
@@ -610,26 +612,7 @@ void setup() {
     // ★★★ ラインスプライトによる分割描画 ★★★
     for (int drawY = 0; drawY < Graphic::SCREEN_HEIGHT; drawY += Graphic::BLOCK_HEIGHT) {
       ctx->graphic->lineSprite.fillScreen(TFT_BLACK);
-      
-      // タイトルロゴ
-      ctx->graphic->lineSprite.setTextSize(3);
-      ctx->graphic->lineSprite.setTextColor(TFT_WHITE);
-      ctx->graphic->lineSprite.setCursor(60, 80 - drawY); // ★ Y座標を drawY 分ずらす
-      ctx->graphic->lineSprite.print("RPG GAME");
-
-      // メニュー項目
-      ctx->graphic->lineSprite.setTextSize(2);
-      
-      // 「はじめから」
-      ctx->graphic->lineSprite.setTextColor(titleCursor == 0 ? TFT_YELLOW : TFT_WHITE);
-      ctx->graphic->lineSprite.setCursor(100, 150 - drawY); // ★
-      ctx->graphic->lineSprite.print("はじめから");
-
-      // 「つづきから」
-      if (hasSave) ctx->graphic->lineSprite.setTextColor(titleCursor == 1 ? TFT_YELLOW : TFT_WHITE);
-      else ctx->graphic->lineSprite.setTextColor(TFT_DARKGREY);
-      ctx->graphic->lineSprite.setCursor(100, 180 - drawY); // ★
-      ctx->graphic->lineSprite.print("つづきから");
+      ctx->titleRenderer.drawLine(*ctx->graphic, titleCursor, hasSave, drawY);
 
       // 画面に転送
       ctx->graphic->lineSprite.pushSprite(0, drawY);
