@@ -26,6 +26,7 @@
 #include "ItemUseSystem.h"
 #include "SkillMenu.h"
 #include "SkillRenderer.h"
+#include "EquipmentMenu.h"
 
 class Menu {
 public:
@@ -38,8 +39,7 @@ public:
     STATE_STORAGE, // ★ 預かり所画面
     STATE_SAVE_RESULT,
     // --- 装備用 ---
-    STATE_EQUIP_SLOT,   // どの部位？ (武器/防具/装飾)
-    STATE_EQUIP_LIST,     // 何を装備する？
+    STATE_EQUIP,
     // ショップ・宿屋
     STATE_INN,          // 宿屋 (泊まりますか？)
     STATE_SHOP_CHOICE,  // 店 (買う/売る/出る)
@@ -56,7 +56,6 @@ public:
   std::vector<int> shopItemList;
   int storageMode = 0; // 0:メニュー選択, 1:引き出す, 2:預ける
 
-  int equipSlot = 0;        // 0:武器, 1:防具, 2:装飾
   Menu() {
     currentMenuState = STATE_MAIN; // 初期状態
   }
@@ -195,7 +194,8 @@ public:
         else {
           g->lineSprite.print("記録に失敗しました");
         }
-      }else if (currentMenuState == STATE_EQUIP_SLOT) {
+      }else if (currentMenuState == STATE_EQUIP &&
+                 equipmentMenu.state() == EquipmentMenu::State::SLOT) {
         int x = 10, y = 40 + yOffset;
         int w = 300, h = 190;
         g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
@@ -213,19 +213,20 @@ public:
         String aName = (s->equipmentState().armorId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().armorId()).name;
         String acName = (s->equipmentState().accessoryId() == -1) ? "なし" : ItemCatalog::get(s->equipmentState().accessoryId()).name;
 
-        g->lineSprite.setTextColor(listCursor == 0 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(equipmentMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.setCursor(x + 20, y + 60); g->lineSprite.printf("武器: %s", wName.c_str());
 
-        g->lineSprite.setTextColor(listCursor == 1 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(equipmentMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.setCursor(x + 20, y + 90); g->lineSprite.printf("防具: %s", aName.c_str());
 
-        g->lineSprite.setTextColor(listCursor == 2 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(equipmentMenu.cursor() == 2 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.setCursor(x + 20, y + 120); g->lineSprite.printf("装飾: %s", acName.c_str());
 
         g->lineSprite.setTextColor(TFT_CYAN);
         g->lineSprite.setCursor(x + 20, y + 160);
         g->lineSprite.printf("ATK:%d DEF:%d", s->attack(), s->defense());
-      }else if (currentMenuState == STATE_EQUIP_LIST) {
+      }else if (currentMenuState == STATE_EQUIP &&
+                 equipmentMenu.state() == EquipmentMenu::State::CANDIDATE) {
         int x = 10, y = 40 + yOffset;
         int w = 300, h = 190;
         g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
@@ -236,30 +237,21 @@ public:
         g->lineSprite.print("装備するアイテム");
         g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
 
-        std::vector<int> equippableIndices;
-        Item::ItemType targetType = Item::ITEM_WEAPON; // Item::をつける
-        if (equipSlot == 1) targetType = Item::ITEM_ARMOR;
-        if (equipSlot == 2) targetType = Item::ITEM_ACCESSORY;
-
-        for(int i=0; i<inventory.items.size(); i++) {
-          if (inventory.items[i].item.type == targetType) {
-            equippableIndices.push_back(i);
-          }
-        }
+        std::vector<int> equippableIndices = equipmentMenu.candidateIndices(inventory);
 
         if (equippableIndices.empty()) {
           g->lineSprite.setCursor(x + 20, y + 55); g->lineSprite.print("装備できるものがありません");
         } else {
           int itemsPerPage = 5;
           int startIdx = 0;
-          if (listCursor >= itemsPerPage) startIdx = listCursor - (itemsPerPage - 1);
+          if (equipmentMenu.cursor() >= itemsPerPage) startIdx = equipmentMenu.cursor() - (itemsPerPage - 1);
           int endIdx = min(startIdx + itemsPerPage, (int)equippableIndices.size());
 
           for (int i = startIdx; i < endIdx; i++) {
             int idx = equippableIndices[i];
             Item& it = inventory.items[idx].item;
 
-            g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
+            g->lineSprite.setTextColor(equipmentMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
             g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
 
             String valStr = "";
@@ -422,5 +414,6 @@ private:
   ItemUseSystem itemUseSystem;
   SkillMenu skillMenu;
   SkillRenderer skillRenderer;
+  EquipmentMenu equipmentMenu;
   bool settingsSaveRequested = false;
 };

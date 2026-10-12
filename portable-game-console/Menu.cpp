@@ -18,20 +18,24 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       if (result.type == ItemMenuResultType::BACK) currentMenuState = STATE_MAIN;
       return;
     }
+    if (currentMenuState == STATE_EQUIP) {
+      music.playSE(1);
+      if (equipmentMenu.cancel() == EquipmentMenuResult::BACK)
+        currentMenuState = STATE_MAIN;
+      return;
+    }
     music.playSE(1);
     if (currentMenuState == STATE_STORAGE) {
       if (storageMode != 0) storageMode = 0; // モード選択に戻る
       else active = false; // メニューを閉じる (イベント終了)
       return;
-    }else if (currentMenuState == STATE_EQUIP_LIST) {
-      currentMenuState = STATE_EQUIP_SLOT;
     }else if (currentMenuState == STATE_SHOP_BUY || currentMenuState == STATE_SHOP_SELL) {
       currentMenuState = STATE_SHOP_CHOICE; // 選択画面に戻る
     }else if (currentMenuState == STATE_SHOP_CHOICE) {
       active = false; // 店を出る
     }else if (currentMenuState == STATE_INN) {
       active = false; // 宿屋を出る
-    }else if (currentMenuState == STATE_EQUIP_SLOT||currentMenuState == STATE_EVOLVE || currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
+    }else if (currentMenuState == STATE_EVOLVE || currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
       // 進化・旋律画面でBを押したらメインに戻る
       if (currentMenuState == STATE_CONFIG) settingsSaveRequested = true;
       currentMenuState = STATE_MAIN;
@@ -73,8 +77,9 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
             listCursor = 0;
             break;
           case MainMenuResult::OPEN_EQUIPMENT:
-            currentMenuState = STATE_EQUIP_SLOT;
+            currentMenuState = STATE_EQUIP;
             listCursor = 0;
+            equipmentMenu.open();
             break;
           case MainMenuResult::REQUEST_SAVE:
             saveSucceeded = saveMgr.saveGame(
@@ -249,62 +254,39 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
     case STATE_SAVE_RESULT:
       if (aPressed) { active = false; music.playSE(1);} // 閉じる
       break;
-    case STATE_EQUIP_SLOT: {
-      // 0:武器, 1:防具, 2:装飾
-      if (upPressed)   { listCursor = (listCursor - 1 + 3) % 3; music.playSE(2); }
-      if (downPressed) { listCursor = (listCursor + 1) % 3; music.playSE(2); }
-      if (aPressed) {
-          music.playSE(0);
-          equipSlot = listCursor;
-          currentMenuState = STATE_EQUIP_LIST;
-          listCursor = 0;
-      }
-      break;
-    }
-    case STATE_EQUIP_LIST: {
-      std::vector<int> equippableIndices;
-      Item::ItemType targetType = Item::ITEM_WEAPON;
-      if (equipSlot == 1) targetType = Item::ITEM_ARMOR;
-      if (equipSlot == 2) targetType = Item::ITEM_ACCESSORY;
-
-      for(int i=0; i<inventory.items.size(); i++) {
-        if (inventory.items[i].item.type == targetType) {
-          equippableIndices.push_back(i);
-        }
-      }
-
-      int count = equippableIndices.size();
-      if (count > 0) {
-        if (upPressed)   { listCursor = (listCursor - 1 + count) % count; music.playSE(2); }
-        if (downPressed) { listCursor = (listCursor + 1) % count; music.playSE(2); }
-
+    case STATE_EQUIP: {
+      if (equipmentMenu.state() == EquipmentMenu::State::SLOT) {
+        if (upPressed)   { equipmentMenu.moveUp(3); music.playSE(2); }
+        if (downPressed) { equipmentMenu.moveDown(3); music.playSE(2); }
         if (aPressed) {
           music.playSE(0);
-          int invIndex = equippableIndices[listCursor];
-          Item newItem = inventory.items[invIndex].item;
+          equipmentMenu.selectSlot();
+        }
+      } else {
+        std::vector<int> equippableIndices = equipmentMenu.candidateIndices(inventory);
+        int count = equippableIndices.size();
+        if (count > 0) {
+          if (upPressed)   { equipmentMenu.moveUp(count); music.playSE(2); }
+          if (downPressed) { equipmentMenu.moveDown(count); music.playSE(2); }
 
-          // ★ 主人公固定
-          CharacterState* s = &hero.state();
+          if (aPressed) {
+            music.playSE(0);
+            EquipRequest request = equipmentMenu.requestEquip(equippableIndices);
+            Item newItem = inventory.items[request.inventoryIndex].item;
+            CharacterState* s = &hero.state();
 
-          // 1. 外す (インベントリに戻す)
-          int oldId = -1;
-          if (equipSlot == 0) oldId = s->equipmentState().weaponId();
-          if (equipSlot == 1) oldId = s->equipmentState().armorId();
-          if (equipSlot == 2) oldId = s->equipmentState().accessoryId();
+            int oldId = -1;
+            if (request.slot == EquipmentSlot::Weapon) oldId = s->equipmentState().weaponId();
+            if (request.slot == EquipmentSlot::Armor) oldId = s->equipmentState().armorId();
+            if (request.slot == EquipmentSlot::Accessory) oldId = s->equipmentState().accessoryId();
+            if (oldId != -1) {
+              inventory.addItem(ItemCatalog::get(oldId));
+            }
 
-          if (oldId != -1) {
-            inventory.addItem(ItemCatalog::get(oldId));
+            s->equip(request.slot, newItem.id);
+            inventory.removeByIndex(request.inventoryIndex);
+            equipmentMenu.completeEquip();
           }
-
-          // 2. 装備する
-          if (equipSlot == 0) s->equip(EquipmentSlot::Weapon, newItem.id);
-          if (equipSlot == 1) s->equip(EquipmentSlot::Armor, newItem.id);
-          if (equipSlot == 2) s->equip(EquipmentSlot::Accessory, newItem.id);
-
-          // 3. 消費
-          inventory.removeByIndex(invIndex);
-
-          currentMenuState = STATE_EQUIP_SLOT;
         }
       }
       break;
