@@ -16,25 +16,6 @@
 #include "EncounterSpec.h"
 #include "BattleTypes.h"
 
-// Phase 9 bridge: retain the exact two image-loading groups while the
-// top-level owner handles SD I/O. ImageManager receives no game objects.
-struct BattleImageHooks {
-  void* context;
-  void (*loadEnemies)(void* context, const EncounterSpec& spec,
-                      const std::vector<Enemy>& enemies, uint16_t** images);
-  void (*loadParty)(void* context, const Party& party, uint16_t** images);
-
-  void prepareEnemies(const EncounterSpec& spec,
-                      const std::vector<Enemy>& enemies,
-                      uint16_t** images) const {
-    loadEnemies(context, spec, enemies, images);
-  }
-
-  void prepareParty(const Party& party, uint16_t** images) const {
-    loadParty(context, party, images);
-  }
-};
-
 class Battle {
 private:
   // Battle クラス内 (private 推奨)
@@ -163,9 +144,6 @@ public:
   String lastEvolvedName = ""; // ★★★ これを追加 ★★★
   int turnCount = 1;
   int statusPage = 0;
-  //std::vector<uint16_t*> enemyImages; // 敵の画像 (64x64)
-  //std::vector<uint16_t*> allyImages;  // 味方の画像 (64x64)
-  uint16_t* activeImages[8];
   std::vector<String> resultMessages;
   int resultMessageIndex = 0;
 
@@ -177,8 +155,8 @@ public:
 
   Battle();
 
-  void start(Player& hero, Party& party, const EncounterSpec& spec,
-             const BattleImageHooks& images, const BattleBgmHooks& bgm);
+  void beginStart(Player& hero, Party& party, const EncounterSpec& spec);
+  void finishStart();
   std::optional<BattleResult> takeResult();
   const CharacterState* currentActorState() const;
   std::vector<const CharacterState*> targetableAlliesForRender(bool revive) const;

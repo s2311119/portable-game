@@ -177,50 +177,6 @@ void onEvent(void* rawContext, BattleBgmEvent event, BattleKind kind) {
 }
 } // namespace battle_bgm_adapter
 
-// Phase 9 bridge: retain the two original lock scopes around image loading.
-namespace battle_image_adapter {
-struct Context {
-  ImageManager* images;
-  Sd* sd;
-};
-
-void loadEnemies(void* rawContext, const EncounterSpec& spec,
-                 const std::vector<Enemy>& enemies, uint16_t** output) {
-  Context& context = *static_cast<Context*>(rawContext);
-  critical_section_enter_blocking(&sdLock);
-  if (spec.kind != BattleKind::NORMAL) {
-    String filename = "/e_" + String(spec.enemies[0].enemyId) + ".bin";
-    output[0] = context.images->load(0, filename, *context.sd);
-    for (int i = 1; i < 4; ++i) output[i] = nullptr;
-  } else {
-    for (int i = 0; i < 4; ++i) {
-      if (i < enemies.size()) {
-        String filename = "/e_" + String(enemies[i].who) + ".bin";
-        output[i] = context.images->load(i, filename, *context.sd);
-      } else {
-        output[i] = nullptr;
-      }
-    }
-  }
-  critical_section_exit(&sdLock);
-}
-
-void loadParty(void* rawContext, const Party& party, uint16_t** output) {
-  Context& context = *static_cast<Context*>(rawContext);
-  critical_section_enter_blocking(&sdLock);
-  output[0] = context.images->load(4, "/a_38.bin", *context.sd);
-  for (int i = 0; i < party.memberCount(); ++i) {
-    if (i < 3) {
-      int id = party.member(i).state().id();
-      if (id == 99) id = 38; // デバッグ用
-      String filename = "/a_" + String(id) + ".bin";
-      output[1 + i] = context.images->load(5 + i, filename, *context.sd);
-    }
-  }
-  critical_section_exit(&sdLock);
-}
-} // namespace battle_image_adapter
-
 // ---------
 // saveクラス
 // ---------
@@ -767,6 +723,39 @@ struct GameContext {
 };
 
 GameContext* ctx = nullptr;
+
+void startBattleEncounter(GameContext& context, const EncounterSpec& spec,
+                          const BattleBgmHooks& bgm) {
+  Battle& battle = *context.battle;
+  if (battle.inBattle) return;
+
+  Party& party = context.session->party();
+  battle.beginStart(context.session->player(), party, spec);
+
+  BattleImageRequest request{};
+  if (spec.kind != BattleKind::NORMAL) {
+    request.enemyCount = 1;
+    request.enemyIds[0] = spec.enemies[0].enemyId;
+  } else {
+    request.enemyCount = static_cast<int>(battle.activeEnemies.size());
+    if (request.enemyCount > 4) request.enemyCount = 4;
+    for (int i = 0; i < request.enemyCount; ++i) {
+      request.enemyIds[i] = battle.activeEnemies[i].who;
+    }
+  }
+  request.playerCharacterId = 38;
+  request.allyCount = static_cast<int>(party.memberCount());
+  if (request.allyCount > 3) request.allyCount = 3;
+  for (int i = 0; i < request.allyCount; ++i) {
+    int id = party.member(i).state().id();
+    request.allyCharacterIds[i] = id == 99 ? 38 : id;
+  }
+
+  context.imgMgr->prepareEnemyImages(request);
+  bgm.emit(BattleBgmEvent::START, spec.kind);
+  context.imgMgr->preparePartyImages(request);
+  battle.finishStart();
+}
 
 void applyFloorMapConfig(GameContext* ctx);
 
@@ -1492,7 +1481,7 @@ void setup() {
   ctx->controller = new Controller();
   ctx->music = new MUSIC();
   ctx->sd = new Sd();
-  ctx->imgMgr = new ImageManager();
+  ctx->imgMgr = new ImageManager(*ctx->sd);
   // Graphic, SD の初期化
   ctx->graphic->init();
   ctx->sd->init(*ctx->music);
@@ -1701,10 +1690,6 @@ void loop() {
   auto& settings = ctx->settings;
   battle_bgm_adapter::Context battleBgmContext{&music, &sd, &map};
   const BattleBgmHooks battleBgm{&battleBgmContext, battle_bgm_adapter::onEvent};
-  battle_image_adapter::Context battleImageContext{&imgmgr, &sd};
-  const BattleImageHooks battleImages{&battleImageContext,
-                                     battle_image_adapter::loadEnemies,
-                                     battle_image_adapter::loadParty};
   vib.update();
   if (state == STATE_GAME) {
     hero.oldX = hero.X;
@@ -1737,7 +1722,7 @@ void loop() {
         if (!ctx->battle->inBattle) {
           EncounterSpec spec = encounterManager.createEncounter(
               ctx->session->progress().floor(), map, encounterRandom);
-          ctx->battle->start(hero, party, spec, battleImages, battleBgm);
+          startBattleEncounter(*ctx, spec, battleBgm);
         }
       }
     }
@@ -1889,7 +1874,7 @@ void loop() {
                                              field_random_adapter::drawRange};
           EncounterSpec spec = encounterManager.createBossEncounter(
               ctx->session->progress().floor(), map, encounterRandom);
-          ctx->battle->start(hero, party, spec, battleImages, battleBgm);
+          startBattleEncounter(*ctx, spec, battleBgm);
         }
 
         currentEvent.type = FieldEventType::NONE;

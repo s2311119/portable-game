@@ -287,14 +287,9 @@ Battle::BattleAction Battle::createBattleAction(
 Battle::Battle() {
     activeEnemies.reserve(4);
     plannedActions.reserve(8);
-
-    for(int i=0; i<8; i++) {
-      activeImages[i] = nullptr;
-    }
   }
 
-void Battle::start(Player& hero, Party& party, const EncounterSpec& spec,
-                   const BattleImageHooks& images, const BattleBgmHooks& bgm) {
+void Battle::beginStart(Player& hero, Party& party, const EncounterSpec& spec) {
     if (inBattle) return;
     pendingResult.reset();
     currentBattleKind = spec.kind;
@@ -334,9 +329,6 @@ void Battle::start(Player& hero, Party& party, const EncounterSpec& spec,
       }
       Enemy& boss = activeEnemies.back();
       boss.name = boss.state().name();
-      images.prepareEnemies(spec, activeEnemies, activeImages);
-
-      bgm.emit(BattleBgmEvent::START, spec.kind);
     }else{
       for (const EnemySpawnSpec& spawn : spec.enemies) {
         activeEnemies.push_back(Enemy::fromRolledLevel(spawn.enemyId, spawn.level));
@@ -346,12 +338,11 @@ void Battle::start(Player& hero, Party& party, const EncounterSpec& spec,
         newEnemy.name = newEnemy.state().name();
       }
 
-      images.prepareEnemies(spec, activeEnemies, activeImages);
-
-      bgm.emit(BattleBgmEvent::START, spec.kind);
     }
-    
-    images.prepareParty(party, activeImages + 4);
+  }
+
+void Battle::finishStart() {
+    Party& party = *partyRef;
     // ★ 行動順リストを作成 (ソートはしない)
     actorList.clear();
     actorList.push_back({CombatantSide::PLAYER, 0});
