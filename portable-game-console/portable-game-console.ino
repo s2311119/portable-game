@@ -747,7 +747,12 @@ void loop() {
 
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
-    menu.update(ctrl, inventory, hero, party, storage, map, ctx->session->progress(), music, sd, save, settings, vib);
+    MenuFlowResult menuResult = menu.update(
+        ctrl, inventory, hero, party, storage,
+        ctx->session->progress(), music, settings, vib);
+    if (menuResult == MenuFlowResult::REQUEST_SAVE) {
+      menu.finishSave(save.saveGame(sd, music, *ctx->session));
+    }
     if (menu.takeSettingsSaveRequest()) {
       save.saveSettings(sd, music, settings);
     }

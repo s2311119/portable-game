@@ -311,18 +311,6 @@ bool SaveManager::saveGame(Sd& sd, MUSIC& music, const GameSession& session) {
       session.player(), session.party(), session.storage(), session.inventory());
 }
 
-bool SaveManager::saveGame(
-    Sd& sd,
-    MUSIC& music,
-    Map& map,
-    WorldProgress& progress,
-    Player& hero,
-    Party& party,
-    AutomatonStorage& storage,
-    Inventory& inventory) {
-  return saveComponents(sd, music, map, progress, hero, party, storage, inventory);
-}
-
 bool SaveManager::saveComponents(
     Sd& sd,
     MUSIC& music,

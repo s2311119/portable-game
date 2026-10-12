@@ -1,8 +1,12 @@
 #include "MenuFlow.h"
 #include "CharacterProgressionSystem.h"
 
-void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib) {
-  if (!active_) return; // メニューが非表示なら何もしない
+MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
+                                Player& hero, Party& party,
+                                AutomatonStorage& storage,
+                                WorldProgress& progress, MUSIC& music,
+                                Settings& settings, Vibration& vib) {
+  if (!active_) return MenuFlowResult::NONE; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
   bool upPressed = ctrl.pressedDebounced(ctrl.BTN_UP);
@@ -16,24 +20,24 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       ItemMenuResult result = itemMenu.cancel();
       music.playSE(1);
       if (result.type == ItemMenuResultType::BACK) screen_ = MenuScreen::MAIN;
-      return;
+      return MenuFlowResult::NONE;
     }
     if (screen_ == MenuScreen::EQUIPMENT) {
       music.playSE(1);
       if (equipmentMenu.cancel() == EquipmentMenuResult::BACK)
         screen_ = MenuScreen::MAIN;
-      return;
+      return MenuFlowResult::NONE;
     }
     if (screen_ == MenuScreen::EVOLUTION) {
       music.playSE(1);
       if (evolutionMenu.cancel() == EvolutionMenuResult::BACK)
         screen_ = MenuScreen::MAIN;
-      return;
+      return MenuFlowResult::NONE;
     }
     music.playSE(1);
     if (screen_ == MenuScreen::STORAGE) {
       if (storageMenu.cancel() == StorageMenuResult::CLOSE) active_ = false;
-      return;
+      return MenuFlowResult::NONE;
     }else if (screen_ == MenuScreen::SHOP) {
       if (shopMenu.cancel() == ShopMenuResult::CLOSE) active_ = false;
     }else if (screen_ == MenuScreen::INN) {
@@ -48,7 +52,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       // メインメニューでBを押したらメニューを閉じる
       if (mainMenu.cancel() == MainMenuResult::CLOSE) active_ = false;
     }
-    return; // Bボタンが押されたフレームは他の操作を無視
+    return MenuFlowResult::NONE; // Bボタンが押されたフレームは他の操作を無視
   }
 
   // --- 状態別 Aボタン（決定）とカーソル移動 ---
@@ -84,10 +88,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
             equipmentMenu.open();
             break;
           case MainMenuResult::REQUEST_SAVE:
-            saveSucceeded = saveMgr.saveGame(
-                sd, music, map, progress, hero, party, storage, inventory);
-            screen_ = MenuScreen::SAVE_RESULT;
-            break;
+            return MenuFlowResult::REQUEST_SAVE;
           case MainMenuResult::OPEN_SETTINGS:
             screen_ = MenuScreen::SETTINGS;
             settingsMenu.open();
@@ -383,4 +384,5 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       break;
     }
   } // switch 終了
+  return MenuFlowResult::NONE;
 }

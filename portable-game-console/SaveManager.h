@@ -30,18 +30,6 @@ public:
   bool saveSettings(Sd& sd, MUSIC& music, const Settings& settings);
   bool loadSettings(Sd& sd, Settings& settings);
 
-  // Menuからの一時的なmigration bridge。MenuFlow移行時に除去する。
-  bool saveGame(
-      Sd& sd,
-      MUSIC& music,
-      Map& map,
-      WorldProgress& progress,
-      Player& hero,
-      Party& party,
-      AutomatonStorage& storage,
-      Inventory& inventory
-  );
-
   bool hasSaveFile(Sd& sd);
 
 private:

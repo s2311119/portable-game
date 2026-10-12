@@ -11,11 +11,8 @@
 #include "Player.h"
 #include "Party.h"
 #include "AutomatonStorage.h"
-#include "Map.h"
 #include "WorldProgress.h"
 #include "MUSIC.h"
-#include "Sd.h"
-#include "SaveManager.h"
 #include "Settings.h"
 #include "Vibration.h"
 #include "MainMenu.h"
@@ -28,6 +25,11 @@
 #include "InnMenu.h"
 #include "StorageMenu.h"
 #include "SettingsMenu.h"
+
+enum class MenuFlowResult {
+  NONE,
+  REQUEST_SAVE
+};
 
 class MenuFlow {
 public:
@@ -81,7 +83,15 @@ public:
   const StorageMenu& storageScreen() const { return storageMenu; }
   const SettingsMenu& settingsScreen() const { return settingsMenu; }
 
-  void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
+  MenuFlowResult update(Controller& ctrl, Inventory& inventory, Player& hero,
+                        Party& party, AutomatonStorage& storage,
+                        WorldProgress& progress, MUSIC& music,
+                        Settings& settings, Vibration& vib);
+
+  void finishSave(bool succeeded) {
+    saveSucceeded = succeeded;
+    screen_ = MenuScreen::SAVE_RESULT;
+  }
 
   bool takeSettingsSaveRequest() {
     bool requested = settingsSaveRequested;
