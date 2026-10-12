@@ -1,5 +1,5 @@
 #pragma once
-#include "AudioManager.h"
+#include <Arduino.h>
 #include <SdFat.h>
 #include <algorithm>
 #include <cstring>
@@ -11,10 +11,11 @@ static const int SD_MOSI_PIN = 19;
 
 class Storage {
 public:
+  static const int TRACK_COUNT = 100;
   static void initializeSynchronization();
 private:
   SdFat sdfat;
-  FsFile musicFiles[AudioManager::TRACK_COUNT];
+  FsFile musicFiles[TRACK_COUNT];
 public:
   Storage();
   void init();

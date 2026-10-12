@@ -11,7 +11,6 @@ class Storage;
 class AudioManager {
 public:
   static const int BUF_SIZE = 4096;
-  static const int TRACK_COUNT = 100;  // 例: 0=nocturne, 1=gekkou
 
   int currentTrack = 0;
   volatile bool pendingSwitch = false;

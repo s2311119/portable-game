@@ -1,3 +1,4 @@
+#include "AudioManager.h"
 #include "Storage.h"
 #include "StorageSyncInternal.h"
 
@@ -16,8 +17,8 @@ void AudioManager::playBGM(BgmCue cue) {
 }
 
 void AudioManager::initializeTracks(Storage &sd) {
-  const char* paths[TRACK_COUNT];
-  for(int i=0; i<TRACK_COUNT; i++) paths[i] = "";
+  const char* paths[Storage::TRACK_COUNT];
+  for(int i=0; i<Storage::TRACK_COUNT; i++) paths[i] = "";
   paths[0] = "/bgm_0.raw"; // 集落
   paths[1] = "/bgm_1.raw"; // ダンジョン
   paths[2] = "/bgm_2.raw"; // 通常戦闘
@@ -25,7 +26,7 @@ void AudioManager::initializeTracks(Storage &sd) {
   paths[4] = "/bgm_4.raw"; // ラスボス
   paths[9] = "/bgm_9.raw"; // タイトル
   paths[99] = "/bgm_99.raw";
-  for (int i = 0; i < TRACK_COUNT; ++i) {
+  for (int i = 0; i < Storage::TRACK_COUNT; ++i) {
     sd.openTrack(i, paths[i]);
     if (!sd.trackIsOpen(i)) {
       //Serial.printf("Failed to open %s\n", paths[i]);
