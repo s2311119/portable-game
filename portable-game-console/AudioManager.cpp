@@ -1,6 +1,5 @@
 #include "AudioManager.h"
 #include "Storage.h"
-#include "StorageSyncInternal.h"
 
 void AudioManager::playBGM(BgmCue cue) {
   int track = 0;
@@ -17,6 +16,7 @@ void AudioManager::playBGM(BgmCue cue) {
 }
 
 void AudioManager::initializeTracks(Storage &sd) {
+  storage_ = &sd;
   const char* paths[Storage::TRACK_COUNT];
   for(int i=0; i<Storage::TRACK_COUNT; i++) paths[i] = "";
   paths[0] = "/bgm_0.raw"; // 集落
@@ -65,11 +65,11 @@ void AudioManager::runWhileStoragePaused(void* context,
 
 void AudioManager::beginStorageOperation() {
   paused = true;
-  critical_section_enter_blocking(&sdLock);
+  storage_->lockIo();
 }
 
 void AudioManager::endStorageOperation() {
-  critical_section_exit(&sdLock);
+  storage_->unlockIo();
   paused = false;
 }
 
@@ -77,7 +77,7 @@ void AudioManager::performPendingSwitch(Storage &sd) {
     if (!pendingSwitch) return;
 
     // --- 競合防止ロック ---
-    critical_section_enter_blocking(&sdLock);
+    sd.lockIo();
 
     int newTrack;
     noInterrupts();
@@ -115,7 +115,7 @@ void AudioManager::performPendingSwitch(Storage &sd) {
     interrupts();
 
     // --- ロック解除 ---
-    critical_section_exit(&sdLock);
+    sd.unlockIo();
 
     delay(30);  // ISRが落ち着く時間
     paused = false;
@@ -136,7 +136,7 @@ void AudioManager::refile(Storage &sd) {
       return;
     }
 
-    critical_section_enter_blocking(&sdLock);
+    sd.lockIo();
 
     // 一度に長時間SDを占有しないよう、
     // 2048 byteずつ裏バッファへ補充する
@@ -169,7 +169,7 @@ void AudioManager::refile(Storage &sd) {
       }
     }
 
-    critical_section_exit(&sdLock);
+    sd.unlockIo();
 
     // 裏バッファ1個分が完成したら再生側へ公開
     if (refillOffset >= BUF_SIZE) {
@@ -195,10 +195,10 @@ void AudioManager::switchTrack(int newId) {
   paused = true;
 
   // SDロックを取得（refileと競合しないようにする）
-  critical_section_enter_blocking(&sdLock);
+  storage_->lockIo();
   sampleIndex = 0;
   needs_refill = false;
-  critical_section_exit(&sdLock);
+  storage_->unlockIo();
 
   requestSwitch(newId);
 }

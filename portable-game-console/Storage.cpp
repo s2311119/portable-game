@@ -1,10 +1,18 @@
 #include "Storage.h"
-#include "StorageSyncInternal.h"
+#include "pico/sync.h"
 
-critical_section_t sdLock;
+static critical_section_t sdLock;
 
 void Storage::initializeSynchronization() {
     critical_section_init(&sdLock);
+  }
+
+void Storage::lockIo() {
+    critical_section_enter_blocking(&sdLock);
+  }
+
+void Storage::unlockIo() {
+    critical_section_exit(&sdLock);
   }
 
 Storage::Storage() {

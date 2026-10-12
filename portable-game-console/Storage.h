@@ -13,6 +13,8 @@ class Storage {
 public:
   static const int TRACK_COUNT = 100;
   static void initializeSynchronization();
+  void lockIo();
+  void unlockIo();
 private:
   SdFat sdfat;
   FsFile musicFiles[TRACK_COUNT];

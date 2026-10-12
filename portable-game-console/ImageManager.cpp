@@ -1,7 +1,6 @@
 #include "ImageManager.h"
 
 #include "Storage.h"
-#include "StorageSyncInternal.h"
 #include <cstring>
 
 ImageManager::ImageManager(Storage& sd) : sd(sd) {
@@ -34,18 +33,18 @@ void ImageManager::load(int slot, ImageKind kind, int id) {
 }
 
 void ImageManager::prepareEnemyImages(const BattleImageRequest& request) {
-  critical_section_enter_blocking(&sdLock);
+  sd.lockIo();
   for (int i = 0; i < 4; ++i) {
     slotInfo[i].active = i < request.enemyCount;
     if (slotInfo[i].active) {
       load(i, ImageKind::ENEMY, request.enemyIds[i]);
     }
   }
-  critical_section_exit(&sdLock);
+  sd.unlockIo();
 }
 
 void ImageManager::preparePartyImages(const BattleImageRequest& request) {
-  critical_section_enter_blocking(&sdLock);
+  sd.lockIo();
   load(4, ImageKind::CHARACTER, request.playerCharacterId);
   for (int i = 0; i < 3; ++i) {
     slotInfo[5 + i].active = i < request.allyCount;
@@ -53,7 +52,7 @@ void ImageManager::preparePartyImages(const BattleImageRequest& request) {
       load(5 + i, ImageKind::CHARACTER, request.allyCharacterIds[i]);
     }
   }
-  critical_section_exit(&sdLock);
+  sd.unlockIo();
 }
 
 const uint16_t* ImageManager::enemyImage(int enemyIndex) const {

@@ -175,6 +175,7 @@ public:
   void endStorageOperation();
 
 private:
+  Storage* storage_ = nullptr;
   void requestSwitch(int trackId);
   void switchTrack(int newId);
 };
