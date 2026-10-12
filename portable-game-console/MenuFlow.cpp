@@ -1,5 +1,6 @@
 #include "MenuFlow.h"
 #include "CharacterProgressionSystem.h"
+#include "ShopTransactionSystem.h"
 
 MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
                                 Player& hero, Party& party,
@@ -352,12 +353,12 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
 
         if (aPressed) {
           ShopBuyRequest request = shopMenu.requestBuy();
-          Item targetItem = ItemCatalog::get(request.itemId);
+          ShopPurchaseQuote quote =
+              ShopTransactionSystem::quotePurchase(request.itemId, inventory);
 
-          if (inventory.money >= targetItem.price) {
+          if (quote.affordable) {
             feedback.playSE(feedback.context, 0);
-            inventory.money -= targetItem.price;
-            inventory.addItem(targetItem);
+            ShopTransactionSystem::completePurchase(quote, inventory);
           } else {
             feedback.playSE(feedback.context, 1);
           }
@@ -370,13 +371,12 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
 
           if (aPressed) {
             ShopSellRequest request = shopMenu.requestSell();
-            Item& item = inventory.items[request.inventoryIndex].item;
-            int sellPrice = item.price / 2;
-            if (sellPrice < 1) sellPrice = 1;
+            int sellPrice = ShopTransactionSystem::salePriceAt(
+                inventory, request.inventoryIndex);
 
             feedback.playSE(feedback.context, 0);
-            inventory.money += sellPrice;
-            inventory.removeByIndex(request.inventoryIndex);
+            ShopTransactionSystem::completeSale(
+                inventory, request.inventoryIndex, sellPrice);
             shopMenu.adjustCursorAfterSale(inventory.items.size());
           }
         }
