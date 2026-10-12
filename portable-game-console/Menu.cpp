@@ -39,7 +39,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       if (shopMenu.cancel() == ShopMenuResult::CLOSE) active = false;
       else currentMenuState = STATE_SHOP_CHOICE;
     }else if (currentMenuState == STATE_INN) {
-      active = false; // 宿屋を出る
+      if (innMenu.cancel() == InnMenuResult::CLOSE) active = false;
     }else if (currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
       // 進化・旋律画面でBを押したらメインに戻る
       if (currentMenuState == STATE_CONFIG) settingsSaveRequested = true;
@@ -288,34 +288,32 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_INN: {
-      // 0: はい, 1: いいえ
-      if (upPressed || downPressed) { listCursor = (listCursor == 0) ? 1 : 0; music.playSE(2);}
+      if (upPressed || downPressed) {
+        innMenu.moveSelection();
+        music.playSE(2);
+      }
 
       if (aPressed) {
-        if (listCursor == 0) { // はい
-          int cost = 10; // 宿泊費
-          if (inventory.money >= cost) {
-            music.playSE(0); // 決定音 (回復音でもOK)
-            inventory.money -= cost;
+        InnMenuResult result = innMenu.confirm(inventory.money);
+        if (result == InnMenuResult::STAY_REQUEST) {
+          music.playSE(0);
+          inventory.money -= innMenu.cost();
 
-            // 全回復
-            hero.state().revive(100);
-            hero.state().heal(9999); hero.state().restoreTP(9999);
-            for(size_t i = 0; i < party.memberCount(); ++i) {
-              CharacterState& member = party.memberState(i);
-              member.revive(100);
-              member.heal(9999); member.restoreTP(9999);
-            }
-            // (ここで「回復した！」メッセージを出したいが、簡易的に閉じる)
-            active = false;
-          } else {
-            music.playSE(1); // お金が足りない
+          hero.state().revive(100);
+          hero.state().heal(9999); hero.state().restoreTP(9999);
+          for(size_t i = 0; i < party.memberCount(); ++i) {
+            CharacterState& member = party.memberState(i);
+            member.revive(100);
+            member.heal(9999); member.restoreTP(9999);
           }
-        } else { // いいえ
-          active = false; music.playSE(1);
+          active = false;
+        } else if (result == InnMenuResult::INSUFFICIENT_FUNDS) {
+          music.playSE(1);
+        } else {
+          active = false;
+          music.playSE(1);
         }
       }
-      if (bPressed) { active = false; music.playSE(1); }
       break;
     }
     case STATE_SHOP_CHOICE: {

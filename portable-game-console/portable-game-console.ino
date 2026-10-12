@@ -758,9 +758,7 @@ void loop() {
         break;
 
       case FieldEventAction::OPEN_INN:
-        ctx->menu->active = true;
-        ctx->menu->currentMenuState = Menu::STATE_INN;
-        ctx->menu->listCursor = 0;
+        ctx->menu->openInn();
         state = STATE_MENU;
         currentEvent.type = FieldEventType::NONE;
         break;

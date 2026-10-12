@@ -32,6 +32,7 @@
 #include "EvolutionRenderer.h"
 #include "ShopMenu.h"
 #include "ShopRenderer.h"
+#include "InnMenu.h"
 
 class Menu {
 public:
@@ -75,6 +76,12 @@ public:
     active = true;
     currentMenuState = STATE_SHOP_CHOICE;
     shopMenu.open();
+  }
+
+  void openInn() {
+    active = true;
+    currentMenuState = STATE_INN;
+    innMenu.open();
   }
 
   void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
@@ -193,11 +200,11 @@ public:
         g->lineSprite.print("一泊 10G です");
 
         g->lineSprite.setCursor(x + 40, y + 50);
-        g->lineSprite.setTextColor(listCursor == 0 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(innMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.print("泊まる");
 
         g->lineSprite.setCursor(x + 40, y + 75);
-        g->lineSprite.setTextColor(listCursor == 1 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(innMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.print("やめる");
       }else if (currentMenuState == STATE_SHOP_CHOICE ||
                  currentMenuState == STATE_SHOP_BUY ||
@@ -264,5 +271,6 @@ private:
   EvolutionRenderer evolutionRenderer;
   ShopMenu shopMenu;
   ShopRenderer shopRenderer;
+  InnMenu innMenu;
   bool settingsSaveRequested = false;
 };
