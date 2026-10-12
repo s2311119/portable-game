@@ -323,7 +323,7 @@ bool SaveManager::saveComponents(
   music.paused = true;
   critical_section_enter_blocking(&sdLock);
 
-  FsFile file = sd.sdfat.open(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
+  FsFile file = sd.openFile(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
     critical_section_exit(&sdLock);
     music.paused = false;
@@ -342,7 +342,7 @@ bool SaveManager::saveComponents(
 LoadGameResult SaveManager::loadGame(Storage& sd, AudioManager& music, GameSession& session) {
   (void)music; // load synchronization is owned by the top-level caller.
   LoadGameResult failure = {false, false, Map::TYPE_DUNGEON};
-  FsFile file = sd.sdfat.open(SAVE_FILENAME, O_READ);
+  FsFile file = sd.openFile(SAVE_FILENAME, O_READ);
   if (!file) return failure;
 
   GameSaveData data;
@@ -358,7 +358,7 @@ bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings&
   music.paused = true;
   critical_section_enter_blocking(&sdLock);
 
-  FsFile file = sd.sdfat.open(SETTINGS_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
+  FsFile file = sd.openFile(SETTINGS_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
     critical_section_exit(&sdLock);
     music.paused = false;
@@ -377,7 +377,7 @@ bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings&
 }
 
 bool SaveManager::loadSettings(Storage& sd, Settings& settings) {
-  FsFile file = sd.sdfat.open(SETTINGS_FILENAME, O_READ);
+  FsFile file = sd.openFile(SETTINGS_FILENAME, O_READ);
   if (!file) return false;
 
   String magic = file.readStringUntil('\n');
@@ -403,5 +403,5 @@ bool SaveManager::loadSettings(Storage& sd, Settings& settings) {
 }
 
 bool SaveManager::hasSaveFile(Storage& sd) {
-  return sd.sdfat.exists(SAVE_FILENAME);
+  return sd.existsFile(SAVE_FILENAME);
 }

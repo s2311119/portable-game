@@ -16,7 +16,9 @@ public:
   volatile bool pendingSwitch = false;
   int pendingTrack = -1;
   size_t refillOffset = 0;
+private:
   SdFat sdfat;
+public:
   Storage() {
     pinMode(SD_CS_PIN, OUTPUT);
     digitalWrite(SD_CS_PIN, HIGH);
@@ -190,4 +192,6 @@ public:
   }
 
   bool loadToBuffer(String filename, uint16_t* buffer);
+  FsFile openFile(const char* filename, uint8_t flags);
+  bool existsFile(const char* filename);
 };

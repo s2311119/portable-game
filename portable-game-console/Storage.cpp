@@ -9,3 +9,11 @@ bool Storage::loadToBuffer(String filename, uint16_t* buffer) {
     file.close();
     return true;
   }
+
+FsFile Storage::openFile(const char* filename, uint8_t flags) {
+    return sdfat.open(filename, flags);
+  }
+
+bool Storage::existsFile(const char* filename) {
+    return sdfat.exists(filename);
+  }
