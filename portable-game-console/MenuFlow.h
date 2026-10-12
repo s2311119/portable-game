@@ -39,7 +39,7 @@
 #include "SettingsMenu.h"
 #include "SettingsRenderer.h"
 
-class Menu {
+class MenuFlow {
 public:
   // ★ メニューの状態を定義
   enum MenuState {
@@ -65,7 +65,7 @@ public:
   bool active = false;
   bool saveSucceeded = false;
 
-  Menu() {
+  MenuFlow() {
     currentMenuState = STATE_MAIN; // 初期状態
   }
 

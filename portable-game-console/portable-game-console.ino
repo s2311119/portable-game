@@ -37,7 +37,7 @@
 #include "GameSession.h"
 #include "Battle.h"
 #include "BattleRenderer.h"
-#include "Menu.h"
+#include "MenuFlow.h"
 #include "MemoryMonitor.h"
 #include <utility>
 
@@ -172,7 +172,7 @@ struct GameContext {
   Controller* controller;
   MUSIC* music;
   Sd* sd;
-  Menu* menu;
+  MenuFlow* menu;
   EncounterManager* encounterManager;
   Exploration exploration;
   FieldEventHandler fieldEventHandler;
@@ -572,7 +572,7 @@ void setup() {
   }
 
   // 共通初期化
-  ctx->menu = new Menu();
+  ctx->menu = new MenuFlow();
   ctx->encounterManager = new EncounterManager();
   ctx->battle = new Battle();
 
