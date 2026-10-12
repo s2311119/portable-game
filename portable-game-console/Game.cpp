@@ -1,5 +1,7 @@
 #include "Game.h"
 
+Game* ctx = nullptr;
+
 void Game::drawMenuFlow() {
   Game& context = *this;
   const MenuFlow& menu = *context.menu;
