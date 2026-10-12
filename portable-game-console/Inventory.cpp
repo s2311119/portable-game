@@ -20,7 +20,7 @@ void Inventory::addItem(const Item& newItem) {
     items.push_back({newItem, 1});
 }
 
-int Inventory::countItem(int id) {
+int Inventory::countItem(int id) const {
     for (const auto& stack : items) {
       if (stack.item.id == id) {
         return stack.quantity;

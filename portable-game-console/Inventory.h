@@ -18,7 +18,7 @@ public:
   // ★アイテムを追加する関数
   void addItem(const Item& newItem);
 
-  int countItem(int id);
+  int countItem(int id) const;
 
   bool removeItem(int id);
   void removeByIndex(int index);
