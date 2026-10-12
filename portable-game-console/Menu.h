@@ -22,6 +22,7 @@
 #include "MainMenu.h"
 #include "MainMenuRenderer.h"
 #include "ItemMenu.h"
+#include "ItemRenderer.h"
 
 extern const int learnableSkillIDs[];
 extern const int learnableSkillCount;
@@ -164,71 +165,8 @@ public:
           else if (scrollCount > 0) { g->lineSprite.setTextColor(TFT_CYAN); g->lineSprite.printf("習得可能！ (所持: %d)", scrollCount); }
           else { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.setTextSize(1); g->lineSprite.setCursor(x + 20, y + 160); g->lineSprite.printf("必要: %s", ItemCatalog::get(reqScrollId).name); }
 
-      } else if (currentMenuState == STATE_ITEM &&
-                 itemMenu.state() == ItemMenu::State::ITEM_LIST) {
-        int x = 10, y = 40 - drawY;
-        int w = 300, h = 190;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.print("道具 (一覧)");
-        g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-        int itemCount = inventory.items.size();
-        if (itemCount == 0) {
-          g->lineSprite.setCursor(x + 20, y + 55); g->lineSprite.print("道具を持っていません");
-        } else {
-          int itemsPerPage = 5;
-          int startIdx = 0;
-          if (itemMenu.cursor() >= itemsPerPage) startIdx = itemMenu.cursor() - (itemsPerPage - 1);
-          int endIdx = startIdx + itemsPerPage;
-          if (endIdx > itemCount) endIdx = itemCount;
-
-          for (int i = startIdx; i < endIdx; i++) {
-            int id = inventory.items[i].item.id;
-            bool isUsable = (id >= 100 && id < 200);
-            uint16_t color = TFT_WHITE;
-            if (i == itemMenu.cursor()) color = TFT_YELLOW;
-            else if (!isUsable) color = TFT_LIGHTGREY;
-
-            g->lineSprite.setTextColor(color);
-            g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
-            if (id >= 200 && id < 300) {
-              // %sの巻物 と書くことで、画面上だけ結合される
-              g->lineSprite.printf("%sの巻物 x%d", inventory.items[i].item.name, inventory.items[i].quantity);
-            } else {
-              // 通常アイテム
-              g->lineSprite.printf("%s x%d", inventory.items[i].item.name, inventory.items[i].quantity);
-            }
-          }
-        }
-
-      } else if (currentMenuState == STATE_ITEM &&
-                 itemMenu.state() == ItemMenu::State::TARGET_SELECT) {
-          int x = 10, y = 40 - drawY;
-          int w = 300, h = 190;
-          g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-          g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-          g->lineSprite.setTextSize(2);
-          g->lineSprite.setTextColor(TFT_WHITE);
-          g->lineSprite.setCursor(x + 20, y + 15);
-          g->lineSprite.print("誰に使いますか？");
-          g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-          uint16_t color = (itemMenu.cursor() == 0) ? TFT_YELLOW : TFT_WHITE;
-          g->lineSprite.setTextColor(color);
-          g->lineSprite.setCursor(x + 20, y + 55);
-          g->lineSprite.printf("調律師 HP:%d/%d", hero.state().stats().getHp(), hero.state().stats().getMaxHp());
-
-          for (int i = 0; i < party.memberCount(); i++) {
-            color = (itemMenu.cursor() == i + 1) ? TFT_YELLOW : TFT_WHITE;
-            g->lineSprite.setTextColor(color);
-            g->lineSprite.setCursor(x + 20, y + 55 + (i + 1) * 28);
-            const auto* s = &party.member(i).state();
-            g->lineSprite.printf("%s HP:%d/%d", s->name(), s->stats().getHp(), s->stats().getMaxHp());
-          }
+      } else if (currentMenuState == STATE_ITEM) {
+        itemRenderer.drawLine(itemMenu, inventory, hero, party, *g, drawY);
 
       } else if (currentMenuState == STATE_STORAGE) {
           g->lineSprite.fillScreen(TFT_BLACK);
@@ -524,5 +462,6 @@ private:
   MainMenu mainMenu;
   MainMenuRenderer mainMenuRenderer;
   ItemMenu itemMenu;
+  ItemRenderer itemRenderer;
   bool settingsSaveRequested = false;
 };
