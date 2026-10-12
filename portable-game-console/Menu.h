@@ -20,6 +20,7 @@
 #include "Settings.h"
 #include "Vibration.h"
 #include "MainMenu.h"
+#include "MainMenuRenderer.h"
 
 extern const int learnableSkillIDs[];
 extern const int learnableSkillCount;
@@ -88,17 +89,7 @@ public:
       // ※ 以下、sp. を g->lineSprite. に置換
 
       if (currentMenuState == STATE_MAIN) {
-        int x = 60, y = 40 - drawY;
-        int w = 200, h = 190;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-        g->lineSprite.setTextSize(2);
-        for (int i = 0; i < mainMenu.itemCount(); i++) {
-          uint16_t color = (i == mainMenu.selectedIndex()) ? TFT_YELLOW : TFT_WHITE;
-          g->lineSprite.setTextColor(color);
-          g->lineSprite.setCursor(x + 20, y + 20 + i * 28);
-          g->lineSprite.print(mainMenu.itemLabelAt(i));
-        }
+        mainMenuRenderer.drawLine(mainMenu, *g, drawY);
 
       } else if (currentMenuState == STATE_EVOLVE) {
           int x = 10, y = 40 - drawY;
@@ -530,5 +521,6 @@ public:
 
 private:
   MainMenu mainMenu;
+  MainMenuRenderer mainMenuRenderer;
   bool settingsSaveRequested = false;
 };
