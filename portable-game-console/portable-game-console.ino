@@ -775,9 +775,7 @@ void loop() {
         break;
 
       case FieldEventAction::OPEN_SHOP:
-        ctx->menu->active = true;
-        ctx->menu->currentMenuState = Menu::STATE_SHOP_CHOICE;
-        ctx->menu->listCursor = 0;
+        ctx->menu->openShop();
         state = STATE_MENU;
         currentEvent.type = FieldEventType::NONE;
         break;

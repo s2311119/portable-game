@@ -35,10 +35,9 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       if (storageMode != 0) storageMode = 0; // モード選択に戻る
       else active = false; // メニューを閉じる (イベント終了)
       return;
-    }else if (currentMenuState == STATE_SHOP_BUY || currentMenuState == STATE_SHOP_SELL) {
-      currentMenuState = STATE_SHOP_CHOICE; // 選択画面に戻る
-    }else if (currentMenuState == STATE_SHOP_CHOICE) {
-      active = false; // 店を出る
+    }else if (currentMenuState == STATE_SHOP_BUY || currentMenuState == STATE_SHOP_SELL || currentMenuState == STATE_SHOP_CHOICE) {
+      if (shopMenu.cancel() == ShopMenuResult::CLOSE) active = false;
+      else currentMenuState = STATE_SHOP_CHOICE;
     }else if (currentMenuState == STATE_INN) {
       active = false; // 宿屋を出る
     }else if (currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
@@ -320,57 +319,26 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_SHOP_CHOICE: {
-      if (upPressed)   { listCursor = (listCursor - 1 + 3) % 3;music.playSE(2); }
-      if (downPressed) { listCursor = (listCursor + 1) % 3;music.playSE(2); }
+      if (upPressed)   { shopMenu.moveUp(3); music.playSE(2); }
+      if (downPressed) { shopMenu.moveDown(3); music.playSE(2); }
 
       if (aPressed) {
         music.playSE(0);
-        if (listCursor == 0) { // 「買う」
-          currentMenuState = STATE_SHOP_BUY;
-          listCursor = 0;
-
-          // ★★★ 商品リストの生成ロジック ★★★
-          shopItemList.clear();
-
-          // 1. 常備薬 (階層が進むと良い薬が入荷)
-          shopItemList.push_back(100); // リペアキット
-          shopItemList.push_back(103); // エネルギー缶
-          shopItemList.push_back(104); // 万能オイル
-          if (progress.floor() >= 10) shopItemList.push_back(101); // リペアキット中
-
-          // 2. 階層に応じた装備品 (Tier計算)
-          // 1-10F: Tier 0, 11-20F: Tier 1, ...
-          int tier = (progress.floor() - 1) / 10;
-          if (tier > 4) tier = 4; // 最大Tier 4 (5段階目)
-
-          // 武器: 300 + tier
-          shopItemList.push_back(300 + tier);
-
-          // 防具: 400 + tier
-          shopItemList.push_back(400 + tier);
-
-          // アクセ: たまに並ぶとか、固定とか
-          if (tier >= 1) shopItemList.push_back(500); // 11F以降
-
-        } else if (listCursor == 1) { // 売る
-          currentMenuState = STATE_SHOP_SELL;
-          listCursor = 0;
-        } else { // 出る
-          active = false;
-        }
+        if (shopMenu.selectChoice(progress.floor()) == ShopMenuResult::CLOSE) active = false;
+        else if (shopMenu.state() == ShopMenu::State::BUY) currentMenuState = STATE_SHOP_BUY;
+        else currentMenuState = STATE_SHOP_SELL;
       }
-      if (bPressed) { active = false; music.playSE(1); }
       break;
     }
     case STATE_SHOP_BUY: {
-      int itemCount = shopItemList.size();
+      int itemCount = shopMenu.stockCount();
 
-      if (upPressed)   { listCursor = (listCursor - 1 + itemCount) % itemCount; music.playSE(2); }
-      if (downPressed) { listCursor = (listCursor + 1) % itemCount; music.playSE(2); }
+      if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
+      if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
 
       if (aPressed) {
-        int itemId = shopItemList[listCursor]; // リストからID取得
-        Item targetItem = ItemCatalog::get(itemId);
+        ShopBuyRequest request = shopMenu.requestBuy();
+        Item targetItem = ItemCatalog::get(request.itemId);
 
         if (inventory.money >= targetItem.price) {
           music.playSE(0);
@@ -380,36 +348,25 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           music.playSE(1);
         }
       }
-      if (bPressed) {
-        currentMenuState = STATE_SHOP_CHOICE;
-        listCursor = 0; // カーソル位置戻す
-        music.playSE(1);
-      }
       break;
     }
     case STATE_SHOP_SELL: {
       int itemCount = inventory.items.size();
       if (itemCount > 0) {
-        if (upPressed)   { listCursor = (listCursor - 1 + itemCount) % itemCount; music.playSE(2); }
-        if (downPressed) { listCursor = (listCursor + 1) % itemCount; music.playSE(2); }
+        if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
+        if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
 
         if (aPressed) {
-          Item& item = inventory.items[listCursor].item;
-          int sellPrice = item.price / 2; // 売値は半額
+          ShopSellRequest request = shopMenu.requestSell();
+          Item& item = inventory.items[request.inventoryIndex].item;
+          int sellPrice = item.price / 2;
           if (sellPrice < 1) sellPrice = 1;
 
-          music.playSE(0); // チャリーン
+          music.playSE(0);
           inventory.money += sellPrice;
-          inventory.removeByIndex(listCursor);
-
-          // カーソル位置調整
-          if (listCursor >= inventory.items.size()) listCursor = max(0, (int)inventory.items.size() - 1);
+          inventory.removeByIndex(request.inventoryIndex);
+          shopMenu.adjustCursorAfterSale(inventory.items.size());
         }
-      }
-      if (bPressed) {
-        currentMenuState = STATE_SHOP_CHOICE;
-        listCursor = 1; // 「売る」にカーソルを戻す
-        music.playSE(1);
       }
       break;
     }

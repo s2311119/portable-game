@@ -30,6 +30,7 @@
 #include "EquipmentRenderer.h"
 #include "EvolutionMenu.h"
 #include "EvolutionRenderer.h"
+#include "ShopMenu.h"
 
 class Menu {
 public:
@@ -56,7 +57,6 @@ public:
   int listCursor = 0;
   bool active = false;
   bool saveSucceeded = false;
-  std::vector<int> shopItemList;
   int storageMode = 0; // 0:メニュー選択, 1:引き出す, 2:預ける
 
   Menu() {
@@ -68,6 +68,12 @@ public:
     currentMenuState = STATE_MAIN; // メニューを開くときは必ずメインから
     mainMenu.reset();
     listCursor = 0;
+  }
+
+  void openShop() {
+    active = true;
+    currentMenuState = STATE_SHOP_CHOICE;
+    shopMenu.open();
   }
 
   void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
@@ -203,15 +209,15 @@ public:
         g->lineSprite.print("いらっしゃい");
 
         g->lineSprite.setCursor(x + 40, y + 40);
-        g->lineSprite.setTextColor(listCursor == 0 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(shopMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.print("買う");
 
         g->lineSprite.setCursor(x + 40, y + 65);
-        g->lineSprite.setTextColor(listCursor == 1 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(shopMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.print("売る");
 
         g->lineSprite.setCursor(x + 40, y + 90);
-        g->lineSprite.setTextColor(listCursor == 2 ? TFT_YELLOW : TFT_WHITE);
+        g->lineSprite.setTextColor(shopMenu.cursor() == 2 ? TFT_YELLOW : TFT_WHITE);
         g->lineSprite.print("出る");
       }else if (currentMenuState == STATE_SHOP_BUY) {
         int x = 10, y = 40 + yOffset;
@@ -226,20 +232,20 @@ public:
         g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
 
         const int shopItems[] = {100, 101, 103, 104, 300, 301, 400, 401, 500};
-        int itemCount = shopItemList.size();
+        int itemCount = shopMenu.stockCount();
 
         // スクロール
         int itemsPerPage = 5;
         int startIdx = 0;
-        if (listCursor >= itemsPerPage) startIdx = listCursor - (itemsPerPage - 1);
+        if (shopMenu.cursor() >= itemsPerPage) startIdx = shopMenu.cursor() - (itemsPerPage - 1);
         int endIdx = min(startIdx + itemsPerPage, itemCount);
 
         for (int i = startIdx; i < endIdx; i++) {
           // リストからID取得
-          int itemId = shopItemList[i];
+          int itemId = shopMenu.stockItemIdAt(i);
           Item it = ItemCatalog::get(itemId);
 
-          g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
+          g->lineSprite.setTextColor(shopMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
           g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
           g->lineSprite.printf("%s (%dG)", it.name, it.price);
         }
@@ -261,14 +267,14 @@ public:
         } else {
           int itemsPerPage = 5;
           int startIdx = 0;
-          if (listCursor >= itemsPerPage) startIdx = listCursor - (itemsPerPage - 1);
+          if (shopMenu.cursor() >= itemsPerPage) startIdx = shopMenu.cursor() - (itemsPerPage - 1);
           int endIdx = min(startIdx + itemsPerPage, itemCount);
 
           for (int i = startIdx; i < endIdx; i++) {
             Item& it = inventory.items[i].item;
             int sellPrice = it.price / 2;
 
-            g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
+            g->lineSprite.setTextColor(shopMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
             g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
             g->lineSprite.printf("%s x%d (%dG)", it.name, inventory.items[i].quantity, sellPrice);
           }
@@ -332,5 +338,6 @@ private:
   EquipmentRenderer equipmentRenderer;
   EvolutionMenu evolutionMenu;
   EvolutionRenderer evolutionRenderer;
+  ShopMenu shopMenu;
   bool settingsSaveRequested = false;
 };
