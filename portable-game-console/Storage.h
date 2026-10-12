@@ -36,4 +36,6 @@ public:
   bool existsFile(const char* filename);
   void runWhileAudioPaused(AudioManager& music, void* context,
                            void (*operation)(void*));
+  void beginSynchronizedWrite(AudioManager& music);
+  void endSynchronizedWrite(AudioManager& music);
 };

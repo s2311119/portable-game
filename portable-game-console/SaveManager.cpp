@@ -320,13 +320,11 @@ bool SaveManager::saveComponents(
     const Party& party,
     const AutomatonStorage& storage,
     const Inventory& inventory) {
-  music.paused = true;
-  critical_section_enter_blocking(&sdLock);
+  sd.beginSynchronizedWrite(music);
 
   FsFile file = sd.openFile(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
-    critical_section_exit(&sdLock);
-    music.paused = false;
+    sd.endSynchronizedWrite(music);
     return false;
   }
 
@@ -334,8 +332,7 @@ bool SaveManager::saveComponents(
   writeGameData(file, data, SAVE_MAGIC);
   file.close();
 
-  critical_section_exit(&sdLock);
-  music.paused = false;
+  sd.endSynchronizedWrite(music);
   return true;
 }
 
@@ -355,13 +352,11 @@ LoadGameResult SaveManager::loadGame(Storage& sd, AudioManager& music, GameSessi
 }
 
 bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings& settings) {
-  music.paused = true;
-  critical_section_enter_blocking(&sdLock);
+  sd.beginSynchronizedWrite(music);
 
   FsFile file = sd.openFile(SETTINGS_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
-    critical_section_exit(&sdLock);
-    music.paused = false;
+    sd.endSynchronizedWrite(music);
     return false;
   }
 
@@ -371,8 +366,7 @@ bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings&
   file.println(settings.isVibrationEnabled() ? 1 : 0);
   file.close();
 
-  critical_section_exit(&sdLock);
-  music.paused = false;
+  sd.endSynchronizedWrite(music);
   return true;
 }
 

@@ -192,9 +192,17 @@ bool Storage::existsFile(const char* filename) {
 
 void Storage::runWhileAudioPaused(AudioManager& music, void* context,
                                    void (*operation)(void*)) {
+    beginSynchronizedWrite(music);
+    operation(context);
+    endSynchronizedWrite(music);
+  }
+
+void Storage::beginSynchronizedWrite(AudioManager& music) {
     music.paused = true;
     critical_section_enter_blocking(&sdLock);
-    operation(context);
+  }
+
+void Storage::endSynchronizedWrite(AudioManager& music) {
     critical_section_exit(&sdLock);
     music.paused = false;
   }
