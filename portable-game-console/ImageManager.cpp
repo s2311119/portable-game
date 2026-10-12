@@ -1,6 +1,7 @@
 #include "ImageManager.h"
 
 #include "Storage.h"
+#include "StorageSyncInternal.h"
 #include <cstring>
 
 ImageManager::ImageManager(Storage& sd) : sd(sd) {

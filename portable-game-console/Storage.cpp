@@ -1,4 +1,11 @@
 #include "Storage.h"
+#include "StorageSyncInternal.h"
+
+critical_section_t sdLock;
+
+void Storage::initializeSynchronization() {
+    critical_section_init(&sdLock);
+  }
 
 Storage::Storage() {
     pinMode(SD_CS_PIN, OUTPUT);

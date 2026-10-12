@@ -1,4 +1,5 @@
 #include "Storage.h"
+#include "StorageSyncInternal.h"
 
 void AudioManager::playBGM(BgmCue cue, Storage &sd) {
   int track = 0;

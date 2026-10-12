@@ -1,10 +1,7 @@
 #pragma once
 #include "AudioManager.h"
-#include "pico/sync.h"
 #include <algorithm>
 #include <cstring>
-
-extern critical_section_t sdLock;
 
 static const int SD_CS_PIN = 22;    // SD カード CS
 static const int SD_MISO_PIN = 16;  // SD MISO（プルアップ必須）
@@ -13,6 +10,7 @@ static const int SD_MOSI_PIN = 19;
 
 class Storage {
 public:
+  static void initializeSynchronization();
   volatile bool pendingSwitch = false;
   int pendingTrack = -1;
   size_t refillOffset = 0;

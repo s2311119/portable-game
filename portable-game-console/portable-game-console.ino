@@ -59,8 +59,6 @@
 #include "pico/time.h"
 #include "hardware/gpio.h"
 
-#include "pico/sync.h"
-critical_section_t sdLock;
 
 #define LGFX_USE_SD 1
 #define H_TRANSPARENT 0xFFFF
@@ -541,7 +539,7 @@ void core1_main() {
 void setup() {
   Serial.begin(115200);
 
-  critical_section_init(&sdLock);
+  Storage::initializeSynchronization();
   
   // シード設定
   uint32_t seed = micros() ^ time_us_32();
