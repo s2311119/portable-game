@@ -100,6 +100,8 @@ struct Game {
   void loadGameAndRegenerateLegacy(LoadGameResult& result);
   static void boot();
   void update();
+  static bool audioTimerCallback(struct repeating_timer* timer);
+  static void core1Main();
 };
 
 extern Game* ctx;

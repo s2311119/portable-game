@@ -1,7 +1,5 @@
 #include "Game.h"
 
-void core1_main();
-
 struct LoadGameOperation {
   Game* context;
   LoadGameResult result;
@@ -76,7 +74,7 @@ void Game::boot() {
   ctx->music->setSeVolume(ctx->settings.getSeVolume());
   ctx->vibration->setEnabled(ctx->settings.isVibrationEnabled());
 
-  multicore_launch_core1(core1_main);
+  multicore_launch_core1(Game::core1Main);
   delay(200);
 
   ctx->music->playBGM(BgmCue::TITLE);

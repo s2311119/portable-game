@@ -115,7 +115,6 @@
 // -------------------------
 // AUDIO / SD (core1 に限定)
 // -------------------------
-bool audio_timer_callback(struct repeating_timer *t);
 
 
 // ---------
@@ -133,7 +132,7 @@ Game* ctx = nullptr;
 
 // タイマー割り込み関数
 
-bool audio_timer_callback(struct repeating_timer *t) {
+bool Game::audioTimerCallback(struct repeating_timer *t) {
   AudioManager* music = ctx->music;
   
   // BGM停止中でもSEは鳴らす
@@ -240,7 +239,7 @@ bool audio_timer_callback(struct repeating_timer *t) {
 // -------------------------
 // core1 のエントリポイント（オーディオ専用）
 // -------------------------
-void core1_main() {
+void Game::core1Main() {
 
   // -------------------------------------------------
   // 音声専用タイマーをcore1上に作成
@@ -265,7 +264,7 @@ void core1_main() {
       alarm_pool_add_repeating_timer_us(
           audioAlarmPool,
           -63,
-          audio_timer_callback,
+          Game::audioTimerCallback,
           nullptr,
           &audioTimer
       );
