@@ -29,6 +29,7 @@
 #include "EquipmentMenu.h"
 #include "EquipmentRenderer.h"
 #include "EvolutionMenu.h"
+#include "EvolutionRenderer.h"
 
 class Menu {
 public:
@@ -93,31 +94,7 @@ public:
         mainMenuRenderer.drawLine(mainMenu, *g, drawY);
 
       } else if (currentMenuState == STATE_EVOLVE) {
-          int x = 10, y = 40 - drawY;
-          int w = 300, h = 190;
-          g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-          g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-          g->lineSprite.setTextSize(2);
-
-          g->lineSprite.setTextColor(TFT_WHITE);
-          g->lineSprite.setCursor(x + 20, y + 15);
-          g->lineSprite.print("進化 (誰を？)");
-          g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-          int memberCount = party.memberCount();
-          if (memberCount == 0) {
-              g->lineSprite.setCursor(x + 20, y + 55);
-              g->lineSprite.print("仲間がいません");
-          } else {
-              for (int i = 0; i < memberCount; i++) {
-                  if (i >= 5) break;
-                  const Automaton& ally = party.member(i);
-                  uint16_t color = (i == evolutionMenu.cursor()) ? TFT_YELLOW : TFT_WHITE;
-                  g->lineSprite.setTextColor(color);
-                  g->lineSprite.setCursor(x + 20, y + 55 + i * 28);
-                  g->lineSprite.printf("%s Lv%d HP%d/%d", ally.state().name(), ally.state().progress().level(), ally.state().stats().getHp(), ally.state().stats().getMaxHp());
-              }
-          }
+        evolutionRenderer.drawLine(evolutionMenu, party, *g, drawY);
 
       } else if (currentMenuState == STATE_SKILL) {
         skillRenderer.drawLine(skillMenu, inventory, hero, *g, drawY);
@@ -354,5 +331,6 @@ private:
   EquipmentMenu equipmentMenu;
   EquipmentRenderer equipmentRenderer;
   EvolutionMenu evolutionMenu;
+  EvolutionRenderer evolutionRenderer;
   bool settingsSaveRequested = false;
 };
