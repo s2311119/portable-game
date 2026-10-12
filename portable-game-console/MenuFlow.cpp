@@ -2,6 +2,7 @@
 #include "CharacterProgressionSystem.h"
 #include "ShopTransactionSystem.h"
 #include "InnStaySystem.h"
+#include "EquipmentChangeSystem.h"
 
 MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
                                 Player& hero, Party& party,
@@ -285,19 +286,8 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
           if (aPressed) {
             feedback.playSE(feedback.context, 0);
             EquipRequest request = equipmentMenu.requestEquip(equippableIndices);
-            Item newItem = inventory.items[request.inventoryIndex].item;
-            CharacterState* s = &hero.state();
-
-            int oldId = -1;
-            if (request.slot == EquipmentSlot::Weapon) oldId = s->equipmentState().weaponId();
-            if (request.slot == EquipmentSlot::Armor) oldId = s->equipmentState().armorId();
-            if (request.slot == EquipmentSlot::Accessory) oldId = s->equipmentState().accessoryId();
-            if (oldId != -1) {
-              inventory.addItem(ItemCatalog::get(oldId));
-            }
-
-            s->equip(request.slot, newItem.id);
-            inventory.removeByIndex(request.inventoryIndex);
+            EquipmentChangeSystem::equip(
+                request.slot, request.inventoryIndex, inventory, hero.state());
             equipmentMenu.completeEquip();
           }
         }
