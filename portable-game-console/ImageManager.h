@@ -15,13 +15,26 @@ struct BattleImageRequest {
 
 class ImageManager {
 private:
+  enum class ImageKind {
+    NONE,
+    ENEMY,
+    CHARACTER
+  };
+
+  struct ImageSlotInfo {
+    ImageKind kind;
+    int id;
+    bool loaded;
+    bool active;
+  };
+
   // 64x64画像 x 8枚分 のメモリを確保 (合計 64KB)
   // これが「メモリプール」です。ここ以外には画像を置きません。
   uint16_t* pool[8];
-  bool activeSlots[8];
+  ImageSlotInfo slotInfo[8];
   Sd& sd;
 
-  void load(int slot, const String& filename);
+  void load(int slot, ImageKind kind, int id);
 
 public:
   explicit ImageManager(Sd& sd);
@@ -30,4 +43,5 @@ public:
   const uint16_t* enemyImage(int enemyIndex) const;
   const uint16_t* playerImage() const;
   const uint16_t* allyImage(int allyIndex) const;
+  void invalidateAll();
 };
