@@ -57,20 +57,3 @@ FsFile Storage::openFile(const char* filename, uint8_t flags) {
 bool Storage::existsFile(const char* filename) {
     return sdfat.exists(filename);
   }
-
-void Storage::runWhileAudioPaused(AudioManager& music, void* context,
-                                   void (*operation)(void*)) {
-    beginSynchronizedWrite(music);
-    operation(context);
-    endSynchronizedWrite(music);
-  }
-
-void Storage::beginSynchronizedWrite(AudioManager& music) {
-    music.paused = true;
-    critical_section_enter_blocking(&sdLock);
-  }
-
-void Storage::endSynchronizedWrite(AudioManager& music) {
-    critical_section_exit(&sdLock);
-    music.paused = false;
-  }

@@ -27,8 +27,4 @@ public:
   bool loadToBuffer(String filename, uint16_t* buffer);
   FsFile openFile(const char* filename, uint8_t flags);
   bool existsFile(const char* filename);
-  void runWhileAudioPaused(AudioManager& music, void* context,
-                           void (*operation)(void*));
-  void beginSynchronizedWrite(AudioManager& music);
-  void endSynchronizedWrite(AudioManager& music);
 };

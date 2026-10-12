@@ -604,8 +604,8 @@ void setup() {
         ctx->session = new GameSession();
 
         LoadGameOperation loadOperation{ctx, {false, false, Map::TYPE_DUNGEON}};
-        ctx->sd->runWhileAudioPaused(
-            *ctx->music, &loadOperation, loadGameAndRegenerateLegacy);
+        ctx->music->runWhileStoragePaused(
+            &loadOperation, loadGameAndRegenerateLegacy);
         const LoadGameResult& loadResult = loadOperation.result;
 
         if (loadResult.success) {

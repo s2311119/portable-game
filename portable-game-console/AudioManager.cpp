@@ -55,6 +55,23 @@ void AudioManager::requestSwitch(int trackId) {
     interrupts();
   }
 
+void AudioManager::runWhileStoragePaused(void* context,
+                                         void (*operation)(void*)) {
+  beginStorageOperation();
+  operation(context);
+  endStorageOperation();
+}
+
+void AudioManager::beginStorageOperation() {
+  paused = true;
+  critical_section_enter_blocking(&sdLock);
+}
+
+void AudioManager::endStorageOperation() {
+  critical_section_exit(&sdLock);
+  paused = false;
+}
+
 void AudioManager::performPendingSwitch(Storage &sd) {
     if (!pendingSwitch) return;
 

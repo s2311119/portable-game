@@ -320,11 +320,11 @@ bool SaveManager::saveComponents(
     const Party& party,
     const AutomatonStorage& storage,
     const Inventory& inventory) {
-  sd.beginSynchronizedWrite(music);
+  music.beginStorageOperation();
 
   FsFile file = sd.openFile(SAVE_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
-    sd.endSynchronizedWrite(music);
+    music.endStorageOperation();
     return false;
   }
 
@@ -332,7 +332,7 @@ bool SaveManager::saveComponents(
   writeGameData(file, data, SAVE_MAGIC);
   file.close();
 
-  sd.endSynchronizedWrite(music);
+  music.endStorageOperation();
   return true;
 }
 
@@ -352,11 +352,11 @@ LoadGameResult SaveManager::loadGame(Storage& sd, AudioManager& music, GameSessi
 }
 
 bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings& settings) {
-  sd.beginSynchronizedWrite(music);
+  music.beginStorageOperation();
 
   FsFile file = sd.openFile(SETTINGS_FILENAME, O_WRITE | O_CREAT | O_TRUNC);
   if (!file) {
-    sd.endSynchronizedWrite(music);
+    music.endStorageOperation();
     return false;
   }
 
@@ -366,7 +366,7 @@ bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings&
   file.println(settings.isVibrationEnabled() ? 1 : 0);
   file.close();
 
-  sd.endSynchronizedWrite(music);
+  music.endStorageOperation();
   return true;
 }
 

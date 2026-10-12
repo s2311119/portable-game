@@ -171,6 +171,9 @@ public:
   void initializeTracks(class Storage &sd);
   void performPendingSwitch(class Storage &sd);
   void refile(class Storage &sd);
+  void runWhileStoragePaused(void* context, void (*operation)(void*));
+  void beginStorageOperation();
+  void endStorageOperation();
 
 private:
   void requestSwitch(int trackId);
