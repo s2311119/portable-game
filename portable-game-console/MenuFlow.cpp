@@ -4,8 +4,8 @@
 MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
                                 Player& hero, Party& party,
                                 AutomatonStorage& storage,
-                                WorldProgress& progress, MUSIC& music,
-                                Settings& settings, Vibration& vib) {
+                                WorldProgress& progress, Settings& settings,
+                                MenuFeedbackHooks feedback) {
   if (!active_) return MenuFlowResult::NONE; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
@@ -18,23 +18,23 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
   if (bPressed) {
     if (screen_ == MenuScreen::ITEM) {
       ItemMenuResult result = itemMenu.cancel();
-      music.playSE(1);
+      feedback.playSE(feedback.context, 1);
       if (result.type == ItemMenuResultType::BACK) screen_ = MenuScreen::MAIN;
       return MenuFlowResult::NONE;
     }
     if (screen_ == MenuScreen::EQUIPMENT) {
-      music.playSE(1);
+      feedback.playSE(feedback.context, 1);
       if (equipmentMenu.cancel() == EquipmentMenuResult::BACK)
         screen_ = MenuScreen::MAIN;
       return MenuFlowResult::NONE;
     }
     if (screen_ == MenuScreen::EVOLUTION) {
-      music.playSE(1);
+      feedback.playSE(feedback.context, 1);
       if (evolutionMenu.cancel() == EvolutionMenuResult::BACK)
         screen_ = MenuScreen::MAIN;
       return MenuFlowResult::NONE;
     }
-    music.playSE(1);
+    feedback.playSE(feedback.context, 1);
     if (screen_ == MenuScreen::STORAGE) {
       if (storageMenu.cancel() == StorageMenuResult::CLOSE) active_ = false;
       return MenuFlowResult::NONE;
@@ -64,14 +64,14 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       // --- メインメニューの操作 ---
       if (upPressed){
         mainMenu.moveUp();
-        music.playSE(2);
+        feedback.playSE(feedback.context, 2);
       }
       if (downPressed){
         mainMenu.moveDown();
-        music.playSE(2);
+        feedback.playSE(feedback.context, 2);
       }
       if (aPressed) {
-        music.playSE(0);
+        feedback.playSE(feedback.context, 0);
         switch (mainMenu.confirm()) {
           case MainMenuResult::OPEN_ITEM:
             screen_ = MenuScreen::ITEM;
@@ -108,31 +108,31 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
         if (itemCount > 0) {
           if (upPressed){
             itemMenu.moveUp(itemCount);
-            music.playSE(2);
+            feedback.playSE(feedback.context, 2);
           }
           if (downPressed){
             itemMenu.moveDown(itemCount);
-            music.playSE(2);
+            feedback.playSE(feedback.context, 2);
           }
           if (aPressed) {
             int id = inventory.items[itemMenu.cursor()].item.id;
             ItemMenuResult result = itemMenu.selectItem(itemUseSystem.canUse(id));
-            music.playSE(result.type == ItemMenuResultType::REJECT ? 1 : 0);
+            feedback.playSE(feedback.context, result.type == ItemMenuResultType::REJECT ? 1 : 0);
           }
         }
       } else {
         int totalTargets = 1 + party.memberCount();
         if (upPressed){
           itemMenu.moveUp(totalTargets);
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
         if (downPressed){
           itemMenu.moveDown(totalTargets);
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
         if (aPressed) {
           ItemMenuResult result = itemMenu.requestUse();
-          music.playSE(0);
+          feedback.playSE(feedback.context, 0);
           itemUseSystem.use(result.useRequest, inventory, hero, party);
           itemMenu.completeUse();
         }
@@ -143,11 +143,11 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       if (storageMenu.state() == StorageMenu::State::CHOICE) {
         if (upPressed || downPressed) {
           storageMenu.toggleChoice();
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
         if (aPressed) {
           storageMenu.selectChoice();
-          music.playSE(0);
+          feedback.playSE(feedback.context, 0);
         }
       }
       else if (storageMenu.state() == StorageMenu::State::WITHDRAW) {
@@ -155,11 +155,11 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
         if (sCount > 0) {
           if (upPressed) {
             storageMenu.moveUp(sCount);
-            music.playSE(2);
+            feedback.playSE(feedback.context, 2);
           }
           if (downPressed) {
             storageMenu.moveDown(sCount);
-            music.playSE(2);
+            feedback.playSE(feedback.context, 2);
           }
 
           if (aPressed) {
@@ -167,9 +167,9 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
               StorageMemberRequest request = storageMenu.requestMember();
               storage.withdrawMember(request.memberIndex, party);
               storageMenu.completeWithdraw();
-              music.playSE(0);
+              feedback.playSE(feedback.context, 0);
             } else {
-              music.playSE(1);
+              feedback.playSE(feedback.context, 1);
             }
           }
         }
@@ -179,17 +179,17 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
         if (pCount > 0) {
           if (upPressed) {
             storageMenu.moveUp(pCount);
-            music.playSE(2);
+            feedback.playSE(feedback.context, 2);
           }
           if (downPressed) {
             storageMenu.moveDown(pCount);
-            music.playSE(2);
+            feedback.playSE(feedback.context, 2);
           }
           if (aPressed) {
             StorageMemberRequest request = storageMenu.requestMember();
             party.depositMember(request.memberIndex, storage);
             storageMenu.completeDeposit(party.memberCount());
-            music.playSE(0);
+            feedback.playSE(feedback.context, 0);
           }
         }
       }
@@ -200,11 +200,11 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       if (memberCount > 0) {
         if (upPressed){
           evolutionMenu.moveUp(memberCount);
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
         if (downPressed){
           evolutionMenu.moveDown(memberCount);
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
 
         if (aPressed) {
@@ -213,11 +213,13 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
               CharacterProgressionSystem::tryItemEvolution(
                   party.memberState(request.partyIndex), inventory,
                   [](void* context) {
-                    static_cast<MUSIC*>(context)->playSE(1);
+                    MenuFeedbackHooks& hooks =
+                        *static_cast<MenuFeedbackHooks*>(context);
+                    hooks.playSE(hooks.context, 1);
                   },
-                  &music);
+                  &feedback);
           const bool itemUsed = evolution.evolved;
-          if (itemUsed) music.playSE(0);
+          if (itemUsed) feedback.playSE(feedback.context, 0);
 
           if (itemUsed) {
             int newItemCount = inventory.items.size();
@@ -231,39 +233,39 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       if (skillMenu.skillCount() > 0) {
         if (upPressed) {
           skillMenu.moveUp();
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
         if (downPressed){
           skillMenu.moveDown();
-          music.playSE(2);
+          feedback.playSE(feedback.context, 2);
         }
         if (aPressed) {
           SkillMenuResult result = skillMenu.confirm(inventory, hero);
-          music.playSE(result == SkillMenuResult::LEARNED ? 0 : 1);
+          feedback.playSE(feedback.context, result == SkillMenuResult::LEARNED ? 0 : 1);
         }
       }
       break;
     }
     case MenuScreen::SAVE_RESULT:
-      if (aPressed) { active_ = false; music.playSE(1);} // 閉じる
+      if (aPressed) { active_ = false; feedback.playSE(feedback.context, 1);} // 閉じる
       break;
     case MenuScreen::EQUIPMENT: {
       if (equipmentMenu.state() == EquipmentMenu::State::SLOT) {
-        if (upPressed)   { equipmentMenu.moveUp(3); music.playSE(2); }
-        if (downPressed) { equipmentMenu.moveDown(3); music.playSE(2); }
+        if (upPressed)   { equipmentMenu.moveUp(3); feedback.playSE(feedback.context, 2); }
+        if (downPressed) { equipmentMenu.moveDown(3); feedback.playSE(feedback.context, 2); }
         if (aPressed) {
-          music.playSE(0);
+          feedback.playSE(feedback.context, 0);
           equipmentMenu.selectSlot();
         }
       } else {
         std::vector<int> equippableIndices = equipmentMenu.candidateIndices(inventory);
         int count = equippableIndices.size();
         if (count > 0) {
-          if (upPressed)   { equipmentMenu.moveUp(count); music.playSE(2); }
-          if (downPressed) { equipmentMenu.moveDown(count); music.playSE(2); }
+          if (upPressed)   { equipmentMenu.moveUp(count); feedback.playSE(feedback.context, 2); }
+          if (downPressed) { equipmentMenu.moveDown(count); feedback.playSE(feedback.context, 2); }
 
           if (aPressed) {
-            music.playSE(0);
+            feedback.playSE(feedback.context, 0);
             EquipRequest request = equipmentMenu.requestEquip(equippableIndices);
             Item newItem = inventory.items[request.inventoryIndex].item;
             CharacterState* s = &hero.state();
@@ -287,13 +289,13 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
     case MenuScreen::INN: {
       if (upPressed || downPressed) {
         innMenu.moveSelection();
-        music.playSE(2);
+        feedback.playSE(feedback.context, 2);
       }
 
       if (aPressed) {
         InnMenuResult result = innMenu.confirm(inventory.money);
         if (result == InnMenuResult::STAY_REQUEST) {
-          music.playSE(0);
+          feedback.playSE(feedback.context, 0);
           inventory.money -= innMenu.cost();
 
           hero.state().revive(100);
@@ -305,46 +307,46 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
           }
           active_ = false;
         } else if (result == InnMenuResult::INSUFFICIENT_FUNDS) {
-          music.playSE(1);
+          feedback.playSE(feedback.context, 1);
         } else {
           active_ = false;
-          music.playSE(1);
+          feedback.playSE(feedback.context, 1);
         }
       }
       break;
     }
     case MenuScreen::SHOP: {
       if (shopMenu.state() == ShopMenu::State::CHOICE) {
-        if (upPressed)   { shopMenu.moveUp(3); music.playSE(2); }
-        if (downPressed) { shopMenu.moveDown(3); music.playSE(2); }
+        if (upPressed)   { shopMenu.moveUp(3); feedback.playSE(feedback.context, 2); }
+        if (downPressed) { shopMenu.moveDown(3); feedback.playSE(feedback.context, 2); }
 
         if (aPressed) {
-          music.playSE(0);
+          feedback.playSE(feedback.context, 0);
           if (shopMenu.selectChoice(progress.floor()) == ShopMenuResult::CLOSE)
             active_ = false;
         }
       } else if (shopMenu.state() == ShopMenu::State::BUY) {
         int itemCount = shopMenu.stockCount();
-        if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
-        if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
+        if (upPressed)   { shopMenu.moveUp(itemCount); feedback.playSE(feedback.context, 2); }
+        if (downPressed) { shopMenu.moveDown(itemCount); feedback.playSE(feedback.context, 2); }
 
         if (aPressed) {
           ShopBuyRequest request = shopMenu.requestBuy();
           Item targetItem = ItemCatalog::get(request.itemId);
 
           if (inventory.money >= targetItem.price) {
-            music.playSE(0);
+            feedback.playSE(feedback.context, 0);
             inventory.money -= targetItem.price;
             inventory.addItem(targetItem);
           } else {
-            music.playSE(1);
+            feedback.playSE(feedback.context, 1);
           }
         }
       } else if (shopMenu.state() == ShopMenu::State::SELL) {
         int itemCount = inventory.items.size();
         if (itemCount > 0) {
-          if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
-          if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
+          if (upPressed)   { shopMenu.moveUp(itemCount); feedback.playSE(feedback.context, 2); }
+          if (downPressed) { shopMenu.moveDown(itemCount); feedback.playSE(feedback.context, 2); }
 
           if (aPressed) {
             ShopSellRequest request = shopMenu.requestSell();
@@ -352,7 +354,7 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
             int sellPrice = item.price / 2;
             if (sellPrice < 1) sellPrice = 1;
 
-            music.playSE(0);
+            feedback.playSE(feedback.context, 0);
             inventory.money += sellPrice;
             inventory.removeByIndex(request.inventoryIndex);
             shopMenu.adjustCursorAfterSale(inventory.items.size());
@@ -362,24 +364,17 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       break;
     }
     case MenuScreen::SETTINGS: {
-      if (upPressed)   { settingsMenu.moveUp(); music.playSE(2); }
-      if (downPressed) { settingsMenu.moveDown(); music.playSE(2); }
+      if (upPressed)   { settingsMenu.moveUp(); feedback.playSE(feedback.context, 2); }
+      if (downPressed) { settingsMenu.moveDown(); feedback.playSE(feedback.context, 2); }
 
       if (leftPressed || rightPressed) {
         SettingsMenuChange change = settingsMenu.change(settings, rightPressed);
-        if (change == SettingsMenuChange::BGM_CHANGED) {
-          music.bgmVolume = (float)settings.getBgmVolume() / 10.0f;
-        } else if (change == SettingsMenuChange::SE_CHANGED) {
-          music.setSeVolume(settings.getSeVolume());
-          music.playSE(0);
-        } else if (change == SettingsMenuChange::VIBRATION_CHANGED) {
-          vib.setEnabled(settings.isVibrationEnabled());
-          if (settings.isVibrationEnabled()) vib.trigger(100);
-        }
+        if (change != SettingsMenuChange::NONE)
+          feedback.settingsChanged(feedback.context, change, settings);
       }
 
       if (aPressed && settingsMenu.confirm() == SettingsMenuResult::BACK) {
-        music.playSE(1);
+        feedback.playSE(feedback.context, 1);
         screen_ = MenuScreen::MAIN;
         return MenuFlowResult::SAVE_SETTINGS;
       }

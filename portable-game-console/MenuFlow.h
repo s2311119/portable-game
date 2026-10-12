@@ -12,9 +12,7 @@
 #include "Party.h"
 #include "AutomatonStorage.h"
 #include "WorldProgress.h"
-#include "MUSIC.h"
 #include "Settings.h"
-#include "Vibration.h"
 #include "MainMenu.h"
 #include "ItemMenu.h"
 #include "ItemUseSystem.h"
@@ -30,6 +28,13 @@ enum class MenuFlowResult {
   NONE,
   REQUEST_SAVE,
   SAVE_SETTINGS
+};
+
+struct MenuFeedbackHooks {
+  void* context;
+  void (*playSE)(void* context, int seId);
+  void (*settingsChanged)(void* context, SettingsMenuChange change,
+                          const Settings& settings);
 };
 
 class MenuFlow {
@@ -86,8 +91,8 @@ public:
 
   MenuFlowResult update(Controller& ctrl, Inventory& inventory, Player& hero,
                         Party& party, AutomatonStorage& storage,
-                        WorldProgress& progress, MUSIC& music,
-                        Settings& settings, Vibration& vib);
+                        WorldProgress& progress, Settings& settings,
+                        MenuFeedbackHooks feedback);
 
   void finishSave(bool succeeded) {
     saveSucceeded = succeeded;

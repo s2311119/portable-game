@@ -164,6 +164,31 @@ void onEvent(void* rawContext, BattleBgmEvent event, BattleKind kind) {
 }
 } // namespace battle_bgm_adapter
 
+namespace menu_feedback_adapter {
+struct Context {
+  MUSIC* music;
+  Vibration* vibration;
+};
+
+void playSE(void* rawContext, int seId) {
+  static_cast<Context*>(rawContext)->music->playSE(seId);
+}
+
+void settingsChanged(void* rawContext, SettingsMenuChange change,
+                     const Settings& settings) {
+  Context& context = *static_cast<Context*>(rawContext);
+  if (change == SettingsMenuChange::BGM_CHANGED) {
+    context.music->bgmVolume = (float)settings.getBgmVolume() / 10.0f;
+  } else if (change == SettingsMenuChange::SE_CHANGED) {
+    context.music->setSeVolume(settings.getSeVolume());
+    context.music->playSE(0);
+  } else if (change == SettingsMenuChange::VIBRATION_CHANGED) {
+    context.vibration->setEnabled(settings.isVibrationEnabled());
+    if (settings.isVibrationEnabled()) context.vibration->trigger(100);
+  }
+}
+} // namespace menu_feedback_adapter
+
 // ---------
 // saveクラス
 // ---------
@@ -747,9 +772,13 @@ void loop() {
 
   else if (state == STATE_MENU) {
     //menu.update(ctrl, inventory, hero, party);
+    menu_feedback_adapter::Context feedbackContext{&music, &vib};
+    MenuFeedbackHooks feedback{&feedbackContext,
+                               menu_feedback_adapter::playSE,
+                               menu_feedback_adapter::settingsChanged};
     MenuFlowResult menuResult = menu.update(
         ctrl, inventory, hero, party, storage,
-        ctx->session->progress(), music, settings, vib);
+        ctx->session->progress(), settings, feedback);
     if (menuResult == MenuFlowResult::REQUEST_SAVE) {
       menu.finishSave(save.saveGame(sd, music, *ctx->session));
     }
