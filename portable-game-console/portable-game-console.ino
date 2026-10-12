@@ -242,6 +242,7 @@ struct Game {
   ImageManager* imgMgr;
   MemoryMonitor memMonitor;
   Settings settings;
+  void drawMenuFlow();
 };
 
 struct LoadGameOperation {
@@ -283,7 +284,8 @@ void loadGameAndRegenerateLegacy(void* rawOperation) {
 
 Game* ctx = nullptr;
 
-void drawMenuFlow(Game& context) {
+void Game::drawMenuFlow() {
+  Game& context = *this;
   const MenuFlow& menu = *context.menu;
   if (!menu.isActive()) return;
 
@@ -792,7 +794,7 @@ void loop() {
       save.saveSettings(sd, settings, saveSync);
     }
     //g.screenSprite.fillScreen(TFT_BLACK);
-    drawMenuFlow(*ctx);
+    ctx->drawMenuFlow();
     //g.screenSprite.pushSprite(0,0);
 
     if (menuResult == MenuFlowResult::CLOSE_MENU) {
