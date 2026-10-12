@@ -244,6 +244,7 @@ struct Game {
   Settings settings;
   void drawMenuFlow();
   void startBattleEncounter(const EncounterSpec& spec, const BattleBgmHooks& bgm);
+  void applyFloorMapConfig();
 };
 
 struct LoadGameOperation {
@@ -363,10 +364,9 @@ void Game::startBattleEncounter(const EncounterSpec& spec,
   battle.finishStart();
 }
 
-void applyFloorMapConfig(Game* ctx);
-
-void applyFloorMapConfig(Game* ctx)
+void Game::applyFloorMapConfig()
 {
+  Game* ctx = this;
   FloorMapConfig config =
       ctx->floorManager.getConfig(ctx->session->progress());
 
@@ -848,7 +848,7 @@ void loop() {
 
       case FieldEventAction::FLOOR_UP:
         if (ctx->floorManager.moveUp(ctx->session->progress())) {
-          applyFloorMapConfig(ctx);
+          ctx->applyFloorMapConfig();
         }
         state = STATE_GAME;
         currentEvent.type = FieldEventType::NONE;
@@ -856,7 +856,7 @@ void loop() {
 
       case FieldEventAction::FLOOR_DOWN:
         if (ctx->floorManager.moveDown(ctx->session->progress())) {
-          applyFloorMapConfig(ctx);
+          ctx->applyFloorMapConfig();
         }
         state = STATE_GAME;
         currentEvent.type = FieldEventType::NONE;
