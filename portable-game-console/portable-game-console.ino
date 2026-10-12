@@ -655,7 +655,7 @@ void loop() {
     // 2. 移動が発生したかチェック
     bool moved = fieldResult.moved;
     // 3. 移動していて、メニューが開いていない場合のみイベントとエンカウントをチェック
-    if (moved && !menu.active) {
+    if (moved && !menu.isActive()) {
       // 5. イベントが発生しなかった場合のみ、エンカウントをチェック
       EncounterRandom encounterRandom = {nullptr,
                                          field_random_adapter::drawMax,
@@ -680,7 +680,7 @@ void loop() {
 
     if (ctrl.pressed(ctrl.BTN_X)) {
       menu.toggle();
-      if (menu.active) state = STATE_MENU;
+      if (menu.isActive()) state = STATE_MENU;
     }
   }
 
@@ -694,7 +694,7 @@ void loop() {
     menu.draw(&g, inventory, hero, party, storage, settings);
     //g.screenSprite.pushSprite(0,0);
 
-    if (!menu.active) {
+    if (!menu.isActive()) {
       state = STATE_GAME; // ゲーム画面に戻る
       //もしうまくいかなかったらここを
       ctx->requestRegenerate = false;

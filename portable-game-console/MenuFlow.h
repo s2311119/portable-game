@@ -41,58 +41,46 @@
 
 class MenuFlow {
 public:
-  // ★ メニューの状態を定義
-  enum MenuState {
-    STATE_MAIN,     // 道具、技、進化... を選ぶ
-    STATE_EVOLVE,    // ★ 「進化」画面
-    STATE_SKILL,
-    STATE_ITEM,
-    STATE_STORAGE, // ★ 預かり所画面
-    STATE_SAVE_RESULT,
-    // --- 装備用 ---
-    STATE_EQUIP,
-    // ショップ・宿屋
-    STATE_INN,          // 宿屋 (泊まりますか？)
-    STATE_SHOP_CHOICE,  // 店 (買う/売る/出る)
-    STATE_SHOP_BUY,     // 買う画面
-    STATE_SHOP_SELL,     // 売る画面
-    STATE_CONFIG
+  enum class MenuScreen {
+    MAIN,
+    EVOLUTION,
+    SKILL,
+    ITEM,
+    STORAGE,
+    SAVE_RESULT,
+    EQUIPMENT,
+    INN,
+    SHOP,
+    SETTINGS
   };
-  MenuState currentMenuState;
-
-  // 進化画面
-  int listCursor = 0;
-  bool active = false;
   bool saveSucceeded = false;
 
-  MenuFlow() {
-    currentMenuState = STATE_MAIN; // 初期状態
-  }
-
   void toggle() {
-    active = !active;
-    currentMenuState = STATE_MAIN; // メニューを開くときは必ずメインから
+    active_ = !active_;
+    screen_ = MenuScreen::MAIN;
     mainMenu.reset();
-    listCursor = 0;
   }
 
   void openShop() {
-    active = true;
-    currentMenuState = STATE_SHOP_CHOICE;
+    active_ = true;
+    screen_ = MenuScreen::SHOP;
     shopMenu.open();
   }
 
   void openInn() {
-    active = true;
-    currentMenuState = STATE_INN;
+    active_ = true;
+    screen_ = MenuScreen::INN;
     innMenu.open();
   }
 
   void openStorage() {
-    active = true;
-    currentMenuState = STATE_STORAGE;
+    active_ = true;
+    screen_ = MenuScreen::STORAGE;
     storageMenu.open();
   }
+
+  bool isActive() const { return active_; }
+  MenuScreen screen() const { return screen_; }
 
   void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
 
@@ -103,7 +91,7 @@ public:
   }
 
   void draw(Graphic* g, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, const Settings& settings) {
-    if (!active) return;
+    if (!active_) return;
 
     // ★ スプライト生成をやめて g->lineSprite を使う
 
@@ -114,21 +102,21 @@ public:
       // 各要素の描画 (Y座標から drawY を引く)
       // ※ 以下、sp. を g->lineSprite. に置換
 
-      if (currentMenuState == STATE_MAIN) {
+      if (screen_ == MenuScreen::MAIN) {
         mainMenuRenderer.drawLine(mainMenu, *g, drawY);
 
-      } else if (currentMenuState == STATE_EVOLVE) {
+      } else if (screen_ == MenuScreen::EVOLUTION) {
         evolutionRenderer.drawLine(evolutionMenu, party, *g, drawY);
 
-      } else if (currentMenuState == STATE_SKILL) {
+      } else if (screen_ == MenuScreen::SKILL) {
         skillRenderer.drawLine(skillMenu, inventory, hero, *g, drawY);
 
-      } else if (currentMenuState == STATE_ITEM) {
+      } else if (screen_ == MenuScreen::ITEM) {
         itemRenderer.drawLine(itemMenu, inventory, hero, party, *g, drawY);
 
-      } else if (currentMenuState == STATE_STORAGE) {
+      } else if (screen_ == MenuScreen::STORAGE) {
         storageRenderer.drawLine(storageMenu, party, storage, *g, drawY);
-      } else if (currentMenuState == STATE_SAVE_RESULT) {
+      } else if (screen_ == MenuScreen::SAVE_RESULT) {
         // --- セーブ完了画面 ---
         int x = 60, y = 100 - drawY;
         int w = 200, h = 60;
@@ -145,15 +133,13 @@ public:
         else {
           g->lineSprite.print("記録に失敗しました");
         }
-      }else if (currentMenuState == STATE_EQUIP) {
+      }else if (screen_ == MenuScreen::EQUIPMENT) {
         equipmentRenderer.drawLine(equipmentMenu, inventory, hero, *g, drawY);
-      }else if (currentMenuState == STATE_INN) {
+      }else if (screen_ == MenuScreen::INN) {
         innRenderer.drawLine(innMenu, *g, drawY);
-      }else if (currentMenuState == STATE_SHOP_CHOICE ||
-                 currentMenuState == STATE_SHOP_BUY ||
-                 currentMenuState == STATE_SHOP_SELL) {
+      }else if (screen_ == MenuScreen::SHOP) {
         shopRenderer.drawLine(shopMenu, inventory, *g, drawY);
-      }else if (currentMenuState == STATE_CONFIG) {
+      }else if (screen_ == MenuScreen::SETTINGS) {
         settingsRenderer.drawLine(settingsMenu, settings, *g, drawY);
       }
 
@@ -164,6 +150,8 @@ public:
   }
 
 private:
+  MenuScreen screen_ = MenuScreen::MAIN;
+  bool active_ = false;
   MainMenu mainMenu;
   MainMenuRenderer mainMenuRenderer;
   ItemMenu itemMenu;

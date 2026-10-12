@@ -2,7 +2,7 @@
 #include "CharacterProgressionSystem.h"
 
 void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib) {
-  if (!active) return; // メニューが非表示なら何もしない
+  if (!active_) return; // メニューが非表示なら何もしない
   bool aPressed = ctrl.pressedDebounced(ctrl.BTN_A);
   bool bPressed = ctrl.pressedDebounced(ctrl.BTN_B);
   bool upPressed = ctrl.pressedDebounced(ctrl.BTN_UP);
@@ -12,50 +12,49 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
 
   // --- Bボタン（キャンセル）処理 ---
   if (bPressed) {
-    if (currentMenuState == STATE_ITEM) {
+    if (screen_ == MenuScreen::ITEM) {
       ItemMenuResult result = itemMenu.cancel();
       music.playSE(1);
-      if (result.type == ItemMenuResultType::BACK) currentMenuState = STATE_MAIN;
+      if (result.type == ItemMenuResultType::BACK) screen_ = MenuScreen::MAIN;
       return;
     }
-    if (currentMenuState == STATE_EQUIP) {
+    if (screen_ == MenuScreen::EQUIPMENT) {
       music.playSE(1);
       if (equipmentMenu.cancel() == EquipmentMenuResult::BACK)
-        currentMenuState = STATE_MAIN;
+        screen_ = MenuScreen::MAIN;
       return;
     }
-    if (currentMenuState == STATE_EVOLVE) {
+    if (screen_ == MenuScreen::EVOLUTION) {
       music.playSE(1);
       if (evolutionMenu.cancel() == EvolutionMenuResult::BACK)
-        currentMenuState = STATE_MAIN;
+        screen_ = MenuScreen::MAIN;
       return;
     }
     music.playSE(1);
-    if (currentMenuState == STATE_STORAGE) {
-      if (storageMenu.cancel() == StorageMenuResult::CLOSE) active = false;
+    if (screen_ == MenuScreen::STORAGE) {
+      if (storageMenu.cancel() == StorageMenuResult::CLOSE) active_ = false;
       return;
-    }else if (currentMenuState == STATE_SHOP_BUY || currentMenuState == STATE_SHOP_SELL || currentMenuState == STATE_SHOP_CHOICE) {
-      if (shopMenu.cancel() == ShopMenuResult::CLOSE) active = false;
-      else currentMenuState = STATE_SHOP_CHOICE;
-    }else if (currentMenuState == STATE_INN) {
-      if (innMenu.cancel() == InnMenuResult::CLOSE) active = false;
-    }else if (currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
+    }else if (screen_ == MenuScreen::SHOP) {
+      if (shopMenu.cancel() == ShopMenuResult::CLOSE) active_ = false;
+    }else if (screen_ == MenuScreen::INN) {
+      if (innMenu.cancel() == InnMenuResult::CLOSE) active_ = false;
+    }else if (screen_ == MenuScreen::SKILL || screen_ == MenuScreen::SETTINGS) {
       // 進化・旋律画面でBを押したらメインに戻る
-      if (currentMenuState == STATE_CONFIG &&
+      if (screen_ == MenuScreen::SETTINGS &&
           settingsMenu.cancel() == SettingsMenuResult::BACK)
         settingsSaveRequested = true;
-      currentMenuState = STATE_MAIN;
-    } else if (currentMenuState == STATE_MAIN) {
+      screen_ = MenuScreen::MAIN;
+    } else if (screen_ == MenuScreen::MAIN) {
       // メインメニューでBを押したらメニューを閉じる
-      if (mainMenu.cancel() == MainMenuResult::CLOSE) active = false;
+      if (mainMenu.cancel() == MainMenuResult::CLOSE) active_ = false;
     }
     return; // Bボタンが押されたフレームは他の操作を無視
   }
 
   // --- 状態別 Aボタン（決定）とカーソル移動 ---
-  switch (currentMenuState) {
+  switch (screen_) {
 
-    case STATE_MAIN: {
+    case MenuScreen::MAIN: {
       // --- メインメニューの操作 ---
       if (upPressed){
         mainMenu.moveUp();
@@ -69,32 +68,28 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
         music.playSE(0);
         switch (mainMenu.confirm()) {
           case MainMenuResult::OPEN_ITEM:
-            currentMenuState = STATE_ITEM;
-            listCursor = 0;
+            screen_ = MenuScreen::ITEM;
             itemMenu.open();
             break;
           case MainMenuResult::OPEN_SKILL:
-            currentMenuState = STATE_SKILL;
-            listCursor = 0;
+            screen_ = MenuScreen::SKILL;
             skillMenu.open();
             break;
           case MainMenuResult::OPEN_EVOLUTION:
-            currentMenuState = STATE_EVOLVE;
-            listCursor = 0;
+            screen_ = MenuScreen::EVOLUTION;
             evolutionMenu.open();
             break;
           case MainMenuResult::OPEN_EQUIPMENT:
-            currentMenuState = STATE_EQUIP;
-            listCursor = 0;
+            screen_ = MenuScreen::EQUIPMENT;
             equipmentMenu.open();
             break;
           case MainMenuResult::REQUEST_SAVE:
             saveSucceeded = saveMgr.saveGame(
                 sd, music, map, progress, hero, party, storage, inventory);
-            currentMenuState = STATE_SAVE_RESULT;
+            screen_ = MenuScreen::SAVE_RESULT;
             break;
           case MainMenuResult::OPEN_SETTINGS:
-            currentMenuState = STATE_CONFIG;
+            screen_ = MenuScreen::SETTINGS;
             settingsMenu.open();
             break;
           case MainMenuResult::NONE:
@@ -104,7 +99,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       }
       break;
     }
-    case STATE_ITEM: {
+    case MenuScreen::ITEM: {
       if (itemMenu.state() == ItemMenu::State::ITEM_LIST) {
         int itemCount = inventory.items.size();
         if (itemCount > 0) {
@@ -141,7 +136,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       }
       break;
     }
-    case STATE_STORAGE: {
+    case MenuScreen::STORAGE: {
       if (storageMenu.state() == StorageMenu::State::CHOICE) {
         if (upPressed || downPressed) {
           storageMenu.toggleChoice();
@@ -197,7 +192,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       }
       break;
     }
-    case STATE_EVOLVE: {
+    case MenuScreen::EVOLUTION: {
       int memberCount = party.memberCount();
       if (memberCount > 0) {
         if (upPressed){
@@ -229,7 +224,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       }
       break;
     }
-    case STATE_SKILL: {
+    case MenuScreen::SKILL: {
       if (skillMenu.skillCount() > 0) {
         if (upPressed) {
           skillMenu.moveUp();
@@ -246,10 +241,10 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       }
       break;
     }
-    case STATE_SAVE_RESULT:
-      if (aPressed) { active = false; music.playSE(1);} // 閉じる
+    case MenuScreen::SAVE_RESULT:
+      if (aPressed) { active_ = false; music.playSE(1);} // 閉じる
       break;
-    case STATE_EQUIP: {
+    case MenuScreen::EQUIPMENT: {
       if (equipmentMenu.state() == EquipmentMenu::State::SLOT) {
         if (upPressed)   { equipmentMenu.moveUp(3); music.playSE(2); }
         if (downPressed) { equipmentMenu.moveDown(3); music.playSE(2); }
@@ -286,7 +281,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       }
       break;
     }
-    case STATE_INN: {
+    case MenuScreen::INN: {
       if (upPressed || downPressed) {
         innMenu.moveSelection();
         music.playSE(2);
@@ -305,69 +300,65 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
             member.revive(100);
             member.heal(9999); member.restoreTP(9999);
           }
-          active = false;
+          active_ = false;
         } else if (result == InnMenuResult::INSUFFICIENT_FUNDS) {
           music.playSE(1);
         } else {
-          active = false;
+          active_ = false;
           music.playSE(1);
         }
       }
       break;
     }
-    case STATE_SHOP_CHOICE: {
-      if (upPressed)   { shopMenu.moveUp(3); music.playSE(2); }
-      if (downPressed) { shopMenu.moveDown(3); music.playSE(2); }
+    case MenuScreen::SHOP: {
+      if (shopMenu.state() == ShopMenu::State::CHOICE) {
+        if (upPressed)   { shopMenu.moveUp(3); music.playSE(2); }
+        if (downPressed) { shopMenu.moveDown(3); music.playSE(2); }
 
-      if (aPressed) {
-        music.playSE(0);
-        if (shopMenu.selectChoice(progress.floor()) == ShopMenuResult::CLOSE) active = false;
-        else if (shopMenu.state() == ShopMenu::State::BUY) currentMenuState = STATE_SHOP_BUY;
-        else currentMenuState = STATE_SHOP_SELL;
-      }
-      break;
-    }
-    case STATE_SHOP_BUY: {
-      int itemCount = shopMenu.stockCount();
-
-      if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
-      if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
-
-      if (aPressed) {
-        ShopBuyRequest request = shopMenu.requestBuy();
-        Item targetItem = ItemCatalog::get(request.itemId);
-
-        if (inventory.money >= targetItem.price) {
+        if (aPressed) {
           music.playSE(0);
-          inventory.money -= targetItem.price;
-          inventory.addItem(targetItem);
-        } else {
-          music.playSE(1);
+          if (shopMenu.selectChoice(progress.floor()) == ShopMenuResult::CLOSE)
+            active_ = false;
         }
-      }
-      break;
-    }
-    case STATE_SHOP_SELL: {
-      int itemCount = inventory.items.size();
-      if (itemCount > 0) {
+      } else if (shopMenu.state() == ShopMenu::State::BUY) {
+        int itemCount = shopMenu.stockCount();
         if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
         if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
 
         if (aPressed) {
-          ShopSellRequest request = shopMenu.requestSell();
-          Item& item = inventory.items[request.inventoryIndex].item;
-          int sellPrice = item.price / 2;
-          if (sellPrice < 1) sellPrice = 1;
+          ShopBuyRequest request = shopMenu.requestBuy();
+          Item targetItem = ItemCatalog::get(request.itemId);
 
-          music.playSE(0);
-          inventory.money += sellPrice;
-          inventory.removeByIndex(request.inventoryIndex);
-          shopMenu.adjustCursorAfterSale(inventory.items.size());
+          if (inventory.money >= targetItem.price) {
+            music.playSE(0);
+            inventory.money -= targetItem.price;
+            inventory.addItem(targetItem);
+          } else {
+            music.playSE(1);
+          }
+        }
+      } else if (shopMenu.state() == ShopMenu::State::SELL) {
+        int itemCount = inventory.items.size();
+        if (itemCount > 0) {
+          if (upPressed)   { shopMenu.moveUp(itemCount); music.playSE(2); }
+          if (downPressed) { shopMenu.moveDown(itemCount); music.playSE(2); }
+
+          if (aPressed) {
+            ShopSellRequest request = shopMenu.requestSell();
+            Item& item = inventory.items[request.inventoryIndex].item;
+            int sellPrice = item.price / 2;
+            if (sellPrice < 1) sellPrice = 1;
+
+            music.playSE(0);
+            inventory.money += sellPrice;
+            inventory.removeByIndex(request.inventoryIndex);
+            shopMenu.adjustCursorAfterSale(inventory.items.size());
+          }
         }
       }
       break;
     }
-    case STATE_CONFIG: {
+    case MenuScreen::SETTINGS: {
       if (upPressed)   { settingsMenu.moveUp(); music.playSE(2); }
       if (downPressed) { settingsMenu.moveDown(); music.playSE(2); }
 
@@ -387,7 +378,7 @@ void MenuFlow::update(Controller &ctrl, Inventory& inventory, Player& hero, Part
       if (aPressed && settingsMenu.confirm() == SettingsMenuResult::BACK) {
         music.playSE(1);
         settingsSaveRequested = true;
-        currentMenuState = STATE_MAIN;
+        screen_ = MenuScreen::MAIN;
       }
       break;
     }
