@@ -58,7 +58,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       currentMenuState = STATE_MAIN;
     } else if (currentMenuState == STATE_MAIN) {
       // メインメニューでBを押したらメニューを閉じる
-      active = false;
+      if (mainMenu.cancel() == MainMenuResult::CLOSE) active = false;
     }
     return; // Bボタンが押されたフレームは他の操作を無視
   }
@@ -69,36 +69,44 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
     case STATE_MAIN: {
       // --- メインメニューの操作 ---
       if (upPressed){
-        mainSelected = (mainSelected - 1 + MAIN_ITEM_COUNT) % MAIN_ITEM_COUNT;
+        mainMenu.moveUp();
         music.playSE(2);
       }
       if (downPressed){
-        mainSelected = (mainSelected + 1) % MAIN_ITEM_COUNT;
+        mainMenu.moveDown();
         music.playSE(2);
       }
       if (aPressed) {
         music.playSE(0);
-        if (mainSelected == 0) {
-          currentMenuState = STATE_ITEM;
-          listCursor = 0;
-        }else if (mainSelected == 1) { // 「旋律」が選ばれた
-          currentMenuState = STATE_SKILL;
-          listCursor = 0;
-        }
-        else if (mainSelected == 2) { // 「進化」が選ばれた
-          currentMenuState = STATE_EVOLVE;
-          listCursor = 0;
-        }else if (mainSelected == 3) {
-          currentMenuState = STATE_EQUIP_SLOT;
-          listCursor = 0;
-        }else if (mainSelected == 4) { // 「記録」
-          saveSucceeded =
-              saveMgr.saveGame(sd, music, map, progress, hero, party, storage, inventory);
-
-          currentMenuState = STATE_SAVE_RESULT;
-        }else if (mainSelected == 5) {
-          currentMenuState = STATE_CONFIG;
-          listCursor = 0;
+        switch (mainMenu.confirm()) {
+          case MainMenuResult::OPEN_ITEM:
+            currentMenuState = STATE_ITEM;
+            listCursor = 0;
+            break;
+          case MainMenuResult::OPEN_SKILL:
+            currentMenuState = STATE_SKILL;
+            listCursor = 0;
+            break;
+          case MainMenuResult::OPEN_EVOLUTION:
+            currentMenuState = STATE_EVOLVE;
+            listCursor = 0;
+            break;
+          case MainMenuResult::OPEN_EQUIPMENT:
+            currentMenuState = STATE_EQUIP_SLOT;
+            listCursor = 0;
+            break;
+          case MainMenuResult::REQUEST_SAVE:
+            saveSucceeded = saveMgr.saveGame(
+                sd, music, map, progress, hero, party, storage, inventory);
+            currentMenuState = STATE_SAVE_RESULT;
+            break;
+          case MainMenuResult::OPEN_SETTINGS:
+            currentMenuState = STATE_CONFIG;
+            listCursor = 0;
+            break;
+          case MainMenuResult::NONE:
+          case MainMenuResult::CLOSE:
+            break;
         }
       }
       break;

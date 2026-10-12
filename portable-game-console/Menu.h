@@ -19,6 +19,7 @@
 #include "SaveManager.h"
 #include "Settings.h"
 #include "Vibration.h"
+#include "MainMenu.h"
 
 extern const int learnableSkillIDs[];
 extern const int learnableSkillCount;
@@ -46,11 +47,6 @@ public:
   };
   MenuState currentMenuState;
 
-  // メインメニュー
-  static const int MAIN_ITEM_COUNT = 6;
-  // ★ "機構カスタマイズ" を "進化" に変更
-  const char* mainItems[MAIN_ITEM_COUNT] = {"道具", "旋律", "進化", "装備", "記録", "設定"};
-  int mainSelected = 0;
   // 進化画面
   int listCursor = 0;
   bool active = false;
@@ -67,7 +63,7 @@ public:
   void toggle() {
     active = !active;
     currentMenuState = STATE_MAIN; // メニューを開くときは必ずメインから
-    mainSelected = 0;
+    mainMenu.reset();
     listCursor = 0;
   }
 
@@ -97,11 +93,11 @@ public:
         g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
         g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
         g->lineSprite.setTextSize(2);
-        for (int i = 0; i < MAIN_ITEM_COUNT; i++) {
-          uint16_t color = (i == mainSelected) ? TFT_YELLOW : TFT_WHITE;
+        for (int i = 0; i < mainMenu.itemCount(); i++) {
+          uint16_t color = (i == mainMenu.selectedIndex()) ? TFT_YELLOW : TFT_WHITE;
           g->lineSprite.setTextColor(color);
           g->lineSprite.setCursor(x + 20, y + 20 + i * 28);
-          g->lineSprite.print(mainItems[i]);
+          g->lineSprite.print(mainMenu.itemLabelAt(i));
         }
 
       } else if (currentMenuState == STATE_EVOLVE) {
@@ -533,5 +529,6 @@ public:
   }
 
 private:
+  MainMenu mainMenu;
   bool settingsSaveRequested = false;
 };
