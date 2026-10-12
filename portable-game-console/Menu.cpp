@@ -129,7 +129,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           }
           if (aPressed) {
             int id = inventory.items[itemMenu.cursor()].item.id;
-            ItemMenuResult result = itemMenu.selectItem(id >= 100 && id < 200);
+            ItemMenuResult result = itemMenu.selectItem(itemUseSystem.canUse(id));
             music.playSE(result.type == ItemMenuResultType::REJECT ? 1 : 0);
           }
         }
@@ -146,19 +146,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
         if (aPressed) {
           ItemMenuResult result = itemMenu.requestUse();
           music.playSE(0);
-          CharacterState* targetStatus = nullptr;
-          if (result.useRequest.targetIndex == 0) targetStatus = &hero.state();
-          else targetStatus = &party.memberState(result.useRequest.targetIndex - 1);
-
-          // Item effects and inventory consumption remain in Menu until ItemUseSystem.
-          int itemId = inventory.items[result.useRequest.itemIndex].item.id;
-          if (itemId == 100) targetStatus->heal(50);
-          else if (itemId == 101) targetStatus->heal(200);
-          else if (itemId == 102) targetStatus->heal(9999);
-          else if (itemId == 103) targetStatus->restoreTP(20);
-          else if (itemId == 104) targetStatus->CureStatus(true);
-
-          inventory.removeByIndex(result.useRequest.itemIndex);
+          itemUseSystem.use(result.useRequest, inventory, hero, party);
           itemMenu.completeUse();
         }
       }

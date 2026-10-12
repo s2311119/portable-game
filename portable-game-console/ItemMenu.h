@@ -1,15 +1,12 @@
 #pragma once
 
+#include "ItemUseRequest.h"
+
 enum class ItemMenuResultType {
   NONE,
   BACK,
   USE_REQUEST,
   REJECT
-};
-
-struct ItemUseRequest {
-  int itemIndex;
-  int targetIndex;
 };
 
 struct ItemMenuResult {

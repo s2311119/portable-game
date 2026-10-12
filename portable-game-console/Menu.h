@@ -23,6 +23,7 @@
 #include "MainMenuRenderer.h"
 #include "ItemMenu.h"
 #include "ItemRenderer.h"
+#include "ItemUseSystem.h"
 
 extern const int learnableSkillIDs[];
 extern const int learnableSkillCount;
@@ -463,5 +464,6 @@ private:
   MainMenuRenderer mainMenuRenderer;
   ItemMenu itemMenu;
   ItemRenderer itemRenderer;
+  ItemUseSystem itemUseSystem;
   bool settingsSaveRequested = false;
 };
