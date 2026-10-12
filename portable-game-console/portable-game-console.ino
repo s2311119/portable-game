@@ -245,6 +245,7 @@ struct Game {
   void drawMenuFlow();
   void startBattleEncounter(const EncounterSpec& spec, const BattleBgmHooks& bgm);
   void applyFloorMapConfig();
+  void loadGameAndRegenerateLegacy(LoadGameResult& result);
 };
 
 struct LoadGameOperation {
@@ -254,11 +255,15 @@ struct LoadGameOperation {
 
 void loadGameAndRegenerateLegacy(void* rawOperation) {
   LoadGameOperation& operation = *static_cast<LoadGameOperation*>(rawOperation);
-  Game* ctx = operation.context;
-  operation.result = ctx->saveManager->loadGame(
+  operation.context->loadGameAndRegenerateLegacy(operation.result);
+}
+
+void Game::loadGameAndRegenerateLegacy(LoadGameResult& result) {
+  Game* ctx = this;
+  result = ctx->saveManager->loadGame(
       *ctx->sd, *ctx->session);
 
-  const LoadGameResult& loadResult = operation.result;
+  const LoadGameResult& loadResult = result;
   if (loadResult.success && loadResult.requiresMapRegeneration) {
     Map::MapType finalType = loadResult.legacyMapType;
     WorldProgress& progress = ctx->session->progress();
