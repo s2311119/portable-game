@@ -90,7 +90,7 @@ bool Battle::executeHostileSkillOnTarget(
       Skill& skill,
       CharacterState* attacker,
       CharacterState* originalTarget,
-      AudioManager& music,
+      const BattleSeHooks& se,
       bool allowTargetRedirect) {
     if (attacker == nullptr ||
         originalTarget == nullptr ||
@@ -149,7 +149,7 @@ bool Battle::executeHostileSkillOnTarget(
     }
 
     if (isReflected) {
-      music.playSE(7);
+      se.emit(7);
 
       message +=
           "\n" +
@@ -161,7 +161,7 @@ bool Battle::executeHostileSkillOnTarget(
           skill,
           attacker,
           attacker,
-          music
+          se
       );
 
       return false;
@@ -174,7 +174,7 @@ bool Battle::executeHostileSkillOnTarget(
         skill,
         attacker,
         defender,
-        music
+        se
     );
 
     bool tookDamage =
@@ -192,7 +192,7 @@ bool Battle::executeHostileSkillOnTarget(
           String(defender->name()) +
           " の反撃！";
 
-      music.playSE(3);
+      se.emit(3);
 
       int counterDamage =
           defender->attack();
@@ -358,7 +358,7 @@ void Battle::finishStart() {
     currentBattleState = STATE_TURN_START;
   }
 
-void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm) {
+void Battle::update(Controller &ctrl, const BattleSeHooks& se, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm) {
     if (!inBattle) return;
     CharacterState* currentActor = resolveCombatant(this->currentActor);
     CharacterState* currentTarget = resolveCombatant(this->currentTarget);
@@ -377,7 +377,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
     // --- Yボタン（ステータス確認）の最優先処理 ---
     if (yPressed) {
       if (currentBattleState == STATE_COMMAND_SELECT) {
-        music.playSE(2);
+        se.emit(2);
         currentBattleState = STATE_CHECK_STATUS;
         statusPage = 0; // ★ 最初は主人公(0)から
       }
@@ -393,7 +393,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
       }
 
       if (aPressed || bPressed || yPressed) {
-        music.playSE(1);
+        se.emit(1);
         currentBattleState = STATE_COMMAND_SELECT;
       }
       return; 
@@ -496,39 +496,39 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
       // 2. 味方のコマンド入力
       case STATE_COMMAND_SELECT: 
         message = String(currentActor->name()) + "：コマンドを選ぼう！";
-        if (leftPressed) {commandSelected = (commandSelected - 1 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
-        if (upPressed)   {commandSelected = (commandSelected - 2 + CMD_COUNT) % CMD_COUNT; music.playSE(2);}
-        if (rightPressed){commandSelected = (commandSelected + 1) % CMD_COUNT; music.playSE(2);}
-        if (downPressed) {commandSelected = (commandSelected + 2) % CMD_COUNT; music.playSE(2);}
+        if (leftPressed) {commandSelected = (commandSelected - 1 + CMD_COUNT) % CMD_COUNT; se.emit(2);}
+        if (upPressed)   {commandSelected = (commandSelected - 2 + CMD_COUNT) % CMD_COUNT; se.emit(2);}
+        if (rightPressed){commandSelected = (commandSelected + 1) % CMD_COUNT; se.emit(2);}
+        if (downPressed) {commandSelected = (commandSelected + 2) % CMD_COUNT; se.emit(2);}
 
         if (aPressed) {
           if (commandSelected == 0) { // たたかう
-            music.playSE(0);
+            se.emit(0);
             pendingActionType = ActionType::ATTACK;
             pendingSkillIndex = -1;
             enemyTargetIndex = 0;   // ★ 敵カーソルをリセット
             currentBattleState = STATE_TARGET_SELECT_ENEMY; // ★ 敵選択へ
           } 
           else if (commandSelected == 1) { // にげる
-            music.playSE(0);
+            se.emit(0);
             message = "逃げ出した！";
             battleEndReason = BattleEndReason::ESCAPE;
             currentBattleState = STATE_BATTLE_END;
           } 
           else if (commandSelected == 2) { // せんりつ
             if (currentActor->effects().getSilencedTurns() > 0) {
-              music.playSE(1);
+              se.emit(1);
               message = String(currentActor->name()) + " は沈黙している！";
               // (Aボタン押しっぱなしループを防ぐ)
               if(ctrl.pressed(ctrl.BTN_A)) delay(200);
             } else {
-              music.playSE(0);
+              se.emit(0);
               skillSelected = 0;
               currentBattleState = STATE_SKILL_SELECT;
             }
           }
           else if (commandSelected == 3) {
-            music.playSE(0);
+            se.emit(0);
             pendingActionType = ActionType::DEFEND;
             pendingSkillIndex = -1;
             
@@ -552,18 +552,18 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
         message = "どの旋律を使う？";
         if (upPressed) {
           skillSelected = (skillSelected - 1 + skillCount) % skillCount;
-          music.playSE(2);
+          se.emit(2);
         }
         if (downPressed) {
           skillSelected = (skillSelected + 1) % skillCount;
-          music.playSE(2);
+          se.emit(2);
         }
 
         if (aPressed) {
           Skill skill = SkillCatalog::get(currentActor->skills().skillIdAt(skillSelected));
           
           if (currentActor->stats().getTp() >= skill.tpCost) {
-            music.playSE(0);
+            se.emit(0);
 
             pendingActionType = ActionType::SKILL;
             pendingSkillIndex = skillSelected;
@@ -590,7 +590,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
                 break;
             }
           } else {
-            music.playSE(1);
+            se.emit(1);
             message = "TPが足りない！";
             // (Aボタン押しっぱなしでTP不足ループするのを防ぐ)
             if(ctrl.pressed(ctrl.BTN_A)) delay(200);
@@ -599,7 +599,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
         }
         // Bボタンでコマンド選択に戻る
         if (bPressed) {
-          music.playSE(1);
+          se.emit(1);
           currentBattleState = STATE_COMMAND_SELECT;
         }
         break;
@@ -616,24 +616,24 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
           do {
             enemyTargetIndex = (enemyTargetIndex - 1 + activeEnemies.size()) % activeEnemies.size();
           } while (activeEnemies[enemyTargetIndex].state().stats().getHp() <= 0);
-          music.playSE(2);
+          se.emit(2);
         }
         if (rightPressed) {
           do {
             enemyTargetIndex = (enemyTargetIndex + 1) % activeEnemies.size();
           } while (activeEnemies[enemyTargetIndex].state().stats().getHp() <= 0);
-          music.playSE(2);
+          se.emit(2);
         }
 
         // Aボタンで決定
         if (aPressed) {
-          music.playSE(0);
+          se.emit(0);
           currentTarget = &activeEnemies[enemyTargetIndex].state();
           currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンでキャンセル
         if (bPressed) {
-          music.playSE(1);
+          se.emit(1);
           if (pendingActionType == ActionType::SKILL) {
             currentBattleState = STATE_SKILL_SELECT;
           } else {
@@ -675,21 +675,21 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
 
         if (upPressed) {
           allyTargetIndex = (allyTargetIndex - 1 + allies.size()) % allies.size();
-          music.playSE(2);
+          se.emit(2);
         }
         if (downPressed) {
           allyTargetIndex = (allyTargetIndex + 1) % allies.size();
-          music.playSE(2);
+          se.emit(2);
         }
 
         if (aPressed) {
-          music.playSE(0);
+          se.emit(0);
           currentTarget = allies[allyTargetIndex];
           currentBattleState = STATE_ACTION_READY;
         }
         // Bボタンで旋律選択に戻る
         if (bPressed) {
-          music.playSE(1);
+          se.emit(1);
           currentBattleState = STATE_SKILL_SELECT;
         }
         break;
@@ -704,10 +704,10 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
         lastDamage = currentActor->ApplyTurnEffects();
 
         if (lastDamage > 0) { // 毒ダメージ
-          music.playSE(3);
+          se.emit(3);
           message = String(currentActor->name()) + " は毒:" + String(lastDamage) + " のダメージ！";
         } else if (lastDamage < 0) { // HPリジェネ
-          music.playSE(7);
+          se.emit(7);
           message = String(currentActor->name()) + " は回復:" + String(-lastDamage) + " 回復！";
         }
         if (currentActor->stats().getHp() <= 0) {
@@ -715,7 +715,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
           if (currentActor->effects().getAutoReviveTurns() > 0) {
             currentActor->consumeAutoRevive(); // 効果消費
             currentActor->revive(50); // HP半分で復活
-            music.playSE(7);
+            se.emit(7);
             message += "\n" + String(currentActor->name()) + " は自動蘇生した！";
           }else{
             message = String(currentActor->name()) + " は力尽きた…";
@@ -1091,7 +1091,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
           currentActor->retireFromBattle(); 
 
           // 3. 効果音 (逃走音)
-          music.playSE(3); // シュッという音など
+          se.emit(3); // シュッという音など
 
           // 4. メッセージ表示へ
           messageFlow = MessageFlow::ACTION_COMPLETE;
@@ -1103,7 +1103,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
           currentActor->beginDefense();
 
           // 2. 音とメッセージ
-          music.playSE(5); // 何か適当な音（物理防御音など）
+          se.emit(5); // 何か適当な音（物理防御音など）
           message = String(currentActor->name()) + " は身を守っている！";
           
           // 3. メッセージ表示ステートへ
@@ -1295,7 +1295,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
                 currentSkill,
                 currentActor,
                 currentTarget,
-                music,
+                se,
                 true   // 挑発・ステルス・かばうあり
             );
           }
@@ -1321,7 +1321,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
                 currentSkill,
                 currentActor,
                 currentTarget,
-                music
+                se
             );
           }
         }
@@ -1345,7 +1345,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
                     currentSkill,
                     currentActor,
                     target,
-                    music,
+                    se,
                     false  // 全体攻撃なので対象変更なし
                 );
 
@@ -1393,7 +1393,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
                 currentSkill,
                 currentActor,
                 target,
-                music
+                se
             );
           }
         }
@@ -1448,7 +1448,7 @@ void Battle::update(Controller &ctrl, AudioManager &music, Player &hero, Invento
                       currentSkill,
                       currentActor,
                       target,
-                      music,
+                      se,
                       true   // 1ヒットごとに対象変更あり
                   );
 
@@ -1850,11 +1850,9 @@ std::vector<const CharacterState*> Battle::targetableAlliesForRender(
     return allies;
 }
 
-void Battle::ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, AudioManager& music) {
+void Battle::ExecuteSkill(Skill& skill, CharacterState* user, CharacterState* target, const BattleSeHooks& se) {
     if (target == nullptr) return;
-    const SkillAudioCue audio{&music, [](void* context, int seId) {
-        static_cast<AudioManager*>(context)->playSE(seId);
-    }};
+    const SkillAudioCue audio{se.context, se.playSE};
     const SkillEffectResult result = SkillEffectSystem::execute(skill, user, target, audio);
     lastDamage += result.lastDamageDelta;
     if (result.actionMessage != nullptr) lastActionMessage = result.actionMessage;

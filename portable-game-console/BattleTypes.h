@@ -39,3 +39,12 @@ struct BattleBgmHooks {
     onEvent(context, event, kind);
   }
 };
+
+struct BattleSeHooks {
+  void* context;
+  void (*playSE)(void* context, int seId);
+
+  void emit(int seId) const {
+    playSE(context, seId);
+  }
+};

@@ -47,6 +47,12 @@ void onEvent(void* rawContext, BattleBgmEvent event, BattleKind kind) {
 }
 } // namespace battle_bgm_adapter
 
+namespace battle_se_adapter {
+void playSE(void* context, int seId) {
+  static_cast<AudioManager*>(context)->playSE(seId);
+}
+} // namespace battle_se_adapter
+
 namespace menu_feedback_adapter {
 struct Context {
   AudioManager* music;
@@ -121,6 +127,7 @@ void Game::update() {
   auto& settings = ctx->settings;
   battle_bgm_adapter::Context battleBgmContext{&music, &map};
   const BattleBgmHooks battleBgm{&battleBgmContext, battle_bgm_adapter::onEvent};
+  const BattleSeHooks battleSe{&music, battle_se_adapter::playSE};
   vib.update();
   if (state == STATE_GAME) {
     hero.oldX = hero.X;
@@ -201,7 +208,7 @@ void Game::update() {
 
   else if (state == STATE_BATTLE) {
     auto &battle = *ctx->battle;
-    battle.update(ctrl, music, hero, inventory, vib, battleBgm);
+    battle.update(ctrl, battleSe, hero, inventory, vib, battleBgm);
     if (const std::optional<BattleResult> result = battle.takeResult()) {
       if (result->outcome == BattleOutcome::VICTORY && result->kind != BattleKind::NORMAL) {
         WorldProgress& progress = ctx->session->progress();
