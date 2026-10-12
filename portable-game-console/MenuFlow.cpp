@@ -45,8 +45,10 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
     }else if (screen_ == MenuScreen::SKILL || screen_ == MenuScreen::SETTINGS) {
       // 進化・旋律画面でBを押したらメインに戻る
       if (screen_ == MenuScreen::SETTINGS &&
-          settingsMenu.cancel() == SettingsMenuResult::BACK)
-        settingsSaveRequested = true;
+          settingsMenu.cancel() == SettingsMenuResult::BACK) {
+        screen_ = MenuScreen::MAIN;
+        return MenuFlowResult::SAVE_SETTINGS;
+      }
       screen_ = MenuScreen::MAIN;
     } else if (screen_ == MenuScreen::MAIN) {
       // メインメニューでBを押したらメニューを閉じる
@@ -378,8 +380,8 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
 
       if (aPressed && settingsMenu.confirm() == SettingsMenuResult::BACK) {
         music.playSE(1);
-        settingsSaveRequested = true;
         screen_ = MenuScreen::MAIN;
+        return MenuFlowResult::SAVE_SETTINGS;
       }
       break;
     }

@@ -28,7 +28,8 @@
 
 enum class MenuFlowResult {
   NONE,
-  REQUEST_SAVE
+  REQUEST_SAVE,
+  SAVE_SETTINGS
 };
 
 class MenuFlow {
@@ -93,12 +94,6 @@ public:
     screen_ = MenuScreen::SAVE_RESULT;
   }
 
-  bool takeSettingsSaveRequest() {
-    bool requested = settingsSaveRequested;
-    settingsSaveRequested = false;
-    return requested;
-  }
-
 private:
   MenuScreen screen_ = MenuScreen::MAIN;
   bool active_ = false;
@@ -113,5 +108,4 @@ private:
   InnMenu innMenu;
   StorageMenu storageMenu;
   SettingsMenu settingsMenu;
-  bool settingsSaveRequested = false;
 };

@@ -753,7 +753,7 @@ void loop() {
     if (menuResult == MenuFlowResult::REQUEST_SAVE) {
       menu.finishSave(save.saveGame(sd, music, *ctx->session));
     }
-    if (menu.takeSettingsSaveRequest()) {
+    if (menuResult == MenuFlowResult::SAVE_SETTINGS) {
       save.saveSettings(sd, music, settings);
     }
     //g.screenSprite.fillScreen(TFT_BLACK);
