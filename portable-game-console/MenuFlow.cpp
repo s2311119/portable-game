@@ -1,6 +1,7 @@
 #include "MenuFlow.h"
 #include "CharacterProgressionSystem.h"
 #include "ShopTransactionSystem.h"
+#include "InnStaySystem.h"
 
 MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
                                 Player& hero, Party& party,
@@ -313,15 +314,7 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
         InnMenuResult result = innMenu.confirm(inventory.money);
         if (result == InnMenuResult::STAY_REQUEST) {
           feedback.playSE(feedback.context, 0);
-          inventory.money -= innMenu.cost();
-
-          hero.state().revive(100);
-          hero.state().heal(9999); hero.state().restoreTP(9999);
-          for(size_t i = 0; i < party.memberCount(); ++i) {
-            CharacterState& member = party.memberState(i);
-            member.revive(100);
-            member.heal(9999); member.restoreTP(9999);
-          }
+          InnStaySystem::stay(innMenu.cost(), inventory, hero, party);
           active_ = false;
           return MenuFlowResult::CLOSE_MENU;
         } else if (result == InnMenuResult::INSUFFICIENT_FUNDS) {
