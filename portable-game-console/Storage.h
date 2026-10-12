@@ -21,7 +21,11 @@ private:
 public:
   Storage();
   void resetRefillOffset();
-  void init(AudioManager &music);
+  void init();
+  void openTrack(int trackId, const char* path);
+  bool trackIsOpen(int trackId) const;
+  void seekTrackStart(int trackId);
+  size_t readTrack(int trackId, void* buffer, size_t bytes);
 
   // 切り替え予約（ID指定）
   void requestSwitch(int trackId);

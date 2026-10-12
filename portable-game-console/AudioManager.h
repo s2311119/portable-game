@@ -165,6 +165,7 @@ public:
   }
 
   void playBGM(BgmCue cue, class Storage &sd);
+  void initializeTracks(class Storage &sd);
 
 private:
   void switchTrack(int newId, class Storage &sd);

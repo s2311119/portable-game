@@ -557,7 +557,8 @@ void setup() {
   ctx->imgMgr = new ImageManager(*ctx->sd);
   // Graphic, SD の初期化
   ctx->graphic->init();
-  ctx->sd->init(*ctx->music);
+  ctx->sd->init();
+  ctx->music->initializeTracks(*ctx->sd);
   // SaveManager 生成
   ctx->saveManager = new SaveManager();
   ctx->vibration = new Vibration();

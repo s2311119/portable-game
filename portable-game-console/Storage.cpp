@@ -15,42 +15,27 @@ Storage::Storage() {
 
 void Storage::resetRefillOffset() { refillOffset = 0; }
 
-void Storage::init(AudioManager &music) {
+void Storage::init() {
     if (!sdfat.begin(SD_CS_PIN, SD_SCK_MHZ(20))) {
       //Serial.println("SD init failed!");
       while (1);
     }
+  }
 
-    const char* paths[AudioManager::TRACK_COUNT];
-    for(int i=0; i<AudioManager::TRACK_COUNT; i++) paths[i] = "";
-    paths[0] = "/bgm_0.raw"; // 集落
-    paths[1] = "/bgm_1.raw"; // ダンジョン
-    paths[2] = "/bgm_2.raw"; // 通常戦闘
-    paths[3] = "/bgm_3.raw"; // ボス戦
-    paths[4] = "/bgm_4.raw"; // ラスボス
-    paths[9] = "/bgm_9.raw"; // タイトル
-    paths[99] = "/bgm_99.raw";
-    for (int i = 0; i < AudioManager::TRACK_COUNT; ++i) {
-      musicFiles[i] = sdfat.open(paths[i], FILE_READ);
-      if (!musicFiles[i]) {
-        //Serial.printf("Failed to open %s\n", paths[i]);
-        //while (1);
-      }
-    }
-    music.currentTrack = 9;
-    // 初期曲データ読み込み
-    FsFile& f = musicFiles[music.currentTrack];
-    f.seek(0);
-    size_t n0 = f.read((void*)music.buffer0, AudioManager::BUF_SIZE);
-    size_t n1 = f.read((void*)music.buffer1, AudioManager::BUF_SIZE);
-    noInterrupts();
-    music.playBuf = music.buffer0;
-    music.fillBuf = music.buffer1;
-    music.playBytes = n0;
-    music.fillBytes = n1;
-    music.sampleIndex = 0;
-    music.needs_refill = false;
-    interrupts();
+void Storage::openTrack(int trackId, const char* path) {
+    musicFiles[trackId] = sdfat.open(path, FILE_READ);
+  }
+
+bool Storage::trackIsOpen(int trackId) const {
+    return (bool)musicFiles[trackId];
+  }
+
+void Storage::seekTrackStart(int trackId) {
+    musicFiles[trackId].seek(0);
+  }
+
+size_t Storage::readTrack(int trackId, void* buffer, size_t bytes) {
+    return musicFiles[trackId].read(buffer, bytes);
   }
 
 void Storage::requestSwitch(int trackId) {

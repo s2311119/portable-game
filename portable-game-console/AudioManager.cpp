@@ -15,6 +15,38 @@ void AudioManager::playBGM(BgmCue cue, Storage &sd) {
   switchTrack(track, sd);
 }
 
+void AudioManager::initializeTracks(Storage &sd) {
+  const char* paths[TRACK_COUNT];
+  for(int i=0; i<TRACK_COUNT; i++) paths[i] = "";
+  paths[0] = "/bgm_0.raw"; // 集落
+  paths[1] = "/bgm_1.raw"; // ダンジョン
+  paths[2] = "/bgm_2.raw"; // 通常戦闘
+  paths[3] = "/bgm_3.raw"; // ボス戦
+  paths[4] = "/bgm_4.raw"; // ラスボス
+  paths[9] = "/bgm_9.raw"; // タイトル
+  paths[99] = "/bgm_99.raw";
+  for (int i = 0; i < TRACK_COUNT; ++i) {
+    sd.openTrack(i, paths[i]);
+    if (!sd.trackIsOpen(i)) {
+      //Serial.printf("Failed to open %s\n", paths[i]);
+      //while (1);
+    }
+  }
+  currentTrack = 9;
+  // 初期曲データ読み込み
+  sd.seekTrackStart(currentTrack);
+  size_t n0 = sd.readTrack(currentTrack, (void*)buffer0, BUF_SIZE);
+  size_t n1 = sd.readTrack(currentTrack, (void*)buffer1, BUF_SIZE);
+  noInterrupts();
+  playBuf = buffer0;
+  fillBuf = buffer1;
+  playBytes = n0;
+  fillBytes = n1;
+  sampleIndex = 0;
+  needs_refill = false;
+  interrupts();
+}
+
 // --- AudioManager::switchTrack 実装部（Storageの定義後） ---
 void AudioManager::switchTrack(int newId, Storage &sd) {
   if (newId == currentTrack) return;
