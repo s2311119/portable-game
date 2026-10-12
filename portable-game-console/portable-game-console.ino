@@ -246,6 +246,7 @@ struct Game {
   void startBattleEncounter(const EncounterSpec& spec, const BattleBgmHooks& bgm);
   void applyFloorMapConfig();
   void loadGameAndRegenerateLegacy(LoadGameResult& result);
+  static void boot();
   void update();
 };
 
@@ -551,7 +552,7 @@ void core1_main() {
 
 // main.ino (setup 関数)
 
-void setup() {
+void Game::boot() {
   Serial.begin(115200);
 
   Storage::initializeSynchronization();
@@ -623,7 +624,7 @@ void setup() {
 
         LoadGameOperation loadOperation{ctx, {false, false, Map::TYPE_DUNGEON}};
         ctx->music->runWhileStoragePaused(
-            &loadOperation, loadGameAndRegenerateLegacy);
+            &loadOperation, ::loadGameAndRegenerateLegacy);
         const LoadGameResult& loadResult = loadOperation.result;
 
         if (loadResult.success) {
@@ -693,6 +694,10 @@ void setup() {
   // ゲーム状態へ移行
   ctx->state = STATE_GAME;
   // 4. 音楽スレッド起動
+}
+
+void setup() {
+  Game::boot();
 }
 
 void Game::update() {
