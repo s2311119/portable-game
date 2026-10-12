@@ -1,6 +1,5 @@
 // main.ino
 #include <SPI.h>
-#include <SdFat.h>
 #include "LGFX_RP2040_ILI9341.hpp"
 #include <LGFX_TFT_eSPI.hpp>  // フォントを使う場合に必要な場合もあります
 #include "bmp.h"
