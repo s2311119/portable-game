@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <SdFat.h>
 #include "hardware/structs/sio.h"
+#include "BgmCue.h"
 
 static const int DAC_CS_PIN   = 17; // MCP4921 CS
 static const int DAC_SCK_PIN  = 9;  // ソフトSPIクロック
@@ -165,5 +166,8 @@ public:
     sio_hw->gpio_set = csMask;
   }
 
+  void playBGM(BgmCue cue, class Storage &sd);
+
+private:
   void switchTrack(int newId, class Storage &sd);
 };

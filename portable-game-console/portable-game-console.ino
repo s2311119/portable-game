@@ -34,6 +34,7 @@
 #include "FloorManager.h"
 #include "Settings.h"
 #include "AudioManager.h"
+#include "BgmCue.h"
 #include "Storage.h"
 #include "SaveManager.h"
 #include "ImageManager.h"
@@ -137,7 +138,7 @@ long drawMax(void*, long max) { return random(max); }
 long drawRange(void*, long min, long max) { return random(min, max); }
 } // namespace field_random_adapter
 
-// Phase 9 bridge: keep the existing track mapping until AudioManager owns it.
+// Battleの意味イベントをBGM cueへ接続する。
 namespace battle_bgm_adapter {
 struct Context {
   AudioManager* music;
@@ -149,19 +150,20 @@ void onEvent(void* rawContext, BattleBgmEvent event, BattleKind kind) {
   Context& context = *static_cast<Context*>(rawContext);
   switch (event) {
     case BattleBgmEvent::START:
-      context.music->switchTrack(
-          kind == BattleKind::FINAL_BOSS ? 4 : kind == BattleKind::NORMAL ? 2 : 3,
+      context.music->playBGM(
+          kind == BattleKind::FINAL_BOSS ? BgmCue::BATTLE_FINAL :
+          kind == BattleKind::NORMAL ? BgmCue::BATTLE_NORMAL : BgmCue::BATTLE_BOSS,
           *context.sd);
       break;
     case BattleBgmEvent::EARLY_FIELD_RETURN:
-      context.music->switchTrack(1, *context.sd);
+      context.music->playBGM(BgmCue::DUNGEON, *context.sd);
       break;
     case BattleBgmEvent::FINAL_FIELD_RETURN:
-      if (context.map->isTown()) context.music->switchTrack(0, *context.sd);
-      else context.music->switchTrack(1, *context.sd);
+      if (context.map->isTown()) context.music->playBGM(BgmCue::TOWN, *context.sd);
+      else context.music->playBGM(BgmCue::DUNGEON, *context.sd);
       break;
     case BattleBgmEvent::DEFEAT:
-      context.music->switchTrack(99, *context.sd);
+      context.music->playBGM(BgmCue::GAME_OVER, *context.sd);
       break;
   }
 }
@@ -323,8 +325,8 @@ void applyFloorMapConfig(GameContext* ctx)
   FloorMapConfig config =
       ctx->floorManager.getConfig(ctx->session->progress());
 
-  ctx->music->switchTrack(
-      config.type == Map::TYPE_TOWN ? 0 : 1,
+  ctx->music->playBGM(
+      config.type == Map::TYPE_TOWN ? BgmCue::TOWN : BgmCue::DUNGEON,
       *ctx->sd
   );
 
@@ -534,7 +536,7 @@ void setup() {
   multicore_launch_core1(core1_main);
   delay(200);
 
-  ctx->music->switchTrack(9, *ctx->sd);
+  ctx->music->playBGM(BgmCue::TITLE, *ctx->sd);
   // 2. ★★★ タイトル画面処理 (ラインスプライト版) ★★★
   bool loadSuccess = false;
   bool startNewGame = false;
@@ -658,10 +660,10 @@ void setup() {
   ctx->worldRenderer.drawFullBackground(*ctx->graphic, ctx->session->map(), ctx->session->player(), camX, camY);
   if (ctx->session->map().isTown()) {
     // 集落なら bgm_0.raw
-    ctx->music->switchTrack(0, *ctx->sd); 
+    ctx->music->playBGM(BgmCue::TOWN, *ctx->sd);
   } else {
     // ダンジョンなら bgm_1.raw
-    ctx->music->switchTrack(1, *ctx->sd);
+    ctx->music->playBGM(BgmCue::DUNGEON, *ctx->sd);
   }
 
   // ゲーム状態へ移行
@@ -802,7 +804,7 @@ void loop() {
         int cy = hero.Y - Graphic::SCREEN_HEIGHT/2;
         worldRenderer.invalidateAndRedraw(g, map, hero, cx, cy);
 
-        music.switchTrack(0, sd);
+        music.playBGM(BgmCue::TOWN, sd);
       }
       state = result->outcome == BattleOutcome::DEFEAT ? STATE_GAME_OVER : STATE_GAME;
     }
@@ -877,7 +879,7 @@ void loop() {
           );
           hero.reset(map);
 
-          music.switchTrack(0, sd);
+          music.playBGM(BgmCue::TOWN, sd);
 
           state = STATE_GAME;
           currentEvent.type = FieldEventType::NONE;
