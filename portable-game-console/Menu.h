@@ -37,6 +37,7 @@
 #include "StorageMenu.h"
 #include "StorageRenderer.h"
 #include "SettingsMenu.h"
+#include "SettingsRenderer.h"
 
 class Menu {
 public:
@@ -153,44 +154,7 @@ public:
                  currentMenuState == STATE_SHOP_SELL) {
         shopRenderer.drawLine(shopMenu, inventory, *g, drawY);
       }else if (currentMenuState == STATE_CONFIG) {
-        int x = 60, y = 40 + yOffset;
-        int w = 200, h = 160;
-        g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-        g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-
-        g->lineSprite.setTextSize(2);
-        g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 20, y + 15);
-        g->lineSprite.print("環境設定");
-        g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-        // 項目描画ヘルパー
-        auto drawItem = [&](int idx, String label, String value) {
-          if (settingsMenu.cursor() == idx) g->lineSprite.setTextColor(TFT_YELLOW);
-          else g->lineSprite.setTextColor(TFT_WHITE);
-          g->lineSprite.setCursor(x + 20, y + 55 + idx * 25);
-          g->lineSprite.print(label);
-          g->lineSprite.setCursor(x + 140, y + 55 + idx * 25);
-          g->lineSprite.print(value);
-        };
-
-        // 1. BGM (引数の settings を使用)
-        String bgmValStr = String(settings.getBgmVolume());
-        drawItem(0, "BGM", bgmValStr);
-
-        // 2. SE (引数の settings を使用)
-        String seValStr = String(settings.getSeVolume());
-        drawItem(1, "SE", seValStr);
-
-        // 3. 振動 (引数の settings を使用)
-        String vibValStr = settings.isVibrationEnabled() ? "ON" : "OFF";
-        drawItem(2, "振動", vibValStr);
-
-        // 4. 戻る
-        if (settingsMenu.cursor() == 3) g->lineSprite.setTextColor(TFT_YELLOW);
-        else g->lineSprite.setTextColor(TFT_WHITE);
-        g->lineSprite.setCursor(x + 60, y + 130);
-        g->lineSprite.print("戻る");
+        settingsRenderer.drawLine(settingsMenu, settings, *g, drawY);
       }
 
       // ★★★ 画面に転送 ★★★
@@ -218,5 +182,6 @@ private:
   StorageMenu storageMenu;
   StorageRenderer storageRenderer;
   SettingsMenu settingsMenu;
+  SettingsRenderer settingsRenderer;
   bool settingsSaveRequested = false;
 };
