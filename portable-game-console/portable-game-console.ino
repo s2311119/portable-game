@@ -18,6 +18,7 @@
 #include "Graphic.h"
 #include "WorldRenderer.h"
 #include "TitleRenderer.h"
+#include "GameOverRenderer.h"
 #include "LegacyGameTypes.h"
 #include "Controller.h"
 #include "EncounterManager.h"
@@ -207,6 +208,7 @@ struct GameContext {
   Graphic* graphic;
   WorldRenderer worldRenderer;
   TitleRenderer titleRenderer;
+  GameOverRenderer gameOverRenderer;
   Controller* controller;
   MUSIC* music;
   Sd* sd;
@@ -929,23 +931,7 @@ void loop() {
       
       // (1) スプライトをクリア
       ctx->graphic->lineSprite.fillScreen(TFT_BLACK);
-
-      // (2) 文字描画設定
-      // 左上(Top-Left)を基準点にします。これがないと位置がずれることがあります。
-      ctx->graphic->lineSprite.setTextDatum(TL_DATUM); 
-
-      // (3) "GAME OVER" 描画
-      ctx->graphic->lineSprite.setTextColor(TFT_RED);
-      ctx->graphic->lineSprite.setTextSize(3);
-      // print ではなく drawString を使います
-      // Y座標: 「本来のY座標(80) - 現在の描画開始位置(drawY)」
-      ctx->graphic->lineSprite.drawString("GAME OVER", 60, 80 - drawY);
-
-      // (4) "タイトルへ" 描画
-      ctx->graphic->lineSprite.setTextSize(2);
-      ctx->graphic->lineSprite.setTextColor(TFT_YELLOW);
-      // Y座標: 「本来のY座標(150) - 現在の描画開始位置(drawY)」
-      ctx->graphic->lineSprite.drawString("タイトルへ", 80, 150 - drawY);
+      ctx->gameOverRenderer.drawLine(*ctx->graphic, drawY);
 
       // (5) 画面への転送
       // 作った短冊を、画面上の drawY の位置に貼り付けます
