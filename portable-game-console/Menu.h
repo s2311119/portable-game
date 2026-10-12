@@ -35,6 +35,7 @@
 #include "InnMenu.h"
 #include "InnRenderer.h"
 #include "StorageMenu.h"
+#include "StorageRenderer.h"
 
 class Menu {
 public:
@@ -124,59 +125,7 @@ public:
         itemRenderer.drawLine(itemMenu, inventory, hero, party, *g, drawY);
 
       } else if (currentMenuState == STATE_STORAGE) {
-          g->lineSprite.fillScreen(TFT_BLACK);
-          g->lineSprite.setTextColor(TFT_WHITE);
-          g->lineSprite.setTextSize(2);
-          g->lineSprite.setCursor(10, 10 - drawY);
-          g->lineSprite.print("=== 預かり所 ===");
-
-          if (storageMenu.state() == StorageMenu::State::CHOICE) {
-              g->lineSprite.setCursor(40, 50 - drawY);
-              g->lineSprite.setTextColor(storageMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE); g->lineSprite.print("仲間を引き出す");
-              g->lineSprite.setCursor(40, 80 - drawY);
-              g->lineSprite.setTextColor(storageMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE); g->lineSprite.print("仲間を預ける");
-              g->lineSprite.setTextColor(TFT_WHITE);
-              g->lineSprite.setCursor(40, 130 - drawY);
-              g->lineSprite.printf("パーティー: %d/%d人", party.memberCount(), Party::MAX_MEMBERS);
-              g->lineSprite.setCursor(40, 150 - drawY);
-              g->lineSprite.printf("預かり所: %d人", storage.memberCount());
-          }
-          else if (storageMenu.state() == StorageMenu::State::WITHDRAW) {
-              g->lineSprite.setCursor(10, 35 - drawY); g->lineSprite.print("誰を引き出しますか？");
-              if (party.memberCount() >= Party::MAX_MEMBERS) { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.print(" (満員)"); }
-              int count = storage.memberCount();
-              if (count == 0) { g->lineSprite.setCursor(30, 60 - drawY); g->lineSprite.setTextColor(TFT_LIGHTGREY); g->lineSprite.print("誰もいません"); }
-
-              int itemsPerPage = 6;
-              int startIdx = 0;
-              if (storageMenu.cursor() >= itemsPerPage) startIdx = storageMenu.cursor() - (itemsPerPage - 1);
-              int endIdx = startIdx + itemsPerPage;
-              if (endIdx > count) endIdx = count;
-
-              for(int i = startIdx; i < endIdx; i++) {
-                  g->lineSprite.setCursor(30, 60 + (i - startIdx) * 25 - drawY);
-                  g->lineSprite.setTextColor(storageMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
-                  g->lineSprite.printf(
-                      "%s Lv%d",
-                      storage.member(i).state().name(),
-                      storage.member(i).state().progress().level()
-                  );
-              }
-          }
-          else if (storageMenu.state() == StorageMenu::State::DEPOSIT) {
-              g->lineSprite.setCursor(10, 35 - drawY); g->lineSprite.print("誰を預けますか？");
-              int count = party.memberCount();
-              if (count == 0) { g->lineSprite.setCursor(30, 60 - drawY); g->lineSprite.print("誰もいません"); }
-              for(int i=0; i<count; i++) {
-                  g->lineSprite.setCursor(30, 60 + i*25 - drawY);
-                  g->lineSprite.setTextColor(storageMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
-                  g->lineSprite.printf(
-                      "%s Lv%d",
-                      party.member(i).state().name(),
-                      party.member(i).state().progress().level()
-                  );
-              }
-          }
+        storageRenderer.drawLine(storageMenu, party, storage, *g, drawY);
       } else if (currentMenuState == STATE_SAVE_RESULT) {
         // --- セーブ完了画面 ---
         int x = 60, y = 100 - drawY;
@@ -266,5 +215,6 @@ private:
   InnMenu innMenu;
   InnRenderer innRenderer;
   StorageMenu storageMenu;
+  StorageRenderer storageRenderer;
   bool settingsSaveRequested = false;
 };
