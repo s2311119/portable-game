@@ -61,7 +61,8 @@
 #include <algorithm>
 #include <utility>
 
-struct Game {
+class Game {
+private:
   GameSession* session = nullptr;
   Graphic* graphic;
   WorldRenderer worldRenderer;
@@ -97,10 +98,11 @@ struct Game {
   void drawMenuFlow();
   void startBattleEncounter(const EncounterSpec& spec, const BattleBgmHooks& bgm);
   void applyFloorMapConfig();
+  static bool audioTimerCallback(struct repeating_timer* timer);
+public:
   void loadGameAndRegenerateLegacy(LoadGameResult& result);
   static void boot();
   void update();
-  static bool audioTimerCallback(struct repeating_timer* timer);
   static void core1Main();
 };
 
