@@ -10,8 +10,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "pico/sync.h"
-extern critical_section_t sdLock;
 #define H_TRANSPARENT 0xFFFF
 
 CharacterState* Battle::resolveTarget(CharacterState* originalTarget, Skill& skill) {
@@ -297,7 +295,8 @@ Battle::Battle() {
     }
   }
 
-void Battle::start(Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr, const BattleBgmHooks& bgm) {
+void Battle::start(Player& hero, Party& party, const EncounterSpec& spec,
+                   const BattleImageHooks& images, const BattleBgmHooks& bgm) {
     if (inBattle) return;
     pendingResult.reset();
     currentBattleKind = spec.kind;
@@ -337,13 +336,7 @@ void Battle::start(Sd &sd, Player& hero, Party& party, const EncounterSpec& spec
       }
       Enemy& boss = activeEnemies.back();
       boss.name = boss.state().name();
-      critical_section_enter_blocking(&sdLock);
-      String imgName = "/e_" + String(spec.enemies[0].enemyId) + ".bin";
-      activeImages[0] = imgMgr.load(0, imgName, sd);
-
-      // 他のスロットは空にする
-      for(int i=1; i<4; i++) activeImages[i] = nullptr;
-      critical_section_exit(&sdLock);
+      images.prepareEnemies(spec, activeEnemies, activeImages);
 
       bgm.emit(BattleBgmEvent::START, spec.kind);
     }else{
@@ -355,33 +348,12 @@ void Battle::start(Sd &sd, Player& hero, Party& party, const EncounterSpec& spec
         newEnemy.name = newEnemy.state().name();
       }
 
-      // 画像ロード処理
-      critical_section_enter_blocking(&sdLock);
-      for (int i = 0; i < 4; i++) {
-        if (i < activeEnemies.size()) {
-          String fname = "/e_" + String(activeEnemies[i].who) + ".bin";
-          activeImages[i] = imgMgr.load(i, fname, sd);
-        } else {
-          activeImages[i] = nullptr;
-        }
-      }
-      critical_section_exit(&sdLock);
+      images.prepareEnemies(spec, activeEnemies, activeImages);
 
       bgm.emit(BattleBgmEvent::START, spec.kind);
     }
     
-    critical_section_enter_blocking(&sdLock);
-    activeImages[4] = imgMgr.load(4, "/a_38.bin", sd);
-    for (int i = 0; i < party.memberCount(); i++) {
-      if (i < 3) {
-        int id = party.member(i).state().id();
-        if (id == 99) id = 38; // デバッグ用
-
-        String fname = "/a_" + String(id) + ".bin";
-        activeImages[5 + i] = imgMgr.load(5 + i, fname, sd);
-      }
-    }
-    critical_section_exit(&sdLock);
+    images.prepareParty(party, activeImages + 4);
     // ★ 行動順リストを作成 (ソートはしない)
     actorList.clear();
     actorList.push_back({CombatantSide::PLAYER, 0});
