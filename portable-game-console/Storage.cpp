@@ -31,15 +31,15 @@ void Storage::init(AudioManager &music) {
     paths[9] = "/bgm_9.raw"; // タイトル
     paths[99] = "/bgm_99.raw";
     for (int i = 0; i < AudioManager::TRACK_COUNT; ++i) {
-      music.musicFiles[i] = sdfat.open(paths[i], FILE_READ);
-      if (!music.musicFiles[i]) {
+      musicFiles[i] = sdfat.open(paths[i], FILE_READ);
+      if (!musicFiles[i]) {
         //Serial.printf("Failed to open %s\n", paths[i]);
         //while (1);
       }
     }
     music.currentTrack = 9;
     // 初期曲データ読み込み
-    FsFile& f = music.musicFiles[music.currentTrack];
+    FsFile& f = musicFiles[music.currentTrack];
     f.seek(0);
     size_t n0 = f.read((void*)music.buffer0, AudioManager::BUF_SIZE);
     size_t n1 = f.read((void*)music.buffer1, AudioManager::BUF_SIZE);
@@ -85,7 +85,7 @@ void Storage::performPendingSwitch(AudioManager &music) {
     refillOffset = 0;
 
     // --- ファイルを最初から ---
-    FsFile &file = music.musicFiles[newTrack];
+    FsFile &file = musicFiles[newTrack];
     file.seek(0);
 
     // --- 新しいデータをロード ---
@@ -122,7 +122,7 @@ void Storage::refile(AudioManager &music) {
     }
 
     FsFile& file =
-        music.musicFiles[music.currentTrack];
+        musicFiles[music.currentTrack];
 
     if (!file.isOpen()) {
       return;

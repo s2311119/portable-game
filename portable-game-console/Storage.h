@@ -1,5 +1,6 @@
 #pragma once
 #include "AudioManager.h"
+#include <SdFat.h>
 #include <algorithm>
 #include <cstring>
 
@@ -16,6 +17,7 @@ public:
   size_t refillOffset = 0;
 private:
   SdFat sdfat;
+  FsFile musicFiles[AudioManager::TRACK_COUNT];
 public:
   Storage();
   void resetRefillOffset();

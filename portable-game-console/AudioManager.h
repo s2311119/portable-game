@@ -1,6 +1,5 @@
 #pragma once
 #include <Arduino.h>
-#include <SdFat.h>
 #include "hardware/structs/sio.h"
 #include "BgmCue.h"
 
@@ -14,7 +13,6 @@ public:
   static const int BUF_SIZE = 4096;
   static const int TRACK_COUNT = 100;  // 例: 0=nocturne, 1=gekkou
 
-  FsFile musicFiles[TRACK_COUNT];
   int currentTrack = 0;
 
   volatile uint8_t buffer0[BUF_SIZE];
