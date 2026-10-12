@@ -34,6 +34,7 @@
 #include "ShopRenderer.h"
 #include "InnMenu.h"
 #include "InnRenderer.h"
+#include "StorageMenu.h"
 
 class Menu {
 public:
@@ -60,7 +61,6 @@ public:
   int listCursor = 0;
   bool active = false;
   bool saveSucceeded = false;
-  int storageMode = 0; // 0:メニュー選択, 1:引き出す, 2:預ける
 
   Menu() {
     currentMenuState = STATE_MAIN; // 初期状態
@@ -83,6 +83,12 @@ public:
     active = true;
     currentMenuState = STATE_INN;
     innMenu.open();
+  }
+
+  void openStorage() {
+    active = true;
+    currentMenuState = STATE_STORAGE;
+    storageMenu.open();
   }
 
   void update(Controller &ctrl, Inventory& inventory, Player& hero, Party& party, AutomatonStorage& storage, Map& map, WorldProgress& progress, MUSIC& music, Sd& sd, SaveManager& saveMgr, Settings& settings, Vibration& vib);
@@ -124,18 +130,18 @@ public:
           g->lineSprite.setCursor(10, 10 - drawY);
           g->lineSprite.print("=== 預かり所 ===");
 
-          if (storageMode == 0) {
+          if (storageMenu.state() == StorageMenu::State::CHOICE) {
               g->lineSprite.setCursor(40, 50 - drawY);
-              g->lineSprite.setTextColor(listCursor == 0 ? TFT_YELLOW : TFT_WHITE); g->lineSprite.print("仲間を引き出す");
+              g->lineSprite.setTextColor(storageMenu.cursor() == 0 ? TFT_YELLOW : TFT_WHITE); g->lineSprite.print("仲間を引き出す");
               g->lineSprite.setCursor(40, 80 - drawY);
-              g->lineSprite.setTextColor(listCursor == 1 ? TFT_YELLOW : TFT_WHITE); g->lineSprite.print("仲間を預ける");
+              g->lineSprite.setTextColor(storageMenu.cursor() == 1 ? TFT_YELLOW : TFT_WHITE); g->lineSprite.print("仲間を預ける");
               g->lineSprite.setTextColor(TFT_WHITE);
               g->lineSprite.setCursor(40, 130 - drawY);
               g->lineSprite.printf("パーティー: %d/%d人", party.memberCount(), Party::MAX_MEMBERS);
               g->lineSprite.setCursor(40, 150 - drawY);
               g->lineSprite.printf("預かり所: %d人", storage.memberCount());
           }
-          else if (storageMode == 1) {
+          else if (storageMenu.state() == StorageMenu::State::WITHDRAW) {
               g->lineSprite.setCursor(10, 35 - drawY); g->lineSprite.print("誰を引き出しますか？");
               if (party.memberCount() >= Party::MAX_MEMBERS) { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.print(" (満員)"); }
               int count = storage.memberCount();
@@ -143,13 +149,13 @@ public:
 
               int itemsPerPage = 6;
               int startIdx = 0;
-              if (listCursor >= itemsPerPage) startIdx = listCursor - (itemsPerPage - 1);
+              if (storageMenu.cursor() >= itemsPerPage) startIdx = storageMenu.cursor() - (itemsPerPage - 1);
               int endIdx = startIdx + itemsPerPage;
               if (endIdx > count) endIdx = count;
 
               for(int i = startIdx; i < endIdx; i++) {
                   g->lineSprite.setCursor(30, 60 + (i - startIdx) * 25 - drawY);
-                  g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
+                  g->lineSprite.setTextColor(storageMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
                   g->lineSprite.printf(
                       "%s Lv%d",
                       storage.member(i).state().name(),
@@ -157,13 +163,13 @@ public:
                   );
               }
           }
-          else if (storageMode == 2) {
+          else if (storageMenu.state() == StorageMenu::State::DEPOSIT) {
               g->lineSprite.setCursor(10, 35 - drawY); g->lineSprite.print("誰を預けますか？");
               int count = party.memberCount();
               if (count == 0) { g->lineSprite.setCursor(30, 60 - drawY); g->lineSprite.print("誰もいません"); }
               for(int i=0; i<count; i++) {
                   g->lineSprite.setCursor(30, 60 + i*25 - drawY);
-                  g->lineSprite.setTextColor(listCursor == i ? TFT_YELLOW : TFT_WHITE);
+                  g->lineSprite.setTextColor(storageMenu.cursor() == i ? TFT_YELLOW : TFT_WHITE);
                   g->lineSprite.printf(
                       "%s Lv%d",
                       party.member(i).state().name(),
@@ -259,5 +265,6 @@ private:
   ShopRenderer shopRenderer;
   InnMenu innMenu;
   InnRenderer innRenderer;
+  StorageMenu storageMenu;
   bool settingsSaveRequested = false;
 };

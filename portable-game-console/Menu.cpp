@@ -32,8 +32,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
     }
     music.playSE(1);
     if (currentMenuState == STATE_STORAGE) {
-      if (storageMode != 0) storageMode = 0; // モード選択に戻る
-      else active = false; // メニューを閉じる (イベント終了)
+      if (storageMenu.cancel() == StorageMenuResult::CLOSE) active = false;
       return;
     }else if (currentMenuState == STATE_SHOP_BUY || currentMenuState == STATE_SHOP_SELL || currentMenuState == STATE_SHOP_CHOICE) {
       if (shopMenu.cancel() == ShopMenuResult::CLOSE) active = false;
@@ -141,57 +140,55 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_STORAGE: {
-      // storageMode: 0=選択, 1=引き出す(Withdraw), 2=預ける(Deposit)
-
-      if (storageMode == 0) {
-        // メニュー選択 (上:引き出す, 下:預ける)
+      if (storageMenu.state() == StorageMenu::State::CHOICE) {
         if (upPressed || downPressed) {
-          listCursor = (listCursor == 0) ? 1 : 0;
+          storageMenu.toggleChoice();
           music.playSE(2);
         }
         if (aPressed) {
-          storageMode = (listCursor == 0) ? 1 : 2; // 0なら引き出す、1なら預ける
-          listCursor = 0;
+          storageMenu.selectChoice();
           music.playSE(0);
         }
       }
-      else if (storageMode == 1) { // 引き出す (Storage -> Party)
+      else if (storageMenu.state() == StorageMenu::State::WITHDRAW) {
         int sCount = storage.memberCount();
         if (sCount > 0) {
-          if (upPressed){
-            listCursor = (listCursor - 1 + sCount) % sCount;
+          if (upPressed) {
+            storageMenu.moveUp(sCount);
             music.playSE(2);
           }
-          if (downPressed){
-            listCursor = (listCursor + 1) % sCount;
+          if (downPressed) {
+            storageMenu.moveDown(sCount);
             music.playSE(2);
           }
 
           if (aPressed) {
             if (party.memberCount() < Party::MAX_MEMBERS) {
-              storage.withdrawMember(listCursor, party);
-              listCursor = 0; // リセット
+              StorageMemberRequest request = storageMenu.requestMember();
+              storage.withdrawMember(request.memberIndex, party);
+              storageMenu.completeWithdraw();
               music.playSE(0);
-            }else{
+            } else {
               music.playSE(1);
             }
           }
         }
       }
-      else if (storageMode == 2) { // 預ける (Party -> Storage)
+      else if (storageMenu.state() == StorageMenu::State::DEPOSIT) {
         int pCount = party.memberCount();
         if (pCount > 0) {
-          if (upPressed){
-            listCursor = (listCursor - 1 + pCount) % pCount;
+          if (upPressed) {
+            storageMenu.moveUp(pCount);
             music.playSE(2);
           }
-          if (downPressed){
-            listCursor = (listCursor + 1) % pCount;
+          if (downPressed) {
+            storageMenu.moveDown(pCount);
             music.playSE(2);
           }
           if (aPressed) {
-            party.depositMember(listCursor, storage);
-            if (listCursor >= party.memberCount()) listCursor = 0;
+            StorageMemberRequest request = storageMenu.requestMember();
+            party.depositMember(request.memberIndex, storage);
+            storageMenu.completeDeposit(party.memberCount());
             music.playSE(0);
           }
         }

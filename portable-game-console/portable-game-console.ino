@@ -764,10 +764,7 @@ void loop() {
         break;
 
       case FieldEventAction::OPEN_STORAGE:
-        menu.active = true;
-        menu.currentMenuState = Menu::STATE_STORAGE;
-        menu.storageMode = 0;
-        menu.listCursor = 0;
+        menu.openStorage();
         state = STATE_MENU;
         currentEvent.type = FieldEventType::NONE;
         break;
