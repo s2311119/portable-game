@@ -25,6 +25,7 @@
 #include "ItemRenderer.h"
 #include "ItemUseSystem.h"
 #include "SkillMenu.h"
+#include "SkillRenderer.h"
 
 class Menu {
 public:
@@ -118,51 +119,7 @@ public:
           }
 
       } else if (currentMenuState == STATE_SKILL) {
-          int x = 10, y = 40 - drawY;
-          int w = 300, h = 190;
-          g->lineSprite.fillRect(x, y, w, h, TFT_DARKGREY);
-          g->lineSprite.drawRect(x, y, w, h, TFT_WHITE);
-          g->lineSprite.setTextSize(2);
-          g->lineSprite.setTextColor(TFT_WHITE);
-          g->lineSprite.setCursor(x + 20, y + 15);
-          g->lineSprite.print("旋律 (何を習得？)");
-          g->lineSprite.drawLine(x, y + 40, x + w, y + 40, TFT_WHITE);
-
-          int itemsPerPage = 3;
-          int startIdx = 0;
-          if (skillMenu.cursor() >= itemsPerPage) startIdx = skillMenu.cursor() - (itemsPerPage - 1);
-          int endIdx = startIdx + itemsPerPage;
-          if (endIdx > skillMenu.skillCount()) endIdx = skillMenu.skillCount();
-
-          for (int i = startIdx; i < endIdx; i++) {
-              Skill skill = SkillCatalog::get(skillMenu.skillIdAt(i));
-              int scrollId = 200 + skill.id;
-              bool hasScroll = (inventory.countItem(scrollId) > 0);
-              bool alreadyLearned = false;
-              alreadyLearned = hero.state().skills().has(skill.id);
-              uint16_t color = TFT_WHITE;
-              if (i == skillMenu.cursor()) color = TFT_YELLOW;
-              else if (alreadyLearned) color = TFT_GREEN;
-              else if (!hasScroll) color = TFT_LIGHTGREY;
-
-              g->lineSprite.setTextColor(color);
-              g->lineSprite.setCursor(x + 20, y + 55 + (i - startIdx) * 28);
-              String statusStr = "";
-              if (alreadyLearned) statusStr = "(済)";
-              g->lineSprite.printf("%s%s (TP:%d)", skill.name, statusStr.c_str(), skill.tpCost);
-          }
-
-          g->lineSprite.drawLine(x, y + 140, x + w, y + 140, TFT_WHITE);
-          int targetSkillId = skillMenu.skillIdAt(skillMenu.cursor());
-          int reqScrollId = 200 + targetSkillId;
-          int scrollCount = inventory.countItem(reqScrollId);
-          g->lineSprite.setCursor(x + 20, y + 155);
-          g->lineSprite.setTextColor(TFT_WHITE);
-          bool isLearned = false;
-          isLearned = hero.state().skills().has(targetSkillId);
-          if (isLearned) { g->lineSprite.setTextColor(TFT_GREEN); g->lineSprite.print("習得済みです"); }
-          else if (scrollCount > 0) { g->lineSprite.setTextColor(TFT_CYAN); g->lineSprite.printf("習得可能！ (所持: %d)", scrollCount); }
-          else { g->lineSprite.setTextColor(TFT_RED); g->lineSprite.setTextSize(1); g->lineSprite.setCursor(x + 20, y + 160); g->lineSprite.printf("必要: %s", ItemCatalog::get(reqScrollId).name); }
+        skillRenderer.drawLine(skillMenu, inventory, hero, *g, drawY);
 
       } else if (currentMenuState == STATE_ITEM) {
         itemRenderer.drawLine(itemMenu, inventory, hero, party, *g, drawY);
@@ -464,5 +421,6 @@ private:
   ItemRenderer itemRenderer;
   ItemUseSystem itemUseSystem;
   SkillMenu skillMenu;
+  SkillRenderer skillRenderer;
   bool settingsSaveRequested = false;
 };
