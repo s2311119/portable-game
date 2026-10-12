@@ -243,6 +243,7 @@ struct Game {
   MemoryMonitor memMonitor;
   Settings settings;
   void drawMenuFlow();
+  void startBattleEncounter(const EncounterSpec& spec, const BattleBgmHooks& bgm);
 };
 
 struct LoadGameOperation {
@@ -328,8 +329,9 @@ void Game::drawMenuFlow() {
   }
 }
 
-void startBattleEncounter(Game& context, const EncounterSpec& spec,
-                          const BattleBgmHooks& bgm) {
+void Game::startBattleEncounter(const EncounterSpec& spec,
+                                const BattleBgmHooks& bgm) {
+  Game& context = *this;
   Battle& battle = *context.battle;
   if (battle.inBattle) return;
 
@@ -758,7 +760,7 @@ void loop() {
         if (!ctx->battle->inBattle) {
           EncounterSpec spec = encounterManager.createEncounter(
               ctx->session->progress().floor(), map, encounterRandom);
-          startBattleEncounter(*ctx, spec, battleBgm);
+          ctx->startBattleEncounter(spec, battleBgm);
         }
       }
     }
@@ -914,7 +916,7 @@ void loop() {
                                              field_random_adapter::drawRange};
           EncounterSpec spec = encounterManager.createBossEncounter(
               ctx->session->progress().floor(), map, encounterRandom);
-          startBattleEncounter(*ctx, spec, battleBgm);
+          ctx->startBattleEncounter(spec, battleBgm);
         }
 
         currentEvent.type = FieldEventType::NONE;
