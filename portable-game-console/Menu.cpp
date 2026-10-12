@@ -24,6 +24,12 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
         currentMenuState = STATE_MAIN;
       return;
     }
+    if (currentMenuState == STATE_EVOLVE) {
+      music.playSE(1);
+      if (evolutionMenu.cancel() == EvolutionMenuResult::BACK)
+        currentMenuState = STATE_MAIN;
+      return;
+    }
     music.playSE(1);
     if (currentMenuState == STATE_STORAGE) {
       if (storageMode != 0) storageMode = 0; // モード選択に戻る
@@ -35,7 +41,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       active = false; // 店を出る
     }else if (currentMenuState == STATE_INN) {
       active = false; // 宿屋を出る
-    }else if (currentMenuState == STATE_EVOLVE || currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
+    }else if (currentMenuState == STATE_SKILL || currentMenuState == STATE_CONFIG) {
       // 進化・旋律画面でBを押したらメインに戻る
       if (currentMenuState == STATE_CONFIG) settingsSaveRequested = true;
       currentMenuState = STATE_MAIN;
@@ -75,6 +81,7 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           case MainMenuResult::OPEN_EVOLUTION:
             currentMenuState = STATE_EVOLVE;
             listCursor = 0;
+            evolutionMenu.open();
             break;
           case MainMenuResult::OPEN_EQUIPMENT:
             currentMenuState = STATE_EQUIP;
@@ -193,22 +200,22 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
       break;
     }
     case STATE_EVOLVE: {
-      // --- 進化画面（仲間選択）の操作 ---
       int memberCount = party.memberCount();
-      if (memberCount > 0) { // 仲間が1人以上いる
+      if (memberCount > 0) {
         if (upPressed){
-          listCursor = (listCursor - 1 + memberCount) % memberCount;
+          evolutionMenu.moveUp(memberCount);
           music.playSE(2);
         }
         if (downPressed){
-          listCursor = (listCursor + 1) % memberCount;
+          evolutionMenu.moveDown(memberCount);
           music.playSE(2);
         }
 
         if (aPressed) {
+          EvolutionRequest request = evolutionMenu.confirm();
           const ProgressionResult evolution =
               CharacterProgressionSystem::tryItemEvolution(
-                  party.memberState(listCursor), inventory,
+                  party.memberState(request.partyIndex), inventory,
                   [](void* context) {
                     static_cast<MUSIC*>(context)->playSE(1);
                   },
@@ -216,22 +223,12 @@ void Menu::update(Controller &ctrl, Inventory& inventory, Player& hero, Party& p
           const bool itemUsed = evolution.evolved;
           if (itemUsed) music.playSE(0);
 
-          // --- 進化後の後処理 ---
           if (itemUsed) {
-            // ★ ここにあった erase は削除しました (上で既に消しているため)
-
-            // カーソル位置を安全な場所に補正 (アイテムが減ってズレる可能性があるため)
             int newItemCount = inventory.items.size();
-            // アイテムリストの方のカーソルではなく、仲間リストのカーソル(listCursor)なので
-            // 実はここはあまり関係ないですが、念のためバグ防止
-            if (listCursor >= memberCount) {
-                listCursor = memberCount - 1;
-            }
-            // (もしアイテム画面ならアイテムリストのカーソル補正が必要ですが、
-            //  ここは進化画面なので、仲間リストのカーソルはそのままで大丈夫です)
+            evolutionMenu.adjustCursorAfterEvolution(memberCount);
           }
-        } // Aボタン処理 終了
-      } // itemCount > 0 終了
+        }
+      }
       break;
     }
     case STATE_SKILL: {

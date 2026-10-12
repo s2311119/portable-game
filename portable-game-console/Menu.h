@@ -28,6 +28,7 @@
 #include "SkillRenderer.h"
 #include "EquipmentMenu.h"
 #include "EquipmentRenderer.h"
+#include "EvolutionMenu.h"
 
 class Menu {
 public:
@@ -111,7 +112,7 @@ public:
               for (int i = 0; i < memberCount; i++) {
                   if (i >= 5) break;
                   const Automaton& ally = party.member(i);
-                  uint16_t color = (i == listCursor) ? TFT_YELLOW : TFT_WHITE;
+                  uint16_t color = (i == evolutionMenu.cursor()) ? TFT_YELLOW : TFT_WHITE;
                   g->lineSprite.setTextColor(color);
                   g->lineSprite.setCursor(x + 20, y + 55 + i * 28);
                   g->lineSprite.printf("%s Lv%d HP%d/%d", ally.state().name(), ally.state().progress().level(), ally.state().stats().getHp(), ally.state().stats().getMaxHp());
@@ -352,5 +353,6 @@ private:
   SkillRenderer skillRenderer;
   EquipmentMenu equipmentMenu;
   EquipmentRenderer equipmentRenderer;
+  EvolutionMenu evolutionMenu;
   bool settingsSaveRequested = false;
 };
