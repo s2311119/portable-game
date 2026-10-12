@@ -33,6 +33,21 @@ uint16_t* ImageManager::get(int slot) {
     return pool[slot];
 }
 
+// Read-only battle views. Active-slot metadata is added with BattleImageRequest.
+const uint16_t* ImageManager::enemyImage(int enemyIndex) const {
+    if (enemyIndex < 0 || enemyIndex >= 4) return nullptr;
+    return pool[enemyIndex];
+}
+
+const uint16_t* ImageManager::playerImage() const {
+    return pool[4];
+}
+
+const uint16_t* ImageManager::allyImage(int allyIndex) const {
+    if (allyIndex < 0 || allyIndex >= 3) return nullptr;
+    return pool[5 + allyIndex];
+}
+
 // 全消去（実際はメモリを解放せず、黒く塗るだけ）
 // これが「擬似的なガベージコレクション」になります
 void ImageManager::clearAll() {

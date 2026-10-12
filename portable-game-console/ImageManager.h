@@ -15,5 +15,8 @@ public:
   ImageManager();
   uint16_t* load(int slot, String filename, Sd& sd);
   uint16_t* get(int slot);
+  const uint16_t* enemyImage(int enemyIndex) const;
+  const uint16_t* playerImage() const;
+  const uint16_t* allyImage(int allyIndex) const;
   void clearAll();
 };
