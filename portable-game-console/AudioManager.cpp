@@ -1,7 +1,7 @@
 #include "Storage.h"
 #include "StorageSyncInternal.h"
 
-void AudioManager::playBGM(BgmCue cue, Storage &sd) {
+void AudioManager::playBGM(BgmCue cue) {
   int track = 0;
   switch (cue) {
     case BgmCue::TOWN: track = 0; break;
@@ -12,7 +12,7 @@ void AudioManager::playBGM(BgmCue cue, Storage &sd) {
     case BgmCue::TITLE: track = 9; break;
     case BgmCue::GAME_OVER: track = 99; break;
   }
-  switchTrack(track, sd);
+  switchTrack(track);
 }
 
 void AudioManager::initializeTracks(Storage &sd) {
@@ -170,8 +170,7 @@ void AudioManager::refile(Storage &sd) {
     }
   }
 
-// --- AudioManager::switchTrack 実装部（Storageの定義後） ---
-void AudioManager::switchTrack(int newId, Storage &sd) {
+void AudioManager::switchTrack(int newId) {
   if (newId == currentTrack) return;
 
   // --- 安全な切替要求 ---

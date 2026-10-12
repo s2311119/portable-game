@@ -167,12 +167,12 @@ public:
     sio_hw->gpio_set = csMask;
   }
 
-  void playBGM(BgmCue cue, class Storage &sd);
+  void playBGM(BgmCue cue);
   void initializeTracks(class Storage &sd);
   void performPendingSwitch(class Storage &sd);
   void refile(class Storage &sd);
 
 private:
   void requestSwitch(int trackId);
-  void switchTrack(int newId, class Storage &sd);
+  void switchTrack(int newId);
 };
