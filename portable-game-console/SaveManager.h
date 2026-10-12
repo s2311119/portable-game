@@ -2,7 +2,7 @@
 
 #include "Map.h"
 
-class Sd;
+class Storage;
 class AudioManager;
 class WorldProgress;
 class Player;
@@ -23,21 +23,21 @@ public:
   const char* SAVE_FILENAME = "/save.dat";
   const char* SAVE_MAGIC = "PGSAVE2";
 
-  bool saveGame(Sd& sd, AudioManager& music, const GameSession& session);
+  bool saveGame(Storage& sd, AudioManager& music, const GameSession& session);
 
-  LoadGameResult loadGame(Sd& sd, AudioManager& music, GameSession& session);
+  LoadGameResult loadGame(Storage& sd, AudioManager& music, GameSession& session);
 
-  bool saveSettings(Sd& sd, AudioManager& music, const Settings& settings);
-  bool loadSettings(Sd& sd, Settings& settings);
+  bool saveSettings(Storage& sd, AudioManager& music, const Settings& settings);
+  bool loadSettings(Storage& sd, Settings& settings);
 
-  bool hasSaveFile(Sd& sd);
+  bool hasSaveFile(Storage& sd);
 
 private:
   const char* SETTINGS_FILENAME = "/settings.dat";
   const char* SETTINGS_MAGIC = "PGSET1";
 
   bool saveComponents(
-      Sd& sd,
+      Storage& sd,
       AudioManager& music,
       const Map& map,
       const WorldProgress& progress,

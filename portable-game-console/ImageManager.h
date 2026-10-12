@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 
-class Sd;
+class Storage;
 
 struct BattleImageRequest {
   int enemyIds[4];
@@ -32,12 +32,12 @@ private:
   // これが「メモリプール」です。ここ以外には画像を置きません。
   uint16_t* pool[8];
   ImageSlotInfo slotInfo[8];
-  Sd& sd;
+  Storage& sd;
 
   void load(int slot, ImageKind kind, int id);
 
 public:
-  explicit ImageManager(Sd& sd);
+  explicit ImageManager(Storage& sd);
   void prepareEnemyImages(const BattleImageRequest& request);
   void preparePartyImages(const BattleImageRequest& request);
   const uint16_t* enemyImage(int enemyIndex) const;

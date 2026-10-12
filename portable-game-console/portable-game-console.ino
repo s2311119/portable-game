@@ -34,7 +34,7 @@
 #include "FloorManager.h"
 #include "Settings.h"
 #include "AudioManager.h"
-#include "Sd.h"
+#include "Storage.h"
 #include "SaveManager.h"
 #include "ImageManager.h"
 #include "GameSession.h"
@@ -141,7 +141,7 @@ long drawRange(void*, long min, long max) { return random(min, max); }
 namespace battle_bgm_adapter {
 struct Context {
   AudioManager* music;
-  Sd* sd;
+  Storage* sd;
   Map* map;
 };
 
@@ -211,7 +211,7 @@ struct GameContext {
   GameOverRenderer gameOverRenderer;
   Controller* controller;
   AudioManager* music;
-  Sd* sd;
+  Storage* sd;
   MenuFlow* menu;
   MainMenuRenderer mainMenuRenderer;
   ItemRenderer itemRenderer;
@@ -516,7 +516,7 @@ void setup() {
   ctx->graphic = new Graphic();
   ctx->controller = new Controller();
   ctx->music = new AudioManager();
-  ctx->sd = new Sd();
+  ctx->sd = new Storage();
   ctx->imgMgr = new ImageManager(*ctx->sd);
   // Graphic, SD の初期化
   ctx->graphic->init();

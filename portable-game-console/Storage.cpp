@@ -1,6 +1,6 @@
-#include "Sd.h"
+#include "Storage.h"
 
-bool Sd::loadToBuffer(String filename, uint16_t* buffer) {
+bool Storage::loadToBuffer(String filename, uint16_t* buffer) {
     FsFile file = sdfat.open(filename.c_str(), O_READ);
     if (!file) return false; // 失敗
 

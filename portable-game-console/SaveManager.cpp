@@ -8,7 +8,7 @@
 #include "AudioManager.h"
 #include "Party.h"
 #include "Player.h"
-#include "Sd.h"
+#include "Storage.h"
 #include "Settings.h"
 #include "WorldProgress.h"
 
@@ -306,13 +306,13 @@ void applyGameData(const GameSaveData& data, GameSession& session) {
 
 } // namespace
 
-bool SaveManager::saveGame(Sd& sd, AudioManager& music, const GameSession& session) {
+bool SaveManager::saveGame(Storage& sd, AudioManager& music, const GameSession& session) {
   return saveComponents(sd, music, session.map(), session.progress(),
       session.player(), session.party(), session.storage(), session.inventory());
 }
 
 bool SaveManager::saveComponents(
-    Sd& sd,
+    Storage& sd,
     AudioManager& music,
     const Map& map,
     const WorldProgress& progress,
@@ -339,7 +339,7 @@ bool SaveManager::saveComponents(
   return true;
 }
 
-LoadGameResult SaveManager::loadGame(Sd& sd, AudioManager& music, GameSession& session) {
+LoadGameResult SaveManager::loadGame(Storage& sd, AudioManager& music, GameSession& session) {
   (void)music; // load synchronization is owned by the top-level caller.
   LoadGameResult failure = {false, false, Map::TYPE_DUNGEON};
   FsFile file = sd.sdfat.open(SAVE_FILENAME, O_READ);
@@ -354,7 +354,7 @@ LoadGameResult SaveManager::loadGame(Sd& sd, AudioManager& music, GameSession& s
   return {true, data.format == SaveFormat::LEGACY, data.mapType};
 }
 
-bool SaveManager::saveSettings(Sd& sd, AudioManager& music, const Settings& settings) {
+bool SaveManager::saveSettings(Storage& sd, AudioManager& music, const Settings& settings) {
   music.paused = true;
   critical_section_enter_blocking(&sdLock);
 
@@ -376,7 +376,7 @@ bool SaveManager::saveSettings(Sd& sd, AudioManager& music, const Settings& sett
   return true;
 }
 
-bool SaveManager::loadSettings(Sd& sd, Settings& settings) {
+bool SaveManager::loadSettings(Storage& sd, Settings& settings) {
   FsFile file = sd.sdfat.open(SETTINGS_FILENAME, O_READ);
   if (!file) return false;
 
@@ -402,6 +402,6 @@ bool SaveManager::loadSettings(Sd& sd, Settings& settings) {
   return true;
 }
 
-bool SaveManager::hasSaveFile(Sd& sd) {
+bool SaveManager::hasSaveFile(Storage& sd) {
   return sd.sdfat.exists(SAVE_FILENAME);
 }

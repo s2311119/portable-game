@@ -1,9 +1,9 @@
 #include "ImageManager.h"
 
-#include "Sd.h"
+#include "Storage.h"
 #include <cstring>
 
-ImageManager::ImageManager(Sd& sd) : sd(sd) {
+ImageManager::ImageManager(Storage& sd) : sd(sd) {
   // 起動時に固定8枚分を確保し、戦闘中の確保・解放は行わない。
   for (int i = 0; i < 8; ++i) {
     pool[i] = new uint16_t[64 * 64];

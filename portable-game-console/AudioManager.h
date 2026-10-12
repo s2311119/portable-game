@@ -7,7 +7,7 @@ static const int DAC_CS_PIN   = 17; // MCP4921 CS
 static const int DAC_SCK_PIN  = 9;  // ソフトSPIクロック
 static const int DAC_MOSI_PIN = 8;  // ソフトSPI MOSI
 
-class Sd;
+class Storage;
 class AudioManager {
 public:
   static const int BUF_SIZE = 4096;
@@ -165,5 +165,5 @@ public:
     sio_hw->gpio_set = csMask;
   }
 
-  void switchTrack(int newId, class Sd &sd);
+  void switchTrack(int newId, class Storage &sd);
 };

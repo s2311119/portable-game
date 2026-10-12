@@ -11,13 +11,13 @@ static const int SD_MISO_PIN = 16;  // SD MISO（プルアップ必須）
 static const int SD_SCK_PIN  = 18;
 static const int SD_MOSI_PIN = 19;
 
-class Sd {
+class Storage {
 public:
   volatile bool pendingSwitch = false;
   int pendingTrack = -1;
   size_t refillOffset = 0;
   SdFat sdfat;
-  Sd() {
+  Storage() {
     pinMode(SD_CS_PIN, OUTPUT);
     digitalWrite(SD_CS_PIN, HIGH);
     pinMode(SD_MISO_PIN, INPUT_PULLUP);
