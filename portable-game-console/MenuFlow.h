@@ -26,6 +26,7 @@
 
 enum class MenuFlowResult {
   NONE,
+  CLOSE_MENU,
   REQUEST_SAVE,
   SAVE_SETTINGS
 };

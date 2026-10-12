@@ -789,7 +789,7 @@ void loop() {
     drawMenuFlow(*ctx);
     //g.screenSprite.pushSprite(0,0);
 
-    if (!menu.isActive()) {
+    if (menuResult == MenuFlowResult::CLOSE_MENU) {
       state = STATE_GAME; // ゲーム画面に戻る
       //もしうまくいかなかったらここを
       ctx->requestRegenerate = false;

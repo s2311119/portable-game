@@ -36,12 +36,21 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
     }
     feedback.playSE(feedback.context, 1);
     if (screen_ == MenuScreen::STORAGE) {
-      if (storageMenu.cancel() == StorageMenuResult::CLOSE) active_ = false;
+      if (storageMenu.cancel() == StorageMenuResult::CLOSE) {
+        active_ = false;
+        return MenuFlowResult::CLOSE_MENU;
+      }
       return MenuFlowResult::NONE;
     }else if (screen_ == MenuScreen::SHOP) {
-      if (shopMenu.cancel() == ShopMenuResult::CLOSE) active_ = false;
+      if (shopMenu.cancel() == ShopMenuResult::CLOSE) {
+        active_ = false;
+        return MenuFlowResult::CLOSE_MENU;
+      }
     }else if (screen_ == MenuScreen::INN) {
-      if (innMenu.cancel() == InnMenuResult::CLOSE) active_ = false;
+      if (innMenu.cancel() == InnMenuResult::CLOSE) {
+        active_ = false;
+        return MenuFlowResult::CLOSE_MENU;
+      }
     }else if (screen_ == MenuScreen::SKILL || screen_ == MenuScreen::SETTINGS) {
       // 進化・旋律画面でBを押したらメインに戻る
       if (screen_ == MenuScreen::SETTINGS &&
@@ -52,7 +61,10 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       screen_ = MenuScreen::MAIN;
     } else if (screen_ == MenuScreen::MAIN) {
       // メインメニューでBを押したらメニューを閉じる
-      if (mainMenu.cancel() == MainMenuResult::CLOSE) active_ = false;
+      if (mainMenu.cancel() == MainMenuResult::CLOSE) {
+        active_ = false;
+        return MenuFlowResult::CLOSE_MENU;
+      }
     }
     return MenuFlowResult::NONE; // Bボタンが押されたフレームは他の操作を無視
   }
@@ -247,7 +259,11 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
       break;
     }
     case MenuScreen::SAVE_RESULT:
-      if (aPressed) { active_ = false; feedback.playSE(feedback.context, 1);} // 閉じる
+      if (aPressed) {
+        active_ = false;
+        feedback.playSE(feedback.context, 1);
+        return MenuFlowResult::CLOSE_MENU;
+      }
       break;
     case MenuScreen::EQUIPMENT: {
       if (equipmentMenu.state() == EquipmentMenu::State::SLOT) {
@@ -306,11 +322,13 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
             member.heal(9999); member.restoreTP(9999);
           }
           active_ = false;
+          return MenuFlowResult::CLOSE_MENU;
         } else if (result == InnMenuResult::INSUFFICIENT_FUNDS) {
           feedback.playSE(feedback.context, 1);
         } else {
           active_ = false;
           feedback.playSE(feedback.context, 1);
+          return MenuFlowResult::CLOSE_MENU;
         }
       }
       break;
@@ -322,8 +340,10 @@ MenuFlowResult MenuFlow::update(Controller& ctrl, Inventory& inventory,
 
         if (aPressed) {
           feedback.playSE(feedback.context, 0);
-          if (shopMenu.selectChoice(progress.floor()) == ShopMenuResult::CLOSE)
+          if (shopMenu.selectChoice(progress.floor()) == ShopMenuResult::CLOSE) {
             active_ = false;
+            return MenuFlowResult::CLOSE_MENU;
+          }
         }
       } else if (shopMenu.state() == ShopMenu::State::BUY) {
         int itemCount = shopMenu.stockCount();
