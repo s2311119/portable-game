@@ -246,6 +246,7 @@ struct Game {
   void startBattleEncounter(const EncounterSpec& spec, const BattleBgmHooks& bgm);
   void applyFloorMapConfig();
   void loadGameAndRegenerateLegacy(LoadGameResult& result);
+  void update();
 };
 
 struct LoadGameOperation {
@@ -694,7 +695,8 @@ void setup() {
   // 4. 音楽スレッド起動
 }
 
-void loop() {
+void Game::update() {
+  Game* ctx = this;
   ctx->memMonitor.update();
   if (ctx->requestRegenerate) {
     ctx->requestRegenerate = false;
@@ -979,4 +981,8 @@ void loop() {
     }
     prevState = state;
   }
+}
+
+void loop() {
+  ctx->update();
 }
