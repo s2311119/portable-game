@@ -12,28 +12,17 @@ static const int SD_MOSI_PIN = 19;
 class Storage {
 public:
   static void initializeSynchronization();
-  volatile bool pendingSwitch = false;
-  int pendingTrack = -1;
-  size_t refillOffset = 0;
 private:
   SdFat sdfat;
   FsFile musicFiles[AudioManager::TRACK_COUNT];
 public:
   Storage();
-  void resetRefillOffset();
   void init();
   void openTrack(int trackId, const char* path);
   bool trackIsOpen(int trackId) const;
   void seekTrackStart(int trackId);
   size_t readTrack(int trackId, void* buffer, size_t bytes);
-
-  // 切り替え予約（ID指定）
-  void requestSwitch(int trackId);
-
-  // core1ループで実行
-  void performPendingSwitch(AudioManager &music);
-
-  void refile(AudioManager &music);
+  bool trackFileIsOpen(int trackId) const;
 
   bool loadToBuffer(String filename, uint16_t* buffer);
   FsFile openFile(const char* filename, uint8_t flags);

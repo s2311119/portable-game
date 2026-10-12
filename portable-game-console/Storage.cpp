@@ -13,8 +13,6 @@ Storage::Storage() {
     pinMode(SD_MISO_PIN, INPUT_PULLUP);
   }
 
-void Storage::resetRefillOffset() { refillOffset = 0; }
-
 void Storage::init() {
     if (!sdfat.begin(SD_CS_PIN, SD_SCK_MHZ(20))) {
       //Serial.println("SD init failed!");
@@ -38,130 +36,8 @@ size_t Storage::readTrack(int trackId, void* buffer, size_t bytes) {
     return musicFiles[trackId].read(buffer, bytes);
   }
 
-void Storage::requestSwitch(int trackId) {
-    if (pendingSwitch) return;
-    noInterrupts();
-    pendingTrack = trackId;
-    pendingSwitch = true;
-    interrupts();
-  }
-
-void Storage::performPendingSwitch(AudioManager &music) {
-    if (!pendingSwitch) return;
-
-    // --- 競合防止ロック ---
-    critical_section_enter_blocking(&sdLock);
-
-    int newTrack;
-    noInterrupts();
-    newTrack = pendingTrack;
-    pendingSwitch = false;
-    interrupts();
-
-    music.paused = true;
-
-    // --- バッファ完全リセット ---
-    memset((void*)music.buffer0, 0, AudioManager::BUF_SIZE);
-    memset((void*)music.buffer1, 0, AudioManager::BUF_SIZE);
-    music.sampleIndex = 0;
-    music.playBytes = 0;
-    music.fillBytes = 0;
-    music.needs_refill = false;
-    refillOffset = 0;
-
-    // --- ファイルを最初から ---
-    FsFile &file = musicFiles[newTrack];
-    file.seek(0);
-
-    // --- 新しいデータをロード ---
-    size_t n0 = file.read((void*)music.buffer0, AudioManager::BUF_SIZE);
-    size_t n1 = file.read((void*)music.buffer1, AudioManager::BUF_SIZE);
-
-    // --- 原子的にスイッチ ---
-    noInterrupts();
-    music.currentTrack = newTrack;
-    music.playBuf = music.buffer0;
-    music.fillBuf = music.buffer1;
-    music.playBytes = n0;
-    music.fillBytes = n1;
-    music.sampleIndex = 0;
-    music.needs_refill = false;
-    interrupts();
-
-    // --- ロック解除 ---
-    critical_section_exit(&sdLock);
-
-    delay(30);  // ISRが落ち着く時間
-    music.paused = false;
-  }
-
-void Storage::refile(AudioManager &music) {
-    // 補充要求がないなら何もしない
-    if (!music.needs_refill) {
-      return;
-    }
-
-    // 曲切り替え中などはSD読み込みしない
-    if (music.paused) {
-      return;
-    }
-
-    FsFile& file =
-        musicFiles[music.currentTrack];
-
-    if (!file.isOpen()) {
-      return;
-    }
-
-    critical_section_enter_blocking(&sdLock);
-
-    // 一度に長時間SDを占有しないよう、
-    // 2048 byteずつ裏バッファへ補充する
-    const size_t CHUNK = 2048;
-
-    if (refillOffset < AudioManager::BUF_SIZE) {
-
-      size_t remaining =
-          AudioManager::BUF_SIZE - refillOffset;
-
-      size_t toRead =
-          min(CHUNK, remaining);
-
-      size_t n =
-          file.read(
-              (void*)(music.fillBuf + refillOffset),
-              toRead
-          );
-
-      refillOffset += n;
-
-      // 要求量より少なくしか読めなかった場合は
-      // 曲末尾に到達したとみなし、次回は先頭から続ける。
-      //
-      // 途中まで読めたデータは捨てず、
-      // fillBuf内にそのまま残しておく。
-      if (n < toRead) {
-        file.seek(0);
-      }
-    }
-
-    critical_section_exit(&sdLock);
-
-    // 裏バッファ1個分が完成したら再生側へ公開
-    if (refillOffset >= AudioManager::BUF_SIZE) {
-
-      noInterrupts();
-
-      music.fillBytes =
-          AudioManager::BUF_SIZE;
-
-      music.needs_refill =
-          false;
-
-      interrupts();
-
-      refillOffset = 0;
-    }
+bool Storage::trackFileIsOpen(int trackId) const {
+    return musicFiles[trackId].isOpen();
   }
 
 bool Storage::loadToBuffer(String filename, uint16_t* buffer) {

@@ -47,6 +47,129 @@ void AudioManager::initializeTracks(Storage &sd) {
   interrupts();
 }
 
+void AudioManager::requestSwitch(int trackId) {
+    if (pendingSwitch) return;
+    noInterrupts();
+    pendingTrack = trackId;
+    pendingSwitch = true;
+    interrupts();
+  }
+
+void AudioManager::performPendingSwitch(Storage &sd) {
+    if (!pendingSwitch) return;
+
+    // --- 競合防止ロック ---
+    critical_section_enter_blocking(&sdLock);
+
+    int newTrack;
+    noInterrupts();
+    newTrack = pendingTrack;
+    pendingSwitch = false;
+    interrupts();
+
+    paused = true;
+
+    // --- バッファ完全リセット ---
+    memset((void*)buffer0, 0, BUF_SIZE);
+    memset((void*)buffer1, 0, BUF_SIZE);
+    sampleIndex = 0;
+    playBytes = 0;
+    fillBytes = 0;
+    needs_refill = false;
+    refillOffset = 0;
+
+    // --- ファイルを最初から ---
+    sd.seekTrackStart(newTrack);
+
+    // --- 新しいデータをロード ---
+    size_t n0 = sd.readTrack(newTrack, (void*)buffer0, BUF_SIZE);
+    size_t n1 = sd.readTrack(newTrack, (void*)buffer1, BUF_SIZE);
+
+    // --- 原子的にスイッチ ---
+    noInterrupts();
+    currentTrack = newTrack;
+    playBuf = buffer0;
+    fillBuf = buffer1;
+    playBytes = n0;
+    fillBytes = n1;
+    sampleIndex = 0;
+    needs_refill = false;
+    interrupts();
+
+    // --- ロック解除 ---
+    critical_section_exit(&sdLock);
+
+    delay(30);  // ISRが落ち着く時間
+    paused = false;
+  }
+
+void AudioManager::refile(Storage &sd) {
+    // 補充要求がないなら何もしない
+    if (!needs_refill) {
+      return;
+    }
+
+    // 曲切り替え中などはSD読み込みしない
+    if (paused) {
+      return;
+    }
+
+    if (!sd.trackFileIsOpen(currentTrack)) {
+      return;
+    }
+
+    critical_section_enter_blocking(&sdLock);
+
+    // 一度に長時間SDを占有しないよう、
+    // 2048 byteずつ裏バッファへ補充する
+    const size_t CHUNK = 2048;
+
+    if (refillOffset < BUF_SIZE) {
+
+      size_t remaining =
+          BUF_SIZE - refillOffset;
+
+      size_t toRead =
+          min(CHUNK, remaining);
+
+      size_t n =
+          sd.readTrack(
+              currentTrack,
+              (void*)(fillBuf + refillOffset),
+              toRead
+          );
+
+      refillOffset += n;
+
+      // 要求量より少なくしか読めなかった場合は
+      // 曲末尾に到達したとみなし、次回は先頭から続ける。
+      //
+      // 途中まで読めたデータは捨てず、
+      // fillBuf内にそのまま残しておく。
+      if (n < toRead) {
+        sd.seekTrackStart(currentTrack);
+      }
+    }
+
+    critical_section_exit(&sdLock);
+
+    // 裏バッファ1個分が完成したら再生側へ公開
+    if (refillOffset >= BUF_SIZE) {
+
+      noInterrupts();
+
+      fillBytes =
+          BUF_SIZE;
+
+      needs_refill =
+          false;
+
+      interrupts();
+
+      refillOffset = 0;
+    }
+  }
+
 // --- AudioManager::switchTrack 実装部（Storageの定義後） ---
 void AudioManager::switchTrack(int newId, Storage &sd) {
   if (newId == currentTrack) return;
@@ -60,5 +183,5 @@ void AudioManager::switchTrack(int newId, Storage &sd) {
   needs_refill = false;
   critical_section_exit(&sdLock);
 
-  sd.requestSwitch(newId);
+  requestSwitch(newId);
 }

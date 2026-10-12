@@ -527,8 +527,8 @@ void core1_main() {
   }
 
   while (true) {
-    ctx->sd->performPendingSwitch(*ctx->music);
-    ctx->sd->refile(*ctx->music);
+    ctx->music->performPendingSwitch(*ctx->sd);
+    ctx->music->refile(*ctx->sd);
 
     tight_loop_contents();
   }

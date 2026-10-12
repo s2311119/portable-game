@@ -14,6 +14,9 @@ public:
   static const int TRACK_COUNT = 100;  // 例: 0=nocturne, 1=gekkou
 
   int currentTrack = 0;
+  volatile bool pendingSwitch = false;
+  int pendingTrack = -1;
+  size_t refillOffset = 0;
 
   volatile uint8_t buffer0[BUF_SIZE];
   volatile uint8_t buffer1[BUF_SIZE];
@@ -166,7 +169,10 @@ public:
 
   void playBGM(BgmCue cue, class Storage &sd);
   void initializeTracks(class Storage &sd);
+  void performPendingSwitch(class Storage &sd);
+  void refile(class Storage &sd);
 
 private:
+  void requestSwitch(int trackId);
   void switchTrack(int newId, class Storage &sd);
 };
