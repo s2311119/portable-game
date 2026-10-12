@@ -14,7 +14,6 @@
 #include "Sd.h"
 #include "Inventory.h"
 #include "Vibration.h"
-#include "Map.h"
 #include "ImageManager.h"
 #include "Skill.h"
 #include "EncounterSpec.h"
@@ -162,10 +161,10 @@ public:
 
   Battle();
 
-  void start(MUSIC &music, Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr);
+  void start(Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr, const BattleBgmHooks& bgm);
   std::optional<BattleResult> takeResult();
 
-  void update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map);
+  void update(Controller &ctrl, MUSIC &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm);
   
   // ★ 引数を Graphic* に変更
   void draw(Graphic* g);

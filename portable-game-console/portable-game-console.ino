@@ -146,6 +146,36 @@ long drawMax(void*, long max) { return random(max); }
 long drawRange(void*, long min, long max) { return random(min, max); }
 } // namespace field_random_adapter
 
+// Phase 9 bridge: keep the existing track mapping until AudioManager owns it.
+namespace battle_bgm_adapter {
+struct Context {
+  MUSIC* music;
+  Sd* sd;
+  Map* map;
+};
+
+void onEvent(void* rawContext, BattleBgmEvent event, BattleKind kind) {
+  Context& context = *static_cast<Context*>(rawContext);
+  switch (event) {
+    case BattleBgmEvent::START:
+      context.music->switchTrack(
+          kind == BattleKind::FINAL_BOSS ? 4 : kind == BattleKind::NORMAL ? 2 : 3,
+          *context.sd);
+      break;
+    case BattleBgmEvent::EARLY_FIELD_RETURN:
+      context.music->switchTrack(1, *context.sd);
+      break;
+    case BattleBgmEvent::FINAL_FIELD_RETURN:
+      if (context.map->isTown()) context.music->switchTrack(0, *context.sd);
+      else context.music->switchTrack(1, *context.sd);
+      break;
+    case BattleBgmEvent::DEFEAT:
+      context.music->switchTrack(99, *context.sd);
+      break;
+  }
+}
+} // namespace battle_bgm_adapter
+
 // ---------
 // saveクラス
 // ---------
@@ -1623,6 +1653,8 @@ void loop() {
   auto& vib = *ctx->vibration;
   auto& imgmgr = *ctx->imgMgr;
   auto& settings = ctx->settings;
+  battle_bgm_adapter::Context battleBgmContext{&music, &sd, &map};
+  const BattleBgmHooks battleBgm{&battleBgmContext, battle_bgm_adapter::onEvent};
   vib.update();
   if (state == STATE_GAME) {
     hero.oldX = hero.X;
@@ -1655,7 +1687,7 @@ void loop() {
         if (!ctx->battle->inBattle) {
           EncounterSpec spec = encounterManager.createEncounter(
               ctx->session->progress().floor(), map, encounterRandom);
-          ctx->battle->start(music, sd, hero, party, spec, imgmgr);
+          ctx->battle->start(sd, hero, party, spec, imgmgr, battleBgm);
         }
       }
     }
@@ -1692,7 +1724,7 @@ void loop() {
 
   else if (state == STATE_BATTLE) {
     auto &battle = *ctx->battle;
-    battle.update(ctrl, music, sd, hero, inventory, vib, map);
+    battle.update(ctrl, music, hero, inventory, vib, battleBgm);
     if (const std::optional<BattleResult> result = battle.takeResult()) {
       if (result->outcome == BattleOutcome::VICTORY && result->kind != BattleKind::NORMAL) {
         WorldProgress& progress = ctx->session->progress();
@@ -1807,7 +1839,7 @@ void loop() {
                                              field_random_adapter::drawRange};
           EncounterSpec spec = encounterManager.createBossEncounter(
               ctx->session->progress().floor(), map, encounterRandom);
-          ctx->battle->start(music, sd, hero, party, spec, imgmgr);
+          ctx->battle->start(sd, hero, party, spec, imgmgr, battleBgm);
         }
 
         currentEvent.type = FieldEventType::NONE;

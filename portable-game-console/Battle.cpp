@@ -297,7 +297,7 @@ Battle::Battle() {
     }
   }
 
-void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr) {
+void Battle::start(Sd &sd, Player& hero, Party& party, const EncounterSpec& spec, ImageManager &imgMgr, const BattleBgmHooks& bgm) {
     if (inBattle) return;
     pendingResult.reset();
     currentBattleKind = spec.kind;
@@ -345,9 +345,7 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
       for(int i=1; i<4; i++) activeImages[i] = nullptr;
       critical_section_exit(&sdLock);
 
-      // 3. ボス戦BGM (ID 3:ボス, ID 4:ラスボス)
-      int bgmId = (spec.kind == BattleKind::FINAL_BOSS) ? 4 : 3;
-      music.switchTrack(bgmId, sd);
+      bgm.emit(BattleBgmEvent::START, spec.kind);
     }else{
       for (const EnemySpawnSpec& spawn : spec.enemies) {
         activeEnemies.push_back(Enemy::fromRolledLevel(spawn.enemyId, spawn.level));
@@ -369,7 +367,7 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
       }
       critical_section_exit(&sdLock);
 
-      music.switchTrack(2, sd);
+      bgm.emit(BattleBgmEvent::START, spec.kind);
     }
     
     critical_section_enter_blocking(&sdLock);
@@ -399,7 +397,7 @@ void Battle::start(MUSIC &music, Sd &sd, Player& hero, Party& party, const Encou
     currentBattleState = STATE_TURN_START;
   }
 
-void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Inventory &inventory, Vibration &vibration, Map &map) {
+void Battle::update(Controller &ctrl, MUSIC &music, Player &hero, Inventory &inventory, Vibration &vibration, const BattleBgmHooks& bgm) {
     if (!inBattle) return;
     CharacterState* currentActor = resolveCombatant(this->currentActor);
     CharacterState* currentTarget = resolveCombatant(this->currentTarget);
@@ -1806,7 +1804,7 @@ void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Invent
             battleEndReason == BattleEndReason::VICTORY;
           inBattle = false;
           if (battleEndReason != BattleEndReason::DEFEAT && !actualBossDefeated) {
-            music.switchTrack(1, sd);
+            bgm.emit(BattleBgmEvent::EARLY_FIELD_RETURN, currentBattleKind);
           }
           
           // 戦闘終了時にステータスをリセット
@@ -1830,11 +1828,10 @@ void Battle::update(Controller &ctrl, MUSIC &music, Sd &sd, Player &hero, Invent
           std::vector<CombatantRef>().swap(actorList);
           if (!actualBossDefeated) {
             if (battleEndReason == BattleEndReason::DEFEAT) {
-              music.switchTrack(99, sd);
+              bgm.emit(BattleBgmEvent::DEFEAT, currentBattleKind);
             }else {
               // 通常戦闘終了後: BGMを戻す
-              if (map.isTown()) music.switchTrack(0, sd);
-              else music.switchTrack(1, sd);
+              bgm.emit(BattleBgmEvent::FINAL_FIELD_RETURN, currentBattleKind);
             }
           }
         }
